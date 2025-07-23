@@ -168,7 +168,7 @@ def delete_portfolio(
 @router.post("/{portfolio_id}/positions", response_model=PortfolioPositionPublic)
 def add_position(
     portfolio_id: UUID,
-    stock_id: UUID,
+    stock_symbol: str,
     quantity: int,
     average_price: float,
     current_user: User = Depends(get_current_user),
@@ -189,22 +189,22 @@ def add_position(
             detail="Portfolio not found"
         )
     
-    # Verify stock exists
+    # Verify stock exists by symbol
     stock = session.exec(
-        select(StockCompany).where(StockCompany.id == stock_id)
+        select(StockCompany).where(StockCompany.symbol == stock_symbol.upper())
     ).first()
     
     if not stock:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Stock not found"
+            detail=f"Stock with symbol '{stock_symbol}' not found"
         )
     
     # Check if position already exists
     existing_position = session.exec(
         select(PortfolioPosition).where(
             PortfolioPosition.portfolio_id == portfolio_id,
-            PortfolioPosition.stock_id == stock_id
+            PortfolioPosition.stock_id == stock.id
         )
     ).first()
     
@@ -218,7 +218,7 @@ def add_position(
     
     position = PortfolioPosition(
         portfolio_id=portfolio_id,
-        stock_id=stock_id,
+        stock_id=stock.id,
         quantity=quantity,
         average_price=average_price,
         total_investment=total_investment,

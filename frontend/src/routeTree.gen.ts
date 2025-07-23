@@ -17,7 +17,9 @@ import { Route as RecoverPasswordImport } from './routes/recover-password'
 import { Route as LoginImport } from './routes/login'
 import { Route as LayoutImport } from './routes/_layout'
 import { Route as LayoutIndexImport } from './routes/_layout/index'
+import { Route as LayoutWatchlistImport } from './routes/_layout/watchlist'
 import { Route as LayoutSettingsImport } from './routes/_layout/settings'
+import { Route as LayoutPortfolioImport } from './routes/_layout/portfolio'
 import { Route as LayoutItemsImport } from './routes/_layout/items'
 import { Route as LayoutAdminImport } from './routes/_layout/admin'
 
@@ -53,8 +55,18 @@ const LayoutIndexRoute = LayoutIndexImport.update({
   getParentRoute: () => LayoutRoute,
 } as any)
 
+const LayoutWatchlistRoute = LayoutWatchlistImport.update({
+  path: '/watchlist',
+  getParentRoute: () => LayoutRoute,
+} as any)
+
 const LayoutSettingsRoute = LayoutSettingsImport.update({
   path: '/settings',
+  getParentRoute: () => LayoutRoute,
+} as any)
+
+const LayoutPortfolioRoute = LayoutPortfolioImport.update({
+  path: '/portfolio',
   getParentRoute: () => LayoutRoute,
 } as any)
 
@@ -100,8 +112,16 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutItemsImport
       parentRoute: typeof LayoutImport
     }
+    '/_layout/portfolio': {
+      preLoaderRoute: typeof LayoutPortfolioImport
+      parentRoute: typeof LayoutImport
+    }
     '/_layout/settings': {
       preLoaderRoute: typeof LayoutSettingsImport
+      parentRoute: typeof LayoutImport
+    }
+    '/_layout/watchlist': {
+      preLoaderRoute: typeof LayoutWatchlistImport
       parentRoute: typeof LayoutImport
     }
     '/_layout/': {
@@ -117,7 +137,9 @@ export const routeTree = rootRoute.addChildren([
   LayoutRoute.addChildren([
     LayoutAdminRoute,
     LayoutItemsRoute,
+    LayoutPortfolioRoute,
     LayoutSettingsRoute,
+    LayoutWatchlistRoute,
     LayoutIndexRoute,
   ]),
   LoginRoute,
