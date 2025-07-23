@@ -1,0 +1,562 @@
+from typing import List, Optional
+from uuid import UUID
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlmodel import select, Session
+from app.api.deps import get_current_user, get_session_dep
+from app.model.portfolio import (
+    Portfolio, PortfolioCreate, PortfolioUpdate, PortfolioPublic,
+    PortfolioPosition, PortfolioPositionPublic,
+    PortfolioSummary
+)
+from app.model.trade import Trade, TradeCreate, TradeUpdate, TradePublic
+from app.model.user import User
+from app.model.stock import StockCompany
+
+router = APIRouter(prefix="/portfolio", tags=["portfolio"])
+
+
+# Portfolio Management APIs
+@router.post("/", response_model=PortfolioPublic)
+def create_portfolio(
+    portfolio: PortfolioCreate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Create a new portfolio for the current user"""
+    # Check if this is the first portfolio (make it default)
+    existing_portfolios = session.exec(
+        select(Portfolio).where(Portfolio.user_id == current_user.id)
+    ).all()
+    
+    if not existing_portfolios:
+        portfolio.is_default = True
+    
+    # If this portfolio is set as default, unset others
+    if portfolio.is_default:
+        for existing in existing_portfolios:
+            existing.is_default = False
+            session.add(existing)
+    
+    db_portfolio = Portfolio(
+        user_id=current_user.id,
+        **portfolio.dict()
+    )
+    session.add(db_portfolio)
+    session.commit()
+    session.refresh(db_portfolio)
+    return db_portfolio
+
+
+@router.get("/", response_model=List[PortfolioPublic])
+def get_user_portfolios(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Get all portfolios for the current user"""
+    portfolios = session.exec(
+        select(Portfolio).where(Portfolio.user_id == current_user.id)
+    ).all()
+    return portfolios
+
+
+@router.get("/{portfolio_id}", response_model=PortfolioPublic)
+def get_portfolio(
+    portfolio_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Get a specific portfolio by ID"""
+    portfolio = session.exec(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        )
+    ).first()
+    
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portfolio not found"
+        )
+    
+    return portfolio
+
+
+@router.put("/{portfolio_id}", response_model=PortfolioPublic)
+def update_portfolio(
+    portfolio_id: UUID,
+    portfolio_update: PortfolioUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Update a portfolio"""
+    portfolio = session.exec(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        )
+    ).first()
+    
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portfolio not found"
+        )
+    
+    # If setting as default, unset other portfolios
+    if portfolio_update.is_default:
+        other_portfolios = session.exec(
+            select(Portfolio).where(
+                Portfolio.user_id == current_user.id,
+                Portfolio.id != portfolio_id
+            )
+        ).all()
+        for other in other_portfolios:
+            other.is_default = False
+            session.add(other)
+    
+    update_data = portfolio_update.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(portfolio, field, value)
+    
+    session.add(portfolio)
+    session.commit()
+    session.refresh(portfolio)
+    return portfolio
+
+
+@router.delete("/{portfolio_id}")
+def delete_portfolio(
+    portfolio_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Delete a portfolio"""
+    portfolio = session.exec(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        )
+    ).first()
+    
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portfolio not found"
+        )
+    
+    # Don't allow deletion of default portfolio if it's the only one
+    if portfolio.is_default:
+        other_portfolios = session.exec(
+            select(Portfolio).where(
+                Portfolio.user_id == current_user.id,
+                Portfolio.id != portfolio_id
+            )
+        ).all()
+        if not other_portfolios:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete the only portfolio"
+            )
+    
+    session.delete(portfolio)
+    session.commit()
+    return {"message": "Portfolio deleted successfully"}
+
+
+# Portfolio Position Management APIs
+@router.post("/{portfolio_id}/positions", response_model=PortfolioPositionPublic)
+def add_position(
+    portfolio_id: UUID,
+    stock_id: UUID,
+    quantity: int,
+    average_price: float,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Add a new position to a portfolio"""
+    # Verify portfolio belongs to user
+    portfolio = session.exec(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        )
+    ).first()
+    
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portfolio not found"
+        )
+    
+    # Verify stock exists
+    stock = session.exec(
+        select(StockCompany).where(StockCompany.id == stock_id)
+    ).first()
+    
+    if not stock:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Stock not found"
+        )
+    
+    # Check if position already exists
+    existing_position = session.exec(
+        select(PortfolioPosition).where(
+            PortfolioPosition.portfolio_id == portfolio_id,
+            PortfolioPosition.stock_id == stock_id
+        )
+    ).first()
+    
+    if existing_position:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Position already exists for this stock"
+        )
+    
+    total_investment = quantity * average_price
+    
+    position = PortfolioPosition(
+        portfolio_id=portfolio_id,
+        stock_id=stock_id,
+        quantity=quantity,
+        average_price=average_price,
+        total_investment=total_investment,
+        current_value=total_investment,  # Initially same as investment
+        unrealized_pnl=0,
+        unrealized_pnl_percent=0
+    )
+    
+    session.add(position)
+    session.commit()
+    session.refresh(position)
+    return position
+
+
+@router.get("/{portfolio_id}/positions", response_model=List[PortfolioPositionPublic])
+def get_portfolio_positions(
+    portfolio_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Get all positions in a portfolio"""
+    # Verify portfolio belongs to user
+    portfolio = session.exec(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        )
+    ).first()
+    
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portfolio not found"
+        )
+    
+    positions = session.exec(
+        select(PortfolioPosition).where(
+            PortfolioPosition.portfolio_id == portfolio_id
+        )
+    ).all()
+    
+    return positions
+
+
+@router.put("/{portfolio_id}/positions/{position_id}")
+def update_position(
+    portfolio_id: UUID,
+    position_id: UUID,
+    quantity: Optional[int] = None,
+    average_price: Optional[float] = None,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Update a portfolio position"""
+    # Verify portfolio belongs to user
+    portfolio = session.exec(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        )
+    ).first()
+    
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portfolio not found"
+        )
+    
+    position = session.exec(
+        select(PortfolioPosition).where(
+            PortfolioPosition.id == position_id,
+            PortfolioPosition.portfolio_id == portfolio_id
+        )
+    ).first()
+    
+    if not position:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Position not found"
+        )
+    
+    if quantity is not None:
+        position.quantity = quantity
+    if average_price is not None:
+        position.average_price = average_price
+    
+    # Recalculate total investment
+    position.total_investment = position.quantity * position.average_price
+    
+    session.add(position)
+    session.commit()
+    session.refresh(position)
+    return position
+
+
+@router.delete("/{portfolio_id}/positions/{position_id}")
+def remove_position(
+    portfolio_id: UUID,
+    position_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Remove a position from portfolio"""
+    # Verify portfolio belongs to user
+    portfolio = session.exec(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        )
+    ).first()
+    
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portfolio not found"
+        )
+    
+    position = session.exec(
+        select(PortfolioPosition).where(
+            PortfolioPosition.id == position_id,
+            PortfolioPosition.portfolio_id == portfolio_id
+        )
+    ).first()
+    
+    if not position:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Position not found"
+        )
+    
+    session.delete(position)
+    session.commit()
+    return {"message": "Position removed successfully"}
+
+
+# Trade Management APIs
+@router.post("/{portfolio_id}/trades", response_model=TradePublic)
+def add_trade(
+    portfolio_id: UUID,
+    trade: TradeCreate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Add a new trade to a portfolio"""
+    # Verify portfolio belongs to user
+    portfolio = session.exec(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        )
+    ).first()
+    
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portfolio not found"
+        )
+    
+    # Verify stock exists
+    stock = session.exec(
+        select(StockCompany).where(StockCompany.id == trade.stock_id)
+    ).first()
+    
+    if not stock:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Stock not found"
+        )
+    
+    db_trade = Trade(
+        portfolio_id=portfolio_id,
+        **trade.dict()
+    )
+    
+    session.add(db_trade)
+    session.commit()
+    session.refresh(db_trade)
+    return db_trade
+
+
+@router.get("/{portfolio_id}/trades", response_model=List[TradePublic])
+def get_portfolio_trades(
+    portfolio_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Get all trades in a portfolio"""
+    # Verify portfolio belongs to user
+    portfolio = session.exec(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        )
+    ).first()
+    
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portfolio not found"
+        )
+    
+    trades = session.exec(
+        select(Trade).where(Trade.portfolio_id == portfolio_id)
+    ).all()
+    
+    return trades
+
+
+@router.put("/{portfolio_id}/trades/{trade_id}", response_model=TradePublic)
+def update_trade(
+    portfolio_id: UUID,
+    trade_id: UUID,
+    trade_update: TradeUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Update a trade"""
+    # Verify portfolio belongs to user
+    portfolio = session.exec(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        )
+    ).first()
+    
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portfolio not found"
+        )
+    
+    trade = session.exec(
+        select(Trade).where(
+            Trade.id == trade_id,
+            Trade.portfolio_id == portfolio_id
+        )
+    ).first()
+    
+    if not trade:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Trade not found"
+        )
+    
+    update_data = trade_update.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(trade, field, value)
+    
+    session.add(trade)
+    session.commit()
+    session.refresh(trade)
+    return trade
+
+
+@router.delete("/{portfolio_id}/trades/{trade_id}")
+def delete_trade(
+    portfolio_id: UUID,
+    trade_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Delete a trade"""
+    # Verify portfolio belongs to user
+    portfolio = session.exec(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        )
+    ).first()
+    
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portfolio not found"
+        )
+    
+    trade = session.exec(
+        select(Trade).where(
+            Trade.id == trade_id,
+            Trade.portfolio_id == portfolio_id
+        )
+    ).first()
+    
+    if not trade:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Trade not found"
+        )
+    
+    session.delete(trade)
+    session.commit()
+    return {"message": "Trade deleted successfully"}
+
+
+# Portfolio Summary API
+@router.get("/{portfolio_id}/summary", response_model=PortfolioSummary)
+def get_portfolio_summary(
+    portfolio_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Get portfolio summary with positions and performance metrics"""
+    # Verify portfolio belongs to user
+    portfolio = session.exec(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        )
+    ).first()
+    
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portfolio not found"
+        )
+    
+    positions = session.exec(
+        select(PortfolioPosition).where(
+            PortfolioPosition.portfolio_id == portfolio_id
+        )
+    ).all()
+    
+    total_investment = sum(pos.total_investment for pos in positions)
+    current_value = sum(pos.current_value for pos in positions)
+    unrealized_pnl = sum(pos.unrealized_pnl for pos in positions)
+    
+    # Calculate overall PnL percentage
+    unrealized_pnl_percent = (
+        (unrealized_pnl / total_investment * 100) if total_investment > 0 else 0
+    )
+    
+    return PortfolioSummary(
+        portfolio_id=portfolio.id,
+        portfolio_name=portfolio.name,
+        total_investment=total_investment,
+        current_value=current_value,
+        unrealized_pnl=unrealized_pnl,
+        unrealized_pnl_percent=unrealized_pnl_percent,
+        total_positions=len(positions),
+        positions=positions
+    ) 
