@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
 from sqlmodel import Field, Relationship, SQLModel
-from sqlalchemy import BigInteger
+from sqlalchemy import BigInteger, Column
 
 if TYPE_CHECKING:
     from .portfolio import Portfolio, PortfolioPosition, Watchlist, WatchlistItem
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 # Stock Company Information
 class StockCompany(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    symbol: str = Field(unique=True, index=True, max_length=20)
+    symbol: str = Field(unique=True, index=True, max_length=50)
     company_name: str = Field(max_length=255)
     sector: str = Field(max_length=100)
     industry: str = Field(max_length=100)
@@ -56,7 +56,7 @@ class StockData(SQLModel, table=True):
     low: Decimal = Field(max_digits=10, decimal_places=2)
     open_price: Decimal = Field(max_digits=10, decimal_places=2)
     previous_close: Decimal = Field(max_digits=10, decimal_places=2)
-    volume: int = Field(default=0, sa_column=BigInteger())
+    volume: int = Field(default=0, sa_column=Column(BigInteger))
     turnover: Decimal = Field(max_digits=15, decimal_places=2, default=0)
     trades_count: int = Field(default=0)
     market_cap: Optional[Decimal] = Field(default=None)
@@ -71,7 +71,7 @@ class IntradayTick(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     company_id: uuid.UUID = Field(foreign_key="stockcompany.id")
     price: Decimal = Field(max_digits=10, decimal_places=2)
-    volume: int = Field(default=0, sa_column=BigInteger())
+    volume: int = Field(default=0, sa_column=Column(BigInteger))
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationships
@@ -87,7 +87,7 @@ class DailyOHLC(SQLModel, table=True):
     high: Decimal = Field(max_digits=10, decimal_places=2)
     low: Decimal = Field(max_digits=10, decimal_places=2)
     close_price: Decimal = Field(max_digits=10, decimal_places=2)
-    volume: int = Field(default=0, sa_column=BigInteger())
+    volume: int = Field(default=0, sa_column=Column(BigInteger))
     turnover: Decimal = Field(max_digits=15, decimal_places=2, default=0)
     trades_count: int = Field(default=0)
     change: Decimal = Field(max_digits=10, decimal_places=2)
@@ -102,7 +102,7 @@ class MarketSummary(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     date: datetime = Field(index=True)
     total_trades: int = Field(default=0)
-    total_volume: int = Field(default=0, sa_column=BigInteger())
+    total_volume: int = Field(default=0, sa_column=Column(BigInteger))
     total_turnover: Decimal = Field(max_digits=20, decimal_places=2, default=0)
     dse_index: Optional[Decimal] = Field(default=None)
     dse_index_change: Optional[Decimal] = Field(default=None)

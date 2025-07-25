@@ -22,6 +22,11 @@ def fetch_and_store_stocknow():
 
     with next(get_session()) as session:
         for code, details in instrument_data.items():
+            # Skip if code is too long or contains spaces (likely not a stock symbol)
+            if len(code) > 50 or ' ' in code:
+                print(f"Skipping invalid symbol: '{code}' (too long or contains spaces)")
+                continue
+                
             # Use a default value for industry if missing or None
             industry_value = details.get("category") or "Unknown"
             # Upsert company
