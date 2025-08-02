@@ -2,13 +2,13 @@ import { useState } from "react"
 import { useForm, SubmitHandler } from "react-hook-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Container, Heading, Text, VStack, HStack, Flex, Box, Badge, Table, Input, IconButton, Grid, GridItem } from "@chakra-ui/react"
-import { FiPlus, FiSearch, FiBriefcase, FiX, FiUpload, FiSave, FiTrendingUp, FiTrendingDown, FiDollarSign, FiPercent, FiBarChart, FiCalendar, FiBell, FiStar, FiUsers, FiTarget, FiAlertTriangle, FiDownload, FiSettings, FiEye, FiClock, FiMonitor, FiStar as FiStarIcon, FiBarChart2, FiPlay, FiMail, FiHome, FiZap, FiGift, FiShield, FiTrendingUp as FiTrendingUpIcon, FiChevronDown, FiChevronUp, FiInfo } from "react-icons/fi"
+import { FiPlus, FiBriefcase, FiX, FiUpload, FiSave, FiStar, FiSettings, FiDownload } from "react-icons/fi"
 import { Button } from "@/components/ui/button"
 import { DialogRoot, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter, DialogCloseTrigger } from "@/components/ui/dialog"
 import { Field } from "@/components/ui/field"
 import useCustomToast from "@/hooks/useCustomToast"
 import { PortfolioService } from "@/client"
-import type { PortfolioCreate, PortfolioPublic, PortfolioPositionPublic } from "@/client"
+import type { PortfolioCreate, PortfolioPublic } from "@/client"
 import { createFileRoute } from "@tanstack/react-router"
 
 const handleError = (error: any) => {
@@ -16,7 +16,7 @@ const handleError = (error: any) => {
 }
 
 // Portfolio Overview Stats Component
-function PortfolioOverviewStats({ portfolioId }: { portfolioId?: string }) {
+function PortfolioOverviewStats({ portfolioId: _portfolioId }: { portfolioId?: string }) {
   // Mock data for Bangladeshi market
   const stats = {
     totalValue: 1250000, // BDT
@@ -98,7 +98,7 @@ function PortfolioOverviewStats({ portfolioId }: { portfolioId?: string }) {
 }
 
 // Asset Allocation Component
-function AssetAllocation({ portfolioId }: { portfolioId?: string }) {
+function AssetAllocation({ portfolioId: _portfolioId }: { portfolioId?: string }) {
   const allocation = {
     stocks: 85,
     bonds: 10,
@@ -168,7 +168,7 @@ function AssetAllocation({ portfolioId }: { portfolioId?: string }) {
 }
 
 // Portfolio Holdings Table Component
-function PortfolioHoldingsTable({ portfolioId, onSuccess }: { portfolioId?: string, onSuccess: () => void }) {
+function PortfolioHoldingsTable({ portfolioId, onSuccess: _onSuccess }: { portfolioId?: string, onSuccess: () => void }) {
   const { data: positions } = useQuery({
     queryKey: ["positions", portfolioId],
     queryFn: async () => {
@@ -185,30 +185,30 @@ function PortfolioHoldingsTable({ portfolioId, onSuccess }: { portfolioId?: stri
     purchaseDate: ""
   })
 
-  const addPositionMutation = useMutation({
-    mutationFn: (data: { stock_symbol: string, quantity: number, average_price: number }) => 
-      PortfolioService.addPosition({
-        portfolioId: portfolioId!,
-        stockSymbol: data.stock_symbol,
-        quantity: data.quantity,
-        averagePrice: data.average_price
-      }),
-    onSuccess: () => {
-      onSuccess()
-      setNewPosition({ ticker: "", quantity: "", costPerShare: "", purchaseDate: "" })
-    },
-    onError: handleError,
-  })
+  // const addPositionMutation = useMutation({
+  //   mutationFn: (data: { stock_symbol: string, quantity: number, average_price: number }) => 
+  //     PortfolioService.addPosition({
+  //       portfolioId: portfolioId!,
+  //       stockSymbol: data.stock_symbol,
+  //       quantity: data.quantity,
+  //       averagePrice: data.average_price
+  //     }),
+  //   onSuccess: () => {
+  //     onSuccess()
+  //     setNewPosition({ ticker: "", quantity: "", costPerShare: "", purchaseDate: "" })
+  //   },
+  //   onError: handleError,
+  // })
 
-  const handleAddPosition = () => {
-    if (newPosition.ticker && newPosition.quantity && newPosition.costPerShare && portfolioId) {
-      addPositionMutation.mutate({
-        stock_symbol: newPosition.ticker.toUpperCase(),
-        quantity: parseInt(newPosition.quantity),
-        average_price: parseFloat(newPosition.costPerShare)
-      })
-    }
-  }
+  // const _handleAddPosition = () => {
+  //   if (newPosition.ticker && newPosition.quantity && newPosition.costPerShare && portfolioId) {
+  //     addPositionMutation.mutate({
+  //       stock_symbol: newPosition.ticker.toUpperCase(),
+  //       quantity: parseInt(newPosition.quantity),
+  //       average_price: parseFloat(newPosition.costPerShare)
+  //     })
+  //   }
+  // }
 
   // Mock data for Bangladeshi stocks
   const mockPositions = [
@@ -343,7 +343,7 @@ function PortfolioHoldingsTable({ portfolioId, onSuccess }: { portfolioId?: stri
 }
 
 // Performance Chart Component
-function PerformanceChart({ portfolioId }: { portfolioId?: string }) {
+function PerformanceChart({ portfolioId: _portfolioId }: { portfolioId?: string }) {
   const timeframes = ["1D", "1W", "1M", "3M", "6M", "YTD", "1Y", "Max"]
   const [selectedTimeframe, setSelectedTimeframe] = useState("1M")
 
@@ -377,7 +377,7 @@ function PerformanceChart({ portfolioId }: { portfolioId?: string }) {
 }
 
 // Smart Notifications Component
-function SmartNotifications({ portfolioId }: { portfolioId?: string }) {
+function SmartNotifications({ portfolioId: _portfolioId }: { portfolioId?: string }) {
   const notifications = [
     { id: 1, type: "news", title: "GP Q2 earnings beat expectations", time: "2h ago", priority: "high" },
     { id: 2, type: "dividend", title: "BRACBANK dividend payment scheduled", time: "1d ago", priority: "medium" },

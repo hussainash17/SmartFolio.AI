@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from .user import User
     from .stock import StockCompany
     from .trade import Trade
+    from .order import Order
 
 
 # Portfolio Model
@@ -26,6 +27,7 @@ class Portfolio(SQLModel, table=True):
     user: "User" = Relationship(back_populates="portfolios")
     positions: list["PortfolioPosition"] = Relationship(back_populates="portfolio")
     trades: list["Trade"] = Relationship(back_populates="portfolio")
+    orders: list["Order"] = Relationship(back_populates="portfolio")
 
 
 # Portfolio Position (current holdings)

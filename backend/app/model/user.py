@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from .portfolio import Portfolio, Watchlist
     from .subscription import UserSubscription, Payment
     from .alert import Alert, UserNewsPreference
+    from .order import Order
 
 
 # Shared properties
@@ -59,6 +60,7 @@ class User(UserBase, table=True):
     payments: list["Payment"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
     alerts: list["Alert"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
     news_preferences: list["UserNewsPreference"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
+    orders: list["Order"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
 
 
 # Properties to return via API, id is always required

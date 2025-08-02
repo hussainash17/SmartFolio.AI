@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from .portfolio import Portfolio, PortfolioPosition, Watchlist, WatchlistItem
     from .alert import Alert, StockNews
     from .trade import Trade
+    from .order import Order
 
 
 # Stock Company Information
@@ -43,6 +44,7 @@ class StockCompany(SQLModel, table=True):
     trades: list["Trade"] = Relationship(back_populates="stock")
     alerts: list["Alert"] = Relationship(back_populates="stock")
     news_relations: list["StockNews"] = Relationship(back_populates="stock")
+    orders: list["Order"] = Relationship(back_populates="stock")
 
 
 # Real-time Stock Data
