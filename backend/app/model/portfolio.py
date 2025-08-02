@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from .stock import StockCompany
     from .trade import Trade
     from .order import Order
+    from .risk_management import PortfolioRiskMetrics
 
 
 # Portfolio Model
@@ -28,6 +29,7 @@ class Portfolio(SQLModel, table=True):
     positions: list["PortfolioPosition"] = Relationship(back_populates="portfolio")
     trades: list["Trade"] = Relationship(back_populates="portfolio")
     orders: list["Order"] = Relationship(back_populates="portfolio")
+    risk_metrics: list["PortfolioRiskMetrics"] = Relationship(back_populates="portfolio")
 
 
 # Portfolio Position (current holdings)
