@@ -1,8 +1,11 @@
 import uuid
 from typing import TYPE_CHECKING
+from datetime import datetime
+from enum import Enum
 
 from pydantic import EmailStr
 from sqlmodel import Field, Relationship, SQLModel
+from sqlalchemy import JSON, Column
 
 if TYPE_CHECKING:
     from .item import Item
@@ -11,6 +14,123 @@ if TYPE_CHECKING:
     from .alert import Alert, UserNewsPreference
     from .order import Order
     from .risk_management import UserRiskProfile, RiskAlert, StockScreener
+
+
+class AccountType(str, Enum):
+    """Types of investment accounts"""
+    INDIVIDUAL = "INDIVIDUAL"
+    JOINT = "JOINT"
+    RETIREMENT_401K = "RETIREMENT_401K"
+    RETIREMENT_IRA = "RETIREMENT_IRA"
+    RETIREMENT_ROTH_IRA = "RETIREMENT_ROTH_IRA"
+    TRUST = "TRUST"
+    CORPORATE = "CORPORATE"
+
+
+class KYCStatus(str, Enum):
+    """KYC verification status"""
+    PENDING = "PENDING"
+    IN_REVIEW = "IN_REVIEW"
+    VERIFIED = "VERIFIED"
+    REJECTED = "REJECTED"
+    EXPIRED = "EXPIRED"
+
+
+class InvestmentGoal(str, Enum):
+    """Investment objectives"""
+    RETIREMENT = "RETIREMENT"
+    EDUCATION = "EDUCATION"
+    WEALTH_BUILDING = "WEALTH_BUILDING"
+    INCOME_GENERATION = "INCOME_GENERATION"
+    CAPITAL_PRESERVATION = "CAPITAL_PRESERVATION"
+    SHORT_TERM_GAINS = "SHORT_TERM_GAINS"
+
+
+# KYC Information Model
+class KYCInformation(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+    
+    # Personal Information
+    first_name: str = Field(max_length=100)
+    last_name: str = Field(max_length=100)
+    date_of_birth: datetime
+    ssn_last_four: str = Field(max_length=4, description="Last 4 digits of SSN")
+    phone_number: str = Field(max_length=20)
+    
+    # Address Information
+    street_address: str = Field(max_length=200)
+    city: str = Field(max_length=100)
+    state: str = Field(max_length=50)
+    zip_code: str = Field(max_length=10)
+    country: str = Field(max_length=50, default="USA")
+    
+    # Employment Information
+    employer_name: str | None = Field(default=None, max_length=200)
+    occupation: str | None = Field(default=None, max_length=100)
+    annual_income: int | None = Field(default=None)
+    employment_status: str | None = Field(default=None, max_length=50)
+    
+    # Financial Information
+    net_worth: int | None = Field(default=None)
+    liquid_net_worth: int | None = Field(default=None)
+    investment_experience: str | None = Field(default=None, max_length=50)  # BEGINNER, INTERMEDIATE, EXPERIENCED
+    
+    # KYC Status
+    kyc_status: KYCStatus = Field(default=KYCStatus.PENDING)
+    verification_date: datetime | None = Field(default=None)
+    expiry_date: datetime | None = Field(default=None)
+    rejection_reason: str | None = Field(default=None, max_length=500)
+    
+    # Document Information
+    documents: dict = Field(default={}, sa_column=Column(JSON))
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    user: "User" = Relationship(back_populates="kyc_information")
+
+
+# Investment Goals Model
+class UserInvestmentGoal(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+    goal_type: InvestmentGoal
+    target_amount: int | None = Field(default=None)
+    target_date: datetime | None = Field(default=None)
+    priority: int = Field(default=1)  # 1 = highest priority
+    description: str | None = Field(default=None, max_length=500)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    user: "User" = Relationship(back_populates="investment_goals")
+
+
+# User Account Model for multiple account types
+class UserAccount(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+    account_type: AccountType
+    account_name: str = Field(max_length=100)
+    account_number: str | None = Field(default=None, max_length=50)
+    
+    # Joint account information
+    joint_holder_name: str | None = Field(default=None, max_length=200)
+    joint_holder_ssn: str | None = Field(default=None, max_length=11)
+    
+    # Retirement account information
+    contribution_limit: int | None = Field(default=None)
+    current_year_contributions: int | None = Field(default=None)
+    
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    user: "User" = Relationship(back_populates="accounts")
 
 
 # Shared properties
@@ -65,6 +185,124 @@ class User(UserBase, table=True):
     risk_profile: "UserRiskProfile" = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
     risk_alerts: list["RiskAlert"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
     stock_screeners: list["StockScreener"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
+    
+    # KYC and Account Management relationships
+    kyc_information: "KYCInformation" = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
+    investment_goals: list["UserInvestmentGoal"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
+    accounts: list["UserAccount"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
+
+
+# KYC Pydantic models for API
+class KYCInformationBase(SQLModel):
+    first_name: str
+    last_name: str
+    date_of_birth: datetime
+    ssn_last_four: str
+    phone_number: str
+    street_address: str
+    city: str
+    state: str
+    zip_code: str
+    country: str = "USA"
+    employer_name: str | None = None
+    occupation: str | None = None
+    annual_income: int | None = None
+    employment_status: str | None = None
+    net_worth: int | None = None
+    liquid_net_worth: int | None = None
+    investment_experience: str | None = None
+
+
+class KYCInformationCreate(KYCInformationBase):
+    pass
+
+
+class KYCInformationUpdate(SQLModel):
+    first_name: str | None = None
+    last_name: str | None = None
+    date_of_birth: datetime | None = None
+    phone_number: str | None = None
+    street_address: str | None = None
+    city: str | None = None
+    state: str | None = None
+    zip_code: str | None = None
+    country: str | None = None
+    employer_name: str | None = None
+    occupation: str | None = None
+    annual_income: int | None = None
+    employment_status: str | None = None
+    net_worth: int | None = None
+    liquid_net_worth: int | None = None
+    investment_experience: str | None = None
+
+
+class KYCInformationPublic(KYCInformationBase):
+    id: uuid.UUID
+    kyc_status: KYCStatus
+    verification_date: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+# Investment Goals Pydantic models
+class UserInvestmentGoalBase(SQLModel):
+    goal_type: InvestmentGoal
+    target_amount: int | None = None
+    target_date: datetime | None = None
+    priority: int = 1
+    description: str | None = None
+    is_active: bool = True
+
+
+class UserInvestmentGoalCreate(UserInvestmentGoalBase):
+    pass
+
+
+class UserInvestmentGoalUpdate(SQLModel):
+    goal_type: InvestmentGoal | None = None
+    target_amount: int | None = None
+    target_date: datetime | None = None
+    priority: int | None = None
+    description: str | None = None
+    is_active: bool | None = None
+
+
+class UserInvestmentGoalPublic(UserInvestmentGoalBase):
+    id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+# User Account Pydantic models
+class UserAccountBase(SQLModel):
+    account_type: AccountType
+    account_name: str
+    account_number: str | None = None
+    joint_holder_name: str | None = None
+    joint_holder_ssn: str | None = None
+    contribution_limit: int | None = None
+    current_year_contributions: int | None = None
+    is_active: bool = True
+
+
+class UserAccountCreate(UserAccountBase):
+    pass
+
+
+class UserAccountUpdate(SQLModel):
+    account_name: str | None = None
+    account_number: str | None = None
+    joint_holder_name: str | None = None
+    joint_holder_ssn: str | None = None
+    contribution_limit: int | None = None
+    current_year_contributions: int | None = None
+    is_active: bool | None = None
+
+
+class UserAccountPublic(UserAccountBase):
+    id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
 
 
 # Properties to return via API, id is always required
