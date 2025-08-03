@@ -17,6 +17,25 @@ from .user import (
     UserUpdate,
     UserUpdateMe,
     UsersPublic,
+    # KYC and Account Management models
+    KYCInformation,
+    KYCInformationBase,
+    KYCInformationCreate,
+    KYCInformationUpdate,
+    KYCInformationPublic,
+    UserInvestmentGoal,
+    UserInvestmentGoalBase,
+    UserInvestmentGoalCreate,
+    UserInvestmentGoalUpdate,
+    UserInvestmentGoalPublic,
+    UserAccount,
+    UserAccountBase,
+    UserAccountCreate,
+    UserAccountUpdate,
+    UserAccountPublic,
+    AccountType,
+    KYCStatus,
+    InvestmentGoal,
 )
 from .item import Item, ItemBase, ItemCreate, ItemPublic, ItemUpdate, ItemsPublic
 
