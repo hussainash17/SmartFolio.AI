@@ -1,28 +1,44 @@
-from typing import List
+"""
+KYC API routes.
+
+This module provides REST endpoints for KYC (Know Your Customer) functionality
+using the service layer for business logic.
+"""
+
+from typing import List, Annotated
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import select, Session
-from datetime import datetime
+from sqlmodel import Session
 
 from app.api.deps import get_current_user, get_session_dep
 from app.model.user import (
     User, 
-    KYCInformation, 
     KYCInformationCreate, 
     KYCInformationUpdate, 
     KYCInformationPublic,
-    KYCStatus,
-    UserInvestmentGoal,
     UserInvestmentGoalCreate,
     UserInvestmentGoalUpdate,
     UserInvestmentGoalPublic,
-    UserAccount,
     UserAccountCreate,
     UserAccountUpdate,
     UserAccountPublic,
 )
+from app.services.kyc_service import KYCService, InvestmentGoalService, UserAccountService, ServiceException
 
 router = APIRouter(prefix="/kyc", tags=["kyc"])
+
+# Dependency injection for services
+def get_kyc_service(session: Session = Depends(get_session_dep)) -> KYCService:
+    """Get KYC service instance with database session."""
+    return KYCService(session)
+
+def get_investment_goal_service(session: Session = Depends(get_session_dep)) -> InvestmentGoalService:
+    """Get Investment Goal service instance with database session."""
+    return InvestmentGoalService(session)
+
+def get_user_account_service(session: Session = Depends(get_session_dep)) -> UserAccountService:
+    """Get User Account service instance with database session."""
+    return UserAccountService(session)
 
 
 # KYC Information Management
@@ -30,109 +46,62 @@ router = APIRouter(prefix="/kyc", tags=["kyc"])
 def create_kyc_information(
     kyc_info: KYCInformationCreate,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    kyc_service: KYCService = Depends(get_kyc_service)
 ):
-    """Submit KYC information for verification"""
-    # Check if KYC information already exists
-    existing_kyc = session.exec(
-        select(KYCInformation).where(KYCInformation.user_id == current_user.id)
-    ).first()
-    
-    if existing_kyc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="KYC information already exists. Use PUT to update."
-        )
-    
-    db_kyc = KYCInformation(
-        user_id=current_user.id,
-        **kyc_info.dict(),
-        kyc_status=KYCStatus.PENDING,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
-    )
-    
-    session.add(db_kyc)
-    session.commit()
-    session.refresh(db_kyc)
-    return db_kyc
+    """Submit KYC information for verification."""
+    try:
+        return kyc_service.create_kyc_information(current_user.id, kyc_info)
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 @router.get("/information", response_model=KYCInformationPublic)
 def get_kyc_information(
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    kyc_service: KYCService = Depends(get_kyc_service)
 ):
-    """Get user's KYC information"""
-    kyc_info = session.exec(
-        select(KYCInformation).where(KYCInformation.user_id == current_user.id)
-    ).first()
-    
-    if not kyc_info:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="KYC information not found"
-        )
-    
-    return kyc_info
+    """Get user's KYC information."""
+    try:
+        kyc_info = kyc_service.get_by_user_id(current_user.id)
+        if not kyc_info:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="KYC information not found"
+            )
+        return kyc_info
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 @router.put("/information", response_model=KYCInformationPublic)
 def update_kyc_information(
     kyc_update: KYCInformationUpdate,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    kyc_service: KYCService = Depends(get_kyc_service)
 ):
-    """Update KYC information"""
-    kyc_info = session.exec(
-        select(KYCInformation).where(KYCInformation.user_id == current_user.id)
-    ).first()
-    
-    if not kyc_info:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="KYC information not found"
-        )
-    
-    # Only allow updates if status is PENDING or REJECTED
-    if kyc_info.kyc_status not in [KYCStatus.PENDING, KYCStatus.REJECTED]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot update KYC information once verified or under review"
-        )
-    
-    update_data = kyc_update.dict(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(kyc_info, field, value)
-    
-    kyc_info.updated_at = datetime.utcnow()
-    kyc_info.kyc_status = KYCStatus.PENDING  # Reset to pending on update
-    
-    session.add(kyc_info)
-    session.commit()
-    session.refresh(kyc_info)
-    return kyc_info
+    """Update KYC information."""
+    try:
+        updated_kyc = kyc_service.update_kyc_information(current_user.id, kyc_update)
+        if not updated_kyc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="KYC information not found"
+            )
+        return updated_kyc
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 @router.get("/status")
 def get_kyc_status(
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    kyc_service: KYCService = Depends(get_kyc_service)
 ):
-    """Get KYC verification status"""
-    kyc_info = session.exec(
-        select(KYCInformation).where(KYCInformation.user_id == current_user.id)
-    ).first()
-    
-    if not kyc_info:
-        return {"status": "NOT_SUBMITTED", "message": "KYC information not submitted"}
-    
-    return {
-        "status": kyc_info.kyc_status,
-        "verification_date": kyc_info.verification_date,
-        "expiry_date": kyc_info.expiry_date,
-        "rejection_reason": kyc_info.rejection_reason
-    }
+    """Get KYC verification status."""
+    try:
+        return kyc_service.get_kyc_status(current_user.id)
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 # Investment Goals Management
@@ -140,36 +109,25 @@ def get_kyc_status(
 def create_investment_goal(
     goal: UserInvestmentGoalCreate,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    goal_service: InvestmentGoalService = Depends(get_investment_goal_service)
 ):
-    """Create a new investment goal"""
-    db_goal = UserInvestmentGoal(
-        user_id=current_user.id,
-        **goal.dict(),
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
-    )
-    
-    session.add(db_goal)
-    session.commit()
-    session.refresh(db_goal)
-    return db_goal
+    """Create a new investment goal."""
+    try:
+        return goal_service.create_goal(current_user.id, goal)
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 @router.get("/goals", response_model=List[UserInvestmentGoalPublic])
 def get_investment_goals(
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    goal_service: InvestmentGoalService = Depends(get_investment_goal_service)
 ):
-    """Get user's investment goals"""
-    goals = session.exec(
-        select(UserInvestmentGoal)
-        .where(UserInvestmentGoal.user_id == current_user.id)
-        .where(UserInvestmentGoal.is_active == True)
-        .order_by(UserInvestmentGoal.priority)
-    ).all()
-    
-    return goals
+    """Get user's investment goals."""
+    try:
+        return goal_service.get_user_goals(current_user.id)
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 @router.put("/goals/{goal_id}", response_model=UserInvestmentGoalPublic)
@@ -177,61 +135,38 @@ def update_investment_goal(
     goal_id: UUID,
     goal_update: UserInvestmentGoalUpdate,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    goal_service: InvestmentGoalService = Depends(get_investment_goal_service)
 ):
-    """Update an investment goal"""
-    goal = session.exec(
-        select(UserInvestmentGoal).where(
-            UserInvestmentGoal.id == goal_id,
-            UserInvestmentGoal.user_id == current_user.id
-        )
-    ).first()
-    
-    if not goal:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Investment goal not found"
-        )
-    
-    update_data = goal_update.dict(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(goal, field, value)
-    
-    goal.updated_at = datetime.utcnow()
-    
-    session.add(goal)
-    session.commit()
-    session.refresh(goal)
-    return goal
+    """Update an investment goal."""
+    try:
+        updated_goal = goal_service.update_goal(goal_id, current_user.id, goal_update)
+        if not updated_goal:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Investment goal not found"
+            )
+        return updated_goal
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 @router.delete("/goals/{goal_id}")
 def delete_investment_goal(
     goal_id: UUID,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    goal_service: InvestmentGoalService = Depends(get_investment_goal_service)
 ):
-    """Delete an investment goal"""
-    goal = session.exec(
-        select(UserInvestmentGoal).where(
-            UserInvestmentGoal.id == goal_id,
-            UserInvestmentGoal.user_id == current_user.id
-        )
-    ).first()
-    
-    if not goal:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Investment goal not found"
-        )
-    
-    goal.is_active = False
-    goal.updated_at = datetime.utcnow()
-    
-    session.add(goal)
-    session.commit()
-    
-    return {"message": "Investment goal deleted successfully"}
+    """Delete an investment goal."""
+    try:
+        success = goal_service.deactivate_goal(goal_id, current_user.id)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Investment goal not found"
+            )
+        return {"message": "Investment goal deleted successfully"}
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 # User Account Management
@@ -239,35 +174,25 @@ def delete_investment_goal(
 def create_user_account(
     account: UserAccountCreate,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    account_service: UserAccountService = Depends(get_user_account_service)
 ):
-    """Create a new user account"""
-    db_account = UserAccount(
-        user_id=current_user.id,
-        **account.dict(),
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
-    )
-    
-    session.add(db_account)
-    session.commit()
-    session.refresh(db_account)
-    return db_account
+    """Create a new user account."""
+    try:
+        return account_service.create_account(current_user.id, account)
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 @router.get("/accounts", response_model=List[UserAccountPublic])
 def get_user_accounts(
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    account_service: UserAccountService = Depends(get_user_account_service)
 ):
-    """Get user's accounts"""
-    accounts = session.exec(
-        select(UserAccount)
-        .where(UserAccount.user_id == current_user.id)
-        .where(UserAccount.is_active == True)
-    ).all()
-    
-    return accounts
+    """Get user's accounts."""
+    try:
+        return account_service.get_user_accounts(current_user.id)
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 @router.put("/accounts/{account_id}", response_model=UserAccountPublic)
@@ -275,58 +200,35 @@ def update_user_account(
     account_id: UUID,
     account_update: UserAccountUpdate,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    account_service: UserAccountService = Depends(get_user_account_service)
 ):
-    """Update a user account"""
-    account = session.exec(
-        select(UserAccount).where(
-            UserAccount.id == account_id,
-            UserAccount.user_id == current_user.id
-        )
-    ).first()
-    
-    if not account:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Account not found"
-        )
-    
-    update_data = account_update.dict(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(account, field, value)
-    
-    account.updated_at = datetime.utcnow()
-    
-    session.add(account)
-    session.commit()
-    session.refresh(account)
-    return account
+    """Update a user account."""
+    try:
+        updated_account = account_service.update_account(account_id, current_user.id, account_update)
+        if not updated_account:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Account not found"
+            )
+        return updated_account
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 @router.delete("/accounts/{account_id}")
 def delete_user_account(
     account_id: UUID,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    account_service: UserAccountService = Depends(get_user_account_service)
 ):
-    """Deactivate a user account"""
-    account = session.exec(
-        select(UserAccount).where(
-            UserAccount.id == account_id,
-            UserAccount.user_id == current_user.id
-        )
-    ).first()
-    
-    if not account:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Account not found"
-        )
-    
-    account.is_active = False
-    account.updated_at = datetime.utcnow()
-    
-    session.add(account)
-    session.commit()
-    
-    return {"message": "Account deactivated successfully"}
+    """Deactivate a user account."""
+    try:
+        success = account_service.deactivate_account(account_id, current_user.id)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Account not found"
+            )
+        return {"message": "Account deactivated successfully"}
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
