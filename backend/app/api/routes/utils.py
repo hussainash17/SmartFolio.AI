@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from pydantic.networks import EmailStr
 
 from app.api.deps import get_current_active_superuser
 from app.model import Message
 from app.utils import generate_test_email, send_email
+from app.services.websocket_manager import manager
 
 router = APIRouter(prefix="/utils", tags=["utils"])
 
@@ -29,3 +30,14 @@ def test_email(email_to: EmailStr) -> Message:
 @router.get("/health-check/")
 async def health_check() -> bool:
     return True
+
+
+@router.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Keep the socket alive; client messages are ignored for now
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        await manager.disconnect(websocket)

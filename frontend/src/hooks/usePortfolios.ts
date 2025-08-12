@@ -49,8 +49,8 @@ export function usePortfolios() {
         }
         acc[position.portfolio_id].push({
           id: position.id,
-          symbol: position.stock_id, // This should be the stock symbol
-          companyName: '', // Will be fetched from stock data
+          symbol: (position as any).stock_symbol || position.stock_id, // prefer symbol if provided by API
+          companyName: '', // Can be populated by market list
           quantity: position.quantity,
           purchasePrice: parseFloat(position.average_price.toString()),
           currentPrice: parseFloat(position.current_value.toString()) / position.quantity,
