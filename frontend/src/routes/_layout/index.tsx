@@ -11,6 +11,8 @@ import { useTrading } from "@/hooks/useTrading"
 import { Portfolio, Stock } from "@/types/portfolio"
 import { Toaster } from "@/components/ui/sonner"
 import { toast } from "sonner"
+import type { MarketData as UIMarketData } from "@/types/trading"
+import { useMemo } from "react"
 
 type View =
   | "dashboard"
@@ -85,6 +87,26 @@ function Dashboard() {
     removeFromWatchlist,
     getMarketData,
   } = useTrading()
+
+  const adaptedMarketData: UIMarketData[] = useMemo(() => {
+    return (marketData as any[]).map((d: any) => ({
+      symbol: d.symbol,
+      companyName: d.company_name,
+      currentPrice: d.last ? Number(d.last) : 0,
+      change: d.change ? Number(d.change) : 0,
+      changePercent: d.change_percent ? Number(d.change_percent) : 0,
+      volume: d.volume || 0,
+      high52Week: 0,
+      low52Week: 0,
+      marketCap: 0,
+      peRatio: 0,
+      dividend: 0,
+      dividendYield: 0,
+      sector: d.sector,
+      industry: d.industry,
+      lastUpdated: d.timestamp || new Date().toISOString(),
+    }))
+  }, [marketData])
 
   const handleViewChange = (view: string) => {
     setCurrentView(view as View)
@@ -291,7 +313,7 @@ function Dashboard() {
             recentOrders={orders.slice(0, 5)}
             recentTransactions={transactions.slice(0, 5)}
             news={news}
-            marketData={marketData}
+            marketData={adaptedMarketData}
             onQuickTrade={handleQuickTrade}
             onChartStock={handleChartStock}
             onNavigate={handleViewChange}
@@ -304,7 +326,7 @@ function Dashboard() {
             recentOrders={orders.slice(0, 5)}
             recentTransactions={transactions.slice(0, 5)}
             news={news}
-            marketData={marketData}
+            marketData={adaptedMarketData}
             onQuickTrade={handleQuickTrade}
             onChartStock={handleChartStock}
             onNavigate={handleViewChange}
@@ -369,7 +391,7 @@ function Dashboard() {
           }
         }}
         onPlaceOrder={handlePlaceOrder}
-        marketData={marketData}
+        marketData={adaptedMarketData}
         buyingPower={accountBalance.buyingPower}
         initialSymbol={quickTradeSymbol}
       />

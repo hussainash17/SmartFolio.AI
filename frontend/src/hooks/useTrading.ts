@@ -1,89 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { connectRealtime } from '@/services/realtime';
+import { OpenAPI } from '@/client';
 import { User, Order, Trade, MarketData, Watchlist, Transaction, NewsItem, AccountBalance } from '../types/trading';
 
-// Mock market data (will be replaced with real API)
-const MOCK_MARKET_DATA: MarketData[] = [
-  {
-    symbol: 'AAPL',
-    companyName: 'Apple Inc.',
-    currentPrice: 192.53,
-    change: 2.45,
-    changePercent: 1.29,
-    volume: 45678900,
-    high52Week: 199.62,
-    low52Week: 164.08,
-    marketCap: 2980000000000,
-    peRatio: 29.8,
-    dividend: 0.24,
-    dividendYield: 0.50,
-    sector: 'Technology',
-    industry: 'Consumer Electronics',
-    lastUpdated: new Date().toISOString(),
-  },
-  {
-    symbol: 'GOOGL',
-    companyName: 'Alphabet Inc.',
-    currentPrice: 138.21,
-    change: -1.15,
-    changePercent: -0.82,
-    volume: 23456789,
-    high52Week: 152.15,
-    low52Week: 121.46,
-    marketCap: 1750000000000,
-    peRatio: 24.5,
-    sector: 'Technology',
-    industry: 'Internet Software & Services',
-    lastUpdated: new Date().toISOString(),
-  },
-  {
-    symbol: 'MSFT',
-    companyName: 'Microsoft Corporation',
-    currentPrice: 378.85,
-    change: 5.67,
-    changePercent: 1.52,
-    volume: 34567890,
-    high52Week: 384.52,
-    low52Week: 309.45,
-    marketCap: 2850000000000,
-    peRatio: 32.1,
-    dividend: 0.75,
-    dividendYield: 0.79,
-    sector: 'Technology',
-    industry: 'Software & Programming',
-    lastUpdated: new Date().toISOString(),
-  },
-  {
-    symbol: 'TSLA',
-    companyName: 'Tesla, Inc.',
-    currentPrice: 248.42,
-    change: -8.23,
-    changePercent: -3.20,
-    volume: 89012345,
-    high52Week: 299.29,
-    low52Week: 152.37,
-    marketCap: 790000000000,
-    peRatio: 65.4,
-    sector: 'Consumer Cyclical',
-    industry: 'Auto Manufacturers',
-    lastUpdated: new Date().toISOString(),
-  },
-  {
-    symbol: 'NVDA',
-    companyName: 'NVIDIA Corporation',
-    currentPrice: 875.28,
-    change: 12.45,
-    changePercent: 1.44,
-    volume: 56789012,
-    high52Week: 950.02,
-    low52Week: 200.02,
-    marketCap: 2150000000000,
-    peRatio: 73.2,
-    sector: 'Technology',
-    industry: 'Semiconductors',
-    lastUpdated: new Date().toISOString(),
-  },
-];
+const WS_PATH = '/api/v1/utils/ws';
 
 // Mock news (will be replaced with real API)
 const MOCK_NEWS: NewsItem[] = [
@@ -194,7 +115,25 @@ export function useTrading() {
     },
   ]);
 
-  const marketData = useMemo(() => MOCK_MARKET_DATA, []);
+  const { data: marketData = [] } = useQuery({
+    queryKey: ['market-list'],
+    queryFn: async () => {
+      const res = await fetch(`${OpenAPI.BASE}/market/stocks`)
+      return (await res.json()) as any[]
+    },
+  })
+
+  useEffect(() => {
+    const wsBase = (OpenAPI.BASE || '').replace(/^http/, 'ws')
+    const wsUrl = `${wsBase}${WS_PATH}`
+    const disconnect = connectRealtime(wsUrl, (msg) => {
+      if (msg.type === 'stock_update') {
+        queryClient.invalidateQueries({ queryKey: ['market-list'] })
+      }
+    })
+    return () => disconnect()
+  }, [queryClient])
+
   const news = useMemo(() => MOCK_NEWS, []);
 
   const accountBalance = useMemo((): AccountBalance => {
@@ -244,7 +183,7 @@ export function useTrading() {
   });
 
   const getMarketData = (symbol: string) => {
-    return marketData.find(data => data.symbol === symbol);
+    return (marketData as any[]).find((d) => d.symbol === symbol)
   };
 
   const placeOrder = (orderData: Omit<Order, 'id' | 'orderDate' | 'status' | 'filledQuantity'>) => {
