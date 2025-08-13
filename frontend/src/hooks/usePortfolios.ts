@@ -1,9 +1,7 @@
 import { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PortfolioService } from '@/client';
-import { Portfolio, Stock, PortfolioSummary } from '../types/portfolio';
+import { Portfolio, Stock, PortfolioSummary } from '@/types/portfolio';
 
-// Mock stock data for demonstration (will be replaced with real API)
+// Mock stock data for demonstration
 const MOCK_STOCKS = [
   { symbol: 'AAPL', companyName: 'Apple Inc.', currentPrice: 192.53, sector: 'Technology' },
   { symbol: 'GOOGL', companyName: 'Alphabet Inc.', currentPrice: 138.21, sector: 'Technology' },
@@ -15,71 +13,100 @@ const MOCK_STOCKS = [
   { symbol: 'V', companyName: 'Visa Inc.', currentPrice: 285.34, sector: 'Financial Services' },
 ];
 
+const INITIAL_PORTFOLIOS: Portfolio[] = [
+  {
+    id: '1',
+    name: 'Growth Portfolio',
+    description: 'High-growth technology stocks',
+    createdDate: '2024-01-15',
+    totalValue: 0,
+    totalCost: 0,
+    cash: 5000,
+    stocks: [
+      {
+        id: 's1',
+        symbol: 'AAPL',
+        companyName: 'Apple Inc.',
+        quantity: 50,
+        purchasePrice: 180.25,
+        currentPrice: 192.53,
+        purchaseDate: '2024-02-01',
+        sector: 'Technology'
+      },
+      {
+        id: 's2',
+        symbol: 'GOOGL',
+        companyName: 'Alphabet Inc.',
+        quantity: 25,
+        purchasePrice: 125.40,
+        currentPrice: 138.21,
+        purchaseDate: '2024-02-15',
+        sector: 'Technology'
+      },
+      {
+        id: 's3',
+        symbol: 'NVDA',
+        companyName: 'NVIDIA Corporation',
+        quantity: 10,
+        purchasePrice: 720.50,
+        currentPrice: 875.28,
+        purchaseDate: '2024-03-01',
+        sector: 'Technology'
+      }
+    ]
+  },
+  {
+    id: '2',
+    name: 'Dividend Portfolio',
+    description: 'Stable dividend-paying stocks',
+    createdDate: '2024-01-20',
+    totalValue: 0,
+    totalCost: 0,
+    cash: 2500,
+    stocks: [
+      {
+        id: 's4',
+        symbol: 'JPM',
+        companyName: 'JPMorgan Chase & Co.',
+        quantity: 30,
+        purchasePrice: 165.80,
+        currentPrice: 179.86,
+        purchaseDate: '2024-02-10',
+        sector: 'Financial Services'
+      },
+      {
+        id: 's5',
+        symbol: 'JNJ',
+        companyName: 'Johnson & Johnson',
+        quantity: 40,
+        purchasePrice: 148.25,
+        currentPrice: 155.92,
+        purchaseDate: '2024-02-20',
+        sector: 'Healthcare'
+      }
+    ]
+  }
+];
+
 export function usePortfolios() {
-  const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(null);
-  const queryClient = useQueryClient();
-
-  // Fetch portfolios from API
-  const { data: portfolios = [], isLoading } = useQuery({
-    queryKey: ['portfolios'],
-    queryFn: async () => {
-      const response = await PortfolioService.getUserPortfolios();
-      return response.map(portfolio => ({
-        id: portfolio.id,
-        name: portfolio.name,
-        description: portfolio.description || '',
-        createdDate: portfolio.created_at,
-        totalValue: 0, // Will be calculated
-        totalCost: 0, // Will be calculated
-        cash: 0, // Will be fetched from positions
-        stocks: [] // Will be fetched separately
-      }));
-    }
-  });
-
-  // Fetch portfolio positions
-  const { data: portfolioPositions = {} } = useQuery({
-    queryKey: ['portfolio-positions', selectedPortfolioId],
-    queryFn: async () => {
-      if (!selectedPortfolioId) return {};
-      const response = await PortfolioService.getPortfolioPositions(selectedPortfolioId);
-      return response.reduce((acc, position) => {
-        if (!acc[position.portfolio_id]) {
-          acc[position.portfolio_id] = [];
-        }
-        acc[position.portfolio_id].push({
-          id: position.id,
-          symbol: (position as any).stock_symbol || position.stock_id, // prefer symbol if provided by API
-          companyName: '', // Can be populated by market list
-          quantity: position.quantity,
-          purchasePrice: parseFloat(position.average_price.toString()),
-          currentPrice: parseFloat(position.current_value.toString()) / position.quantity,
-          purchaseDate: position.last_updated,
-          sector: ''
-        });
-        return acc;
-      }, {} as Record<string, Stock[]>);
-    },
-    enabled: !!selectedPortfolioId
-  });
+  const [portfolios, setPortfolios] = useState<Portfolio[]>(INITIAL_PORTFOLIOS);
+  const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>('1');
 
   // Calculate portfolio values
   const updatedPortfolios = useMemo(() => {
     return portfolios.map(portfolio => {
-      const positions = portfolioPositions[portfolio.id] || [];
-      const totalValue = positions.reduce((sum, stock) => 
+      const totalValue = portfolio.stocks.reduce((sum, stock) => 
         sum + (stock.quantity * stock.currentPrice), 0) + portfolio.cash;
-      const totalCost = positions.reduce((sum, stock) => 
+      const totalCost = portfolio.stocks.reduce((sum, stock) => 
         sum + (stock.quantity * stock.purchasePrice), 0) + portfolio.cash;
       
       return {
         ...portfolio,
-        stocks: positions,
         totalValue,
         totalCost
       };
     });
-  }, [portfolios, portfolioPositions]);
+  }, [portfolios]);
 
   const selectedPortfolio = useMemo(() => 
     updatedPortfolios.find(p => p.id === selectedPortfolioId) || null,
@@ -105,88 +132,57 @@ export function usePortfolios() {
     };
   }, [updatedPortfolios]);
 
-  // Create portfolio mutation
-  const createPortfolioMutation = useMutation({
-    mutationFn: async (portfolio: Omit<Portfolio, 'id' | 'totalValue' | 'totalCost'>) => {
-      const response = await PortfolioService.createPortfolio({
-        name: portfolio.name,
-        description: portfolio.description,
-        is_default: false,
-        is_active: true
-      });
-      return response;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['portfolios'] });
-    }
-  });
-
-  // Add stock mutation
-  const addStockMutation = useMutation({
-    mutationFn: async ({ portfolioId, stock }: { portfolioId: string, stock: Omit<Stock, 'id'> }) => {
-      const response = await PortfolioService.addPosition(portfolioId, {
-        stock_symbol: stock.symbol,
-        quantity: stock.quantity,
-        average_price: stock.purchasePrice
-      });
-      return response;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['portfolio-positions'] });
-    }
-  });
-
-  // Update stock mutation
-  const updateStockMutation = useMutation({
-    mutationFn: async ({ portfolioId, stockId, updates }: { portfolioId: string, stockId: string, updates: Partial<Stock> }) => {
-      const response = await PortfolioService.updatePosition(portfolioId, stockId, {
-        quantity: updates.quantity,
-        average_price: updates.purchasePrice
-      });
-      return response;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['portfolio-positions'] });
-    }
-  });
-
-  // Remove stock mutation
-  const removeStockMutation = useMutation({
-    mutationFn: async ({ portfolioId, stockId }: { portfolioId: string, stockId: string }) => {
-      await PortfolioService.removePosition(portfolioId, stockId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['portfolio-positions'] });
-    }
-  });
-
   const addPortfolio = (portfolio: Omit<Portfolio, 'id' | 'totalValue' | 'totalCost'>) => {
-    createPortfolioMutation.mutate(portfolio);
+    const newPortfolio: Portfolio = {
+      ...portfolio,
+      id: Date.now().toString(),
+      totalValue: portfolio.cash,
+      totalCost: portfolio.cash
+    };
+    setPortfolios(prev => [...prev, newPortfolio]);
   };
 
   const updatePortfolio = (id: string, updates: Partial<Portfolio>) => {
-    // TODO: Implement portfolio update
-    console.log('Update portfolio:', id, updates);
+    setPortfolios(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
   };
 
   const deletePortfolio = (id: string) => {
-    // TODO: Implement portfolio deletion
-    console.log('Delete portfolio:', id);
+    setPortfolios(prev => prev.filter(p => p.id !== id));
     if (selectedPortfolioId === id) {
       setSelectedPortfolioId(updatedPortfolios.length > 1 ? updatedPortfolios[0].id : null);
     }
   };
 
   const addStock = (portfolioId: string, stock: Omit<Stock, 'id'>) => {
-    addStockMutation.mutate({ portfolioId, stock });
+    const newStock: Stock = {
+      ...stock,
+      id: Date.now().toString()
+    };
+    
+    setPortfolios(prev => prev.map(p => 
+      p.id === portfolioId 
+        ? { ...p, stocks: [...p.stocks, newStock] }
+        : p
+    ));
   };
 
   const updateStock = (portfolioId: string, stockId: string, updates: Partial<Stock>) => {
-    updateStockMutation.mutate({ portfolioId, stockId, updates });
+    setPortfolios(prev => prev.map(p => 
+      p.id === portfolioId 
+        ? {
+            ...p,
+            stocks: p.stocks.map(s => s.id === stockId ? { ...s, ...updates } : s)
+          }
+        : p
+    ));
   };
 
   const removeStock = (portfolioId: string, stockId: string) => {
-    removeStockMutation.mutate({ portfolioId, stockId });
+    setPortfolios(prev => prev.map(p => 
+      p.id === portfolioId 
+        ? { ...p, stocks: p.stocks.filter(s => s.id !== stockId) }
+        : p
+    ));
   };
 
   const getAvailableStocks = () => MOCK_STOCKS;
@@ -196,7 +192,6 @@ export function usePortfolios() {
     selectedPortfolio,
     selectedPortfolioId,
     portfolioSummary,
-    isLoading,
     setSelectedPortfolioId,
     addPortfolio,
     updatePortfolio,

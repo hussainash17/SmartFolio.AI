@@ -18,8 +18,11 @@ import { Route as LoginImport } from './routes/login'
 import { Route as LayoutImport } from './routes/_layout'
 import { Route as LayoutIndexImport } from './routes/_layout/index'
 import { Route as LayoutWatchlistImport } from './routes/_layout/watchlist'
+import { Route as LayoutTradingImport } from './routes/_layout/trading'
 import { Route as LayoutSettingsImport } from './routes/_layout/settings'
 import { Route as LayoutPortfolioImport } from './routes/_layout/portfolio'
+import { Route as LayoutOrdersImport } from './routes/_layout/orders'
+import { Route as LayoutMarketImport } from './routes/_layout/market'
 import { Route as LayoutItemsImport } from './routes/_layout/items'
 import { Route as LayoutAdminImport } from './routes/_layout/admin'
 
@@ -60,6 +63,11 @@ const LayoutWatchlistRoute = LayoutWatchlistImport.update({
   getParentRoute: () => LayoutRoute,
 } as any)
 
+const LayoutTradingRoute = LayoutTradingImport.update({
+  path: '/trading',
+  getParentRoute: () => LayoutRoute,
+} as any)
+
 const LayoutSettingsRoute = LayoutSettingsImport.update({
   path: '/settings',
   getParentRoute: () => LayoutRoute,
@@ -67,6 +75,16 @@ const LayoutSettingsRoute = LayoutSettingsImport.update({
 
 const LayoutPortfolioRoute = LayoutPortfolioImport.update({
   path: '/portfolio',
+  getParentRoute: () => LayoutRoute,
+} as any)
+
+const LayoutOrdersRoute = LayoutOrdersImport.update({
+  path: '/orders',
+  getParentRoute: () => LayoutRoute,
+} as any)
+
+const LayoutMarketRoute = LayoutMarketImport.update({
+  path: '/market',
   getParentRoute: () => LayoutRoute,
 } as any)
 
@@ -112,12 +130,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutItemsImport
       parentRoute: typeof LayoutImport
     }
+    '/_layout/market': {
+      preLoaderRoute: typeof LayoutMarketImport
+      parentRoute: typeof LayoutImport
+    }
+    '/_layout/orders': {
+      preLoaderRoute: typeof LayoutOrdersImport
+      parentRoute: typeof LayoutImport
+    }
     '/_layout/portfolio': {
       preLoaderRoute: typeof LayoutPortfolioImport
       parentRoute: typeof LayoutImport
     }
     '/_layout/settings': {
       preLoaderRoute: typeof LayoutSettingsImport
+      parentRoute: typeof LayoutImport
+    }
+    '/_layout/trading': {
+      preLoaderRoute: typeof LayoutTradingImport
       parentRoute: typeof LayoutImport
     }
     '/_layout/watchlist': {
@@ -137,8 +167,11 @@ export const routeTree = rootRoute.addChildren([
   LayoutRoute.addChildren([
     LayoutAdminRoute,
     LayoutItemsRoute,
+    LayoutMarketRoute,
+    LayoutOrdersRoute,
     LayoutPortfolioRoute,
     LayoutSettingsRoute,
+    LayoutTradingRoute,
     LayoutWatchlistRoute,
     LayoutIndexRoute,
   ]),
