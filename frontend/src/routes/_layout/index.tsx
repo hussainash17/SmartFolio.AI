@@ -236,7 +236,7 @@ function Dashboard() {
       case "settings":
         return "Platform Settings"
       case "help":
-        return "Help & Support"
+        return "Documentation, tutorials, and customer support resources"
       case "chart":
         return "Chart Analysis"
       default:
