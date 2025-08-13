@@ -1,5 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { connectRealtime } from '@/services/realtime';
+import { OpenAPI } from '@/client';
 import { User, Order, Trade, MarketData, Watchlist, Transaction, NewsItem, AccountBalance, Position, MarketIndex, OrderBook, TimeAndSales, TechnicalAnalysis, RiskMetrics, PortfolioAnalytics, MarketMovers, SectorPerformance } from '@/types/trading';
+
+const WS_PATH = '/api/v1/utils/ws';
 
 // Mock user data
 const MOCK_USER: User = {
@@ -730,7 +735,26 @@ export function useTrading() {
   const [marketMovers] = useState<MarketMovers>(MOCK_MARKET_MOVERS);
   const [sectorPerformance] = useState<SectorPerformance[]>(MOCK_SECTOR_PERFORMANCE);
 
-  const marketData = useMemo(() => MOCK_MARKET_DATA, []);
+  const { data: marketData = [] } = useQuery({
+    queryKey: ['market-list'],
+    queryFn: async () => {
+      const res = await fetch(`${OpenAPI.BASE}/market/stocks`)
+      return (await res.json()) as any[]
+    },
+  })
+
+  useEffect(() => {
+    const wsBase = (OpenAPI.BASE || '').replace(/^http/, 'ws')
+    const wsUrl = `${wsBase}${WS_PATH}`
+    const disconnect = connectRealtime(wsUrl, (msg) => {
+      if (msg.type === 'stock_update') {
+        queryClient.invalidateQueries({ queryKey: ['market-list'] })
+      }
+    })
+    return () => disconnect()
+  }, [queryClient])
+
+  const news = useMemo(() => MOCK_NEWS, []);
 
   const accountBalance = useMemo((): AccountBalance => {
     const totalValue = user.totalAccountValue;
@@ -770,7 +794,7 @@ export function useTrading() {
   }, [user]);
 
   const getMarketData = (symbol: string) => {
-    return marketData.find(data => data.symbol === symbol);
+    return (marketData as any[]).find((d) => d.symbol === symbol)
   };
 
   const placeOrder = (orderData: Omit<Order, 'id' | 'orderDate' | 'status' | 'filledQuantity'>) => {

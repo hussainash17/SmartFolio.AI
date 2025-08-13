@@ -43,7 +43,7 @@ class SmartStockScheduler:
                 CronTrigger(
                     day_of_week='mon-fri',
                     hour='10-17',
-                    minute='*/1',
+                    minute='*/5',
                     second='0'
                 ),
                 id='stocknow_scraper',

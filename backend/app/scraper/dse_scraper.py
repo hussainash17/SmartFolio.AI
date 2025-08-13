@@ -16,6 +16,7 @@ from app.model.stock import (
     DailyOHLC,
     MarketSummary,
 )
+from app.services.websocket_manager import manager
 
 logger = logging.getLogger(__name__)
 
@@ -312,6 +313,26 @@ class DSEScraper:
             
             db.commit()
             logger.info(f"Saved stock data for {symbol}")
+            # Broadcast live update
+            try:
+                await manager.broadcast({
+                    "type": "stock_update",
+                    "symbol": symbol,
+                    "payload": {
+                        "last_trade_price": str(stock_data.get('last_trade_price', 0)),
+                        "change": str(stock_data.get('change', 0)),
+                        "change_percent": str(stock_data.get('change_percent', 0)),
+                        "high": str(stock_data.get('high', 0)),
+                        "low": str(stock_data.get('low', 0)),
+                        "open_price": str(stock_data.get('open_price', 0)),
+                        "previous_close": str(stock_data.get('previous_close', 0)),
+                        "volume": stock_data.get('volume', 0),
+                        "turnover": str(stock_data.get('turnover', 0)),
+                        "trades_count": stock_data.get('trades_count', 0),
+                    }
+                })
+            except Exception:
+                logger.debug("Broadcast failed; continuing")
             
         except Exception as e:
             logger.error(f"Error saving stock data for {symbol}: {e}")
@@ -377,6 +398,13 @@ class DSEScraper:
             
             db.commit()
             logger.info(f"Aggregated daily data for {date.date()}")
+            try:
+                await manager.broadcast({
+                    "type": "ohlc_aggregated",
+                    "date": str(date.date()),
+                })
+            except Exception:
+                logger.debug("Broadcast failed; continuing")
             
         except Exception as e:
             logger.error(f"Error aggregating daily data: {e}")
@@ -393,6 +421,13 @@ async def run_dse_scraper():
             summary = await scraper.get_market_summary()
             if summary:
                 await scraper.save_market_summary(db, summary)
+                try:
+                    await manager.broadcast({
+                        "type": "market_summary",
+                        "payload": summary,
+                    })
+                except Exception:
+                    logger.debug("Broadcast failed; continuing")
             
             # Fetch and save all stocks data
             stocks_data = await scraper.get_all_stocks_data()
