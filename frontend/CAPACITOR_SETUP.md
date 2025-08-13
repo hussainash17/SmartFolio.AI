@@ -185,11 +185,11 @@ Create `.env` files for different environments:
 ```bash
 # .env.development
 VITE_API_URL=http://localhost:8000
-VITE_WS_URL=ws://localhost:8000/ws
+VITE_WS_URL=ws://localhost:8000/api/v1/utils/ws
 
 # .env.production
 VITE_API_URL=https://api.smartstock.com
-VITE_WS_URL=wss://api.smartstock.com/ws
+VITE_WS_URL=wss://api.smartstock.com/api/v1/utils/ws
 ```
 
 ## 📱 Platform-Specific Setup
