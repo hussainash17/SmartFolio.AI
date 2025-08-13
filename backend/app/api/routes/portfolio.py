@@ -10,7 +10,7 @@ from app.model.portfolio import (
 )
 from app.model.trade import Trade, TradeCreate, TradeUpdate, TradePublic
 from app.model.user import User
-from app.model.stock import StockCompany
+from app.model.stock import StockCompany, StockData
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
@@ -221,7 +221,7 @@ def add_position(
         stock_id=stock.id,
         quantity=quantity,
         average_price=average_price,
-        total_investment=total_investment,
+        total_investment=total_investment,  # Initially same as investment
         current_value=total_investment,  # Initially same as investment
         unrealized_pnl=0,
         unrealized_pnl_percent=0
@@ -261,6 +261,64 @@ def get_portfolio_positions(
     ).all()
     
     return positions
+
+
+@router.get("/{portfolio_id}/positions/with-details")
+def get_portfolio_positions_with_details(
+    portfolio_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Get all positions in a portfolio with stock details"""
+    # Verify portfolio belongs to user
+    portfolio = session.exec(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        )
+    ).first()
+    
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portfolio not found"
+        )
+    
+    rows = session.exec(
+        select(PortfolioPosition, StockCompany)
+        .join(StockCompany, PortfolioPosition.stock_id == StockCompany.id)
+        .where(PortfolioPosition.portfolio_id == portfolio_id)
+    ).all()
+    
+    result = []
+    for position, stock in rows:
+        current_price = None
+        if position.quantity and position.quantity > 0 and position.current_value is not None:
+            try:
+                current_price = float(position.current_value) / float(position.quantity)
+            except Exception:
+                current_price = None
+        result.append({
+            "id": position.id,
+            "portfolio_id": position.portfolio_id,
+            "stock_id": position.stock_id,
+            "quantity": position.quantity,
+            "average_price": float(position.average_price),
+            "total_investment": float(position.total_investment),
+            "current_value": float(position.current_value) if position.current_value is not None else None,
+            "unrealized_pnl": float(position.unrealized_pnl) if position.unrealized_pnl is not None else None,
+            "unrealized_pnl_percent": float(position.unrealized_pnl_percent) if position.unrealized_pnl_percent is not None else None,
+            "last_updated": position.last_updated,
+            "current_price": current_price,
+            "stock": {
+                "id": stock.id,
+                "symbol": stock.symbol,
+                "company_name": stock.company_name,
+                "sector": stock.sector,
+                "industry": stock.industry,
+            }
+        })
+    return result
 
 
 @router.put("/{portfolio_id}/positions/{position_id}")
