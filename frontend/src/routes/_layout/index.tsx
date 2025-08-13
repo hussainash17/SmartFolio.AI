@@ -1,5 +1,5 @@
-import { useState } from "react"
 import { createFileRoute } from "@tanstack/react-router"
+import { useState, useMemo } from "react"
 import { ComprehensiveDashboard } from "@/components/Portfolio/ComprehensiveDashboard"
 import { TradingSidebar } from "@/components/Portfolio/TradingSidebar"
 import { GlobalTopBar } from "@/components/Portfolio/GlobalTopBar"
@@ -12,7 +12,6 @@ import { Portfolio, Stock } from "@/types/portfolio"
 import { Toaster } from "@/components/ui/sonner"
 import { toast } from "sonner"
 import type { MarketData as UIMarketData } from "@/types/trading"
-import { useMemo } from "react"
 
 type View =
   | "dashboard"
@@ -91,20 +90,20 @@ function Dashboard() {
   const adaptedMarketData: UIMarketData[] = useMemo(() => {
     return (marketData as any[]).map((d: any) => ({
       symbol: d.symbol,
-      companyName: d.company_name,
-      currentPrice: d.last ? Number(d.last) : 0,
-      change: d.change ? Number(d.change) : 0,
-      changePercent: d.change_percent ? Number(d.change_percent) : 0,
+      companyName: d.company_name || d.companyName || d.symbol,
+      currentPrice: d.last ? Number(d.last) : (d.currentPrice || 0),
+      change: d.change ? Number(d.change) : (d.change || 0),
+      changePercent: d.change_percent ? Number(d.change_percent) : (d.changePercent || 0),
       volume: d.volume || 0,
-      high52Week: 0,
-      low52Week: 0,
-      marketCap: 0,
-      peRatio: 0,
-      dividend: 0,
-      dividendYield: 0,
+      high52Week: d.high52Week || 0,
+      low52Week: d.low52Week || 0,
+      marketCap: d.marketCap || 0,
+      peRatio: d.peRatio || 0,
+      dividend: d.dividend || 0,
+      dividendYield: d.dividendYield || 0,
       sector: d.sector,
       industry: d.industry,
-      lastUpdated: d.timestamp || new Date().toISOString(),
+      lastUpdated: d.timestamp || d.lastUpdated || new Date().toISOString(),
     }))
   }, [marketData])
 
