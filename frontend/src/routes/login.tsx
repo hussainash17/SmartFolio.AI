@@ -19,6 +19,7 @@ import { emailPattern, passwordRules } from "../utils"
 export const Route = createFileRoute("/login")({
   component: Login,
   beforeLoad: async () => {
+    // If user is already authenticated, redirect to dashboard
     if (isLoggedIn()) {
       throw redirect({
         to: "/",
@@ -68,42 +69,61 @@ function Login() {
       >
         <Image
           src={Logo}
-          alt="FastAPI logo"
+          alt="PortfolioMax logo"
           height="auto"
           maxW="2xs"
           alignSelf="center"
           mb={4}
         />
+        
+        {/* Error Display */}
+        {error && (
+          <Text color="red.500" textAlign="center" fontSize="sm">
+            {error}
+          </Text>
+        )}
+
         <Field
           invalid={!!errors.username}
-          errorText={errors.username?.message || !!error}
+          errorText={errors.username?.message}
         >
           <InputGroup w="100%" startElement={<FiMail />}>
             <Input
               id="username"
               {...register("username", {
-                required: "Username is required",
+                required: "Email is required",
                 pattern: emailPattern,
               })}
               placeholder="Email"
               type="email"
+              autoComplete="email"
             />
           </InputGroup>
         </Field>
+        
         <PasswordInput
           type="password"
           startElement={<FiLock />}
           {...register("password", passwordRules())}
           placeholder="Password"
           errors={errors}
+          autoComplete="current-password"
         />
+        
         <RouterLink to="/recover-password" className="main-link">
           Forgot Password?
         </RouterLink>
-        <Button variant="solid" type="submit" loading={isSubmitting} size="md">
-          Log In
+        
+        <Button 
+          variant="default" 
+          type="submit" 
+          size="lg"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "Signing In..." : "Sign In"}
         </Button>
-        <Text>
+        
+        <Text textAlign="center">
           Don't have an account?{" "}
           <RouterLink to="/signup" className="main-link">
             Sign Up

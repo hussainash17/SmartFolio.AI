@@ -1,51 +1,63 @@
-import {
-  MutationCache,
-  QueryCache,
-  QueryClient,
-  QueryClientProvider,
-} from "@tanstack/react-query"
-import { RouterProvider, createRouter } from "@tanstack/react-router"
-import React, { StrictMode } from "react"
+import React from "react"
 import ReactDOM from "react-dom/client"
-import { routeTree } from "./routeTree.gen"
-
-import { ApiError, OpenAPI } from "./client"
-import { CustomProvider } from "./components/ui/provider"
+import { RouterProvider, createRouter } from "@tanstack/react-router"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { ChakraProvider } from "@chakra-ui/react"
+import { routeTree } from "./app/routes"
+import { OpenAPI } from "./client"
 import "./index.css"
 
-OpenAPI.BASE = import.meta.env.VITE_API_URL
-OpenAPI.TOKEN = async () => {
-  return localStorage.getItem("access_token") || ""
-}
+// Configure API client
+OpenAPI.BASE = (import.meta as any).env?.VITE_API_URL || "http://localhost:8000"
+OpenAPI.WITH_CREDENTIALS = true
 
-const handleApiError = (error: Error) => {
-  if (error instanceof ApiError && [401, 403].includes(error.status)) {
-    localStorage.removeItem("access_token")
-    window.location.href = "/login"
-  }
-}
+// Create query client
 const queryClient = new QueryClient({
-  queryCache: new QueryCache({
-    onError: handleApiError,
-  }),
-  mutationCache: new MutationCache({
-    onError: handleApiError,
-  }),
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
 })
 
-const router = createRouter({ routeTree })
+// Create router
+const router = createRouter({
+  routeTree,
+  context: {
+    queryClient,
+  },
+  defaultPreload: "intent",
+})
+
+// Register router for type safety
 declare module "@tanstack/react-router" {
   interface Register {
     router: typeof router
   }
 }
 
+// Global error handler
+const handleApiError = (error: any) => {
+  console.error("API Error:", error)
+  
+  if (error?.status === 401 || error?.status === 403) {
+    // Redirect to login on authentication errors
+    window.location.href = "/login"
+  }
+}
+
+// Set up global error handling
+window.addEventListener("unhandledrejection", (event) => {
+  handleApiError(event.reason)
+})
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <CustomProvider>
-      <QueryClientProvider client={queryClient}>
+  <React.StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <ChakraProvider>
         <RouterProvider router={router} />
-      </QueryClientProvider>
-    </CustomProvider>
-  </StrictMode>,
-)
+      </ChakraProvider>
+    </QueryClientProvider>
+  </React.StrictMode>
+) 

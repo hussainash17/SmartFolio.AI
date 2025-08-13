@@ -15,13 +15,6 @@ import { Route as SignupImport } from './routes/signup'
 import { Route as ResetPasswordImport } from './routes/reset-password'
 import { Route as RecoverPasswordImport } from './routes/recover-password'
 import { Route as LoginImport } from './routes/login'
-import { Route as LayoutImport } from './routes/_layout'
-import { Route as LayoutIndexImport } from './routes/_layout/index'
-import { Route as LayoutWatchlistImport } from './routes/_layout/watchlist'
-import { Route as LayoutSettingsImport } from './routes/_layout/settings'
-import { Route as LayoutPortfolioImport } from './routes/_layout/portfolio'
-import { Route as LayoutItemsImport } from './routes/_layout/items'
-import { Route as LayoutAdminImport } from './routes/_layout/admin'
 
 // Create/Update Routes
 
@@ -45,49 +38,10 @@ const LoginRoute = LoginImport.update({
   getParentRoute: () => rootRoute,
 } as any)
 
-const LayoutRoute = LayoutImport.update({
-  id: '/_layout',
-  getParentRoute: () => rootRoute,
-} as any)
-
-const LayoutIndexRoute = LayoutIndexImport.update({
-  path: '/',
-  getParentRoute: () => LayoutRoute,
-} as any)
-
-const LayoutWatchlistRoute = LayoutWatchlistImport.update({
-  path: '/watchlist',
-  getParentRoute: () => LayoutRoute,
-} as any)
-
-const LayoutSettingsRoute = LayoutSettingsImport.update({
-  path: '/settings',
-  getParentRoute: () => LayoutRoute,
-} as any)
-
-const LayoutPortfolioRoute = LayoutPortfolioImport.update({
-  path: '/portfolio',
-  getParentRoute: () => LayoutRoute,
-} as any)
-
-const LayoutItemsRoute = LayoutItemsImport.update({
-  path: '/items',
-  getParentRoute: () => LayoutRoute,
-} as any)
-
-const LayoutAdminRoute = LayoutAdminImport.update({
-  path: '/admin',
-  getParentRoute: () => LayoutRoute,
-} as any)
-
 // Populate the FileRoutesByPath interface
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_layout': {
-      preLoaderRoute: typeof LayoutImport
-      parentRoute: typeof rootRoute
-    }
     '/login': {
       preLoaderRoute: typeof LoginImport
       parentRoute: typeof rootRoute
@@ -104,44 +58,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupImport
       parentRoute: typeof rootRoute
     }
-    '/_layout/admin': {
-      preLoaderRoute: typeof LayoutAdminImport
-      parentRoute: typeof LayoutImport
-    }
-    '/_layout/items': {
-      preLoaderRoute: typeof LayoutItemsImport
-      parentRoute: typeof LayoutImport
-    }
-    '/_layout/portfolio': {
-      preLoaderRoute: typeof LayoutPortfolioImport
-      parentRoute: typeof LayoutImport
-    }
-    '/_layout/settings': {
-      preLoaderRoute: typeof LayoutSettingsImport
-      parentRoute: typeof LayoutImport
-    }
-    '/_layout/watchlist': {
-      preLoaderRoute: typeof LayoutWatchlistImport
-      parentRoute: typeof LayoutImport
-    }
-    '/_layout/': {
-      preLoaderRoute: typeof LayoutIndexImport
-      parentRoute: typeof LayoutImport
-    }
   }
 }
 
 // Create and export the route tree
 
 export const routeTree = rootRoute.addChildren([
-  LayoutRoute.addChildren([
-    LayoutAdminRoute,
-    LayoutItemsRoute,
-    LayoutPortfolioRoute,
-    LayoutSettingsRoute,
-    LayoutWatchlistRoute,
-    LayoutIndexRoute,
-  ]),
   LoginRoute,
   RecoverPasswordRoute,
   ResetPasswordRoute,
