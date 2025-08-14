@@ -23,6 +23,7 @@ class Portfolio(SQLModel, table=True):
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    cash_balance: Optional[Decimal] = Field(default=Decimal(0), max_digits=15, decimal_places=2)
 
     # Relationships
     user: "User" = Relationship(back_populates="portfolios")
@@ -96,6 +97,7 @@ class PortfolioUpdate(SQLModel):
     description: Optional[str] = None
     is_default: Optional[bool] = None
     is_active: Optional[bool] = None
+    cash_balance: Optional[Decimal] = None
 
 
 class PortfolioPublic(PortfolioBase):
@@ -103,6 +105,7 @@ class PortfolioPublic(PortfolioBase):
     user_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    cash_balance: Optional[Decimal] = None
 
 
 class PortfolioPositionBase(SQLModel):

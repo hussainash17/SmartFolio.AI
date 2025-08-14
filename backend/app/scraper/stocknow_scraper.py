@@ -9,6 +9,44 @@ from app.model import StockCompany, DailyOHLC
 INSTRUMENTS_URL = "https://stocknow.com.bd/api/v1/instruments"
 DAILY_URL = "https://stocknow.com.bd/api/v1/instruments?before={date}"
 
+# Best-effort mapping from StockNow sector_id to sector names
+SECTOR_ID_TO_NAME = {
+    1: "Banking",
+    2: "NBFI",
+    3: "Fuel & Power",
+    4: "Cement",
+    5: "Ceramics",
+    6: "Engineering",
+    7: "Food & Allied",
+    8: "IT",
+    9: "Jute",
+    10: "Miscellaneous",
+    11: "Paper & Printing",
+    12: "Pharmaceuticals & Chemicals",
+    13: "Services & Real Estate",
+    14: "Tannery",
+    15: "Telecommunication",
+    16: "Travel & Leisure",
+    17: "Textiles",
+    18: "Mutual Funds",
+    19: "Insurance",
+}
+
+
+def _sector_name(value):
+    try:
+        if value is None:
+            return "Unknown"
+        if isinstance(value, int):
+            return SECTOR_ID_TO_NAME.get(value, "Unknown")
+        # if comes as string number
+        if isinstance(value, str) and value.isdigit():
+            return SECTOR_ID_TO_NAME.get(int(value), "Unknown")
+        # otherwise assume already a name
+        return value
+    except Exception:
+        return "Unknown"
+
 
 def fetch_and_store_stocknow():
     # 1. Fetch instrument details
@@ -29,13 +67,14 @@ def fetch_and_store_stocknow():
                 
             # Use a default value for industry if missing or None
             industry_value = details.get("category") or "Unknown"
+            sector_value = _sector_name(details.get("sector_id"))
             # Upsert company
             company = session.exec(select(StockCompany).where(StockCompany.symbol == code)).first()
             if not company:
                 company = StockCompany(
                     symbol=code,
                     company_name=details.get("name"),
-                    sector=str(details.get("sector_id")),
+                    sector=sector_value,
                     industry=industry_value,
                     is_active=True,
                 )
@@ -45,7 +84,7 @@ def fetch_and_store_stocknow():
             else:
                 # Update company info if changed
                 company.company_name = details.get("name")
-                company.sector = str(details.get("sector_id"))
+                company.sector = sector_value
                 company.industry = industry_value
                 session.add(company)
                 session.commit()

@@ -118,6 +118,10 @@ def update_portfolio(
     update_data = portfolio_update.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(portfolio, field, value)
+
+    # Touch updated_at
+    from datetime import datetime as _dt
+    portfolio.updated_at = _dt.utcnow()
     
     session.add(portfolio)
     session.commit()
