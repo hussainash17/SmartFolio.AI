@@ -23,8 +23,8 @@ except Exception:  # pragma: no cover
 
 
 # revision identifiers, used by Alembic.
-revision = "c706cbb4d1ab"
-down_revision = "ea5530c74046"
+revision = "2024_08_14_1200"
+down_revision = "2024_08_03_1600"
 branch_labels = None
 depends_on = None
 
