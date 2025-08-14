@@ -135,6 +135,7 @@ export function usePortfolios() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
     },
   });
 
@@ -154,6 +155,7 @@ export function usePortfolios() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
     },
   });
 
@@ -164,6 +166,7 @@ export function usePortfolios() {
     },
     onSuccess: (id) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
       if (selectedPortfolioId === id) {
         const next = portfolios.find((p) => p.id !== id);
         setSelectedPortfolioId(next ? next.id : null);
@@ -186,6 +189,7 @@ export function usePortfolios() {
       if (selectedPortfolioId === portfolioId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.portfolio(portfolioId) });
       }
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
     },
   });
 
@@ -204,6 +208,7 @@ export function usePortfolios() {
       if (selectedPortfolioId === portfolioId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.portfolio(portfolioId) });
       }
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
     },
   });
 
@@ -217,6 +222,7 @@ export function usePortfolios() {
       if (selectedPortfolioId === portfolioId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.portfolio(portfolioId) });
       }
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
     },
   });
 
