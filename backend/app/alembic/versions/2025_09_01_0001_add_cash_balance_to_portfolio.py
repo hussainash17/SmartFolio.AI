@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'add_cash_balance_to_portfolio'
-down_revision = 'ea5530c74046'
+down_revision = '2024_08_14_1200'
 branch_labels = None
 depends_on = None
 
