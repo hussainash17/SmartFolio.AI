@@ -52,6 +52,7 @@ export function usePortfolios() {
 
   const { data: portfoliosRaw = [], isLoading: loading } = useQuery({
     queryKey: queryKeys.portfolios,
+    enabled: !!(OpenAPI as any).TOKEN,
     queryFn: async () => {
       const apiPortfolios = await PortfolioService.getUserPortfolios();
       const mapped: Portfolio[] = await Promise.all(

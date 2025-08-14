@@ -239,7 +239,7 @@ export function ComprehensiveDashboard({
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold {dashboardSummary.ytd_return_percent >= 0 ? 'text-green-600' : 'text-red-600'}">
+            <div className={`text-2xl font-bold ${dashboardSummaryMemo.ytd_return_percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {formatPercent(dashboardSummaryMemo.ytd_return_percent || 0)}
             </div>
             <div className="flex items-center gap-1 mt-1">
@@ -257,7 +257,7 @@ export function ComprehensiveDashboard({
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardSummaryMemo.risk_score.toFixed(1)}</div>
+            <div className="text-2xl font-bold">{Number(dashboardSummaryMemo?.risk_score ?? 0).toFixed(1)}</div>
             <div className="flex items-center gap-2 mt-1">
               <Badge variant="outline" className="text-orange-600 border-orange-200">
                 {dashboardSummaryMemo.risk_level || 'Moderate'} Risk

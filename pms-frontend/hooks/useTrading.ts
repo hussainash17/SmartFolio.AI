@@ -28,6 +28,7 @@ export function useTrading() {
 
   const { data: marketData = [] } = useQuery({
     queryKey: queryKeys.marketList(50, 0),
+    enabled: !!(OpenAPI as any).TOKEN,
     queryFn: async () => {
       const list = (await MarketService.listStocks({ limit: 50, offset: 0 })) as any[];
       const mapped: MarketData[] = (list || []).map((it: any) => ({
@@ -54,6 +55,7 @@ export function useTrading() {
 
   const { data: news = [] } = useQuery({
     queryKey: queryKeys.newsList(20, 0),
+    enabled: !!(OpenAPI as any).TOKEN,
     queryFn: async () => {
       const newsList = await NewsService.listNews({ limit: 20, offset: 0 });
       return (newsList as any[]).map((n: any) => ({
@@ -69,6 +71,7 @@ export function useTrading() {
 
   const { data: orders = [] } = useQuery({
     queryKey: queryKeys.ordersList,
+    enabled: !!(OpenAPI as any).TOKEN,
     queryFn: async () => {
       const apiOrders = await OrdersService.getUserOrders();
       return (apiOrders as any[]).map((o: any) => ({
@@ -95,6 +98,7 @@ export function useTrading() {
 
   const { data: dashboard = { total_portfolio_value: 0, cash_balance: 0, stock_value: 0, buying_power: 0, day_change: 0, day_change_percent: 0 } } = useQuery({
     queryKey: queryKeys.dashboardSummary,
+    enabled: !!(OpenAPI as any).TOKEN,
     queryFn: async () => {
       const base = (OpenAPI as any).BASE || '';
       const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/dashboard/summary`, {
