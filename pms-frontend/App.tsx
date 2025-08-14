@@ -757,7 +757,7 @@ export default function App() {
         onOpenChange={setIsStockFormOpen}
         onSubmit={handleStockSubmit}
         initialData={editingStock || undefined}
-        availableStocks={getAvailableStocks()}
+        availableStocks={marketData}
       />
 
       <QuickTradeDialog

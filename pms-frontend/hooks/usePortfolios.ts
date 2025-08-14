@@ -21,9 +21,10 @@ export function usePortfolios() {
         const apiPortfolios = await PortfolioService.getUserPortfolios();
         const mapped: Portfolio[] = await Promise.all(
           apiPortfolios.map(async (p) => {
-            const positions = await PortfolioService.getPortfolioPositions({ portfolioId: p.id });
-            // Map positions into UI stocks. Backend does not provide symbol/name here; fall back via detailed endpoint when available
-            const details = await fetchPositionsWithDetailsSafe(p.id);
+            const [summary, details] = await Promise.all([
+              PortfolioService.getPortfolioSummary({ portfolioId: p.id }),
+              fetchPositionsWithDetailsSafe(p.id),
+            ]);
             const stocks: Stock[] = (details || []).map((row: any) => ({
               id: String(row.id),
               symbol: row.stock?.symbol || '',
@@ -35,10 +36,9 @@ export function usePortfolios() {
               sector: row.stock?.sector,
             }));
 
+            const totalValue = Number((summary as any)?.current_value || 0);
+            const totalCost = Number((summary as any)?.total_investment || 0);
             const cash = 0;
-            const totalStockValue = stocks.reduce((sum, s) => sum + s.quantity * s.currentPrice, 0);
-            const totalCost = stocks.reduce((sum, s) => sum + s.quantity * s.purchasePrice, 0) + cash;
-            const totalValue = totalStockValue + cash;
 
             return {
               id: String(p.id),
@@ -82,11 +82,7 @@ export function usePortfolios() {
   };
 
   const updatedPortfolios = useMemo(() => {
-    return portfolios.map((portfolio) => {
-      const totalValue = portfolio.stocks.reduce((sum, stock) => sum + stock.quantity * stock.currentPrice, 0) + portfolio.cash;
-      const totalCost = portfolio.stocks.reduce((sum, stock) => sum + stock.quantity * stock.purchasePrice, 0) + portfolio.cash;
-      return { ...portfolio, totalValue, totalCost };
-    });
+    return portfolios;
   }, [portfolios]);
 
   const selectedPortfolio = useMemo(
@@ -156,8 +152,11 @@ export function usePortfolios() {
       quantity: stock.quantity,
       averagePrice: stock.purchasePrice,
     });
-    // Refresh positions for that portfolio
-    const details = await fetchPositionsWithDetailsSafe(portfolioId);
+    // Refresh positions and summary for that portfolio
+    const [summary, details] = await Promise.all([
+      PortfolioService.getPortfolioSummary({ portfolioId }),
+      fetchPositionsWithDetailsSafe(portfolioId),
+    ]);
     setPortfolios((prev) =>
       prev.map((p) =>
         p.id === portfolioId
@@ -173,6 +172,8 @@ export function usePortfolios() {
                 purchaseDate: new Date(row.last_updated).toISOString().split('T')[0],
                 sector: row.stock?.sector,
               })),
+              totalValue: Number((summary as any)?.current_value || 0),
+              totalCost: Number((summary as any)?.total_investment || 0),
             }
           : p
       )
@@ -186,7 +187,10 @@ export function usePortfolios() {
       quantity: updates.quantity,
       averagePrice: updates.purchasePrice,
     });
-    const details = await fetchPositionsWithDetailsSafe(portfolioId);
+    const [summary, details] = await Promise.all([
+      PortfolioService.getPortfolioSummary({ portfolioId }),
+      fetchPositionsWithDetailsSafe(portfolioId),
+    ]);
     setPortfolios((prev) =>
       prev.map((p) =>
         p.id === portfolioId
@@ -202,6 +206,8 @@ export function usePortfolios() {
                 purchaseDate: new Date(row.last_updated).toISOString().split('T')[0],
                 sector: row.stock?.sector,
               })),
+              totalValue: Number((summary as any)?.current_value || 0),
+              totalCost: Number((summary as any)?.total_investment || 0),
             }
           : p
       )
@@ -210,7 +216,10 @@ export function usePortfolios() {
 
   const removeStock = async (portfolioId: string, stockId: string) => {
     await PortfolioService.removePosition({ portfolioId, positionId: stockId });
-    const details = await fetchPositionsWithDetailsSafe(portfolioId);
+    const [summary, details] = await Promise.all([
+      PortfolioService.getPortfolioSummary({ portfolioId }),
+      fetchPositionsWithDetailsSafe(portfolioId),
+    ]);
     setPortfolios((prev) =>
       prev.map((p) =>
         p.id === portfolioId
@@ -226,6 +235,8 @@ export function usePortfolios() {
                 purchaseDate: new Date(row.last_updated).toISOString().split('T')[0],
                 sector: row.stock?.sector,
               })),
+              totalValue: Number((summary as any)?.current_value || 0),
+              totalCost: Number((summary as any)?.total_investment || 0),
             }
           : p
       )
