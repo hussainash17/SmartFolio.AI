@@ -245,3 +245,173 @@ def get_top_movers(
         return data
 
     return {"gainers": serialize(gainers), "losers": serialize(losers)}
+
+
+@router.get("/most-active")
+def get_most_active(
+    limit: int = Query(10, ge=1, le=50),
+    session: Session = Depends(get_session_dep),
+) -> List[Dict[str, Any]]:
+    # Determine latest timestamp across StockData
+    latest_ts = session.exec(select(func.max(StockData.timestamp))).one()
+    if not latest_ts or not latest_ts[0]:
+        return []
+    latest_time = latest_ts[0]
+
+    rows = session.exec(
+        select(StockData, StockCompany)
+        .join(StockCompany, StockCompany.id == StockData.company_id)
+        .where(StockData.timestamp == latest_time)
+        .order_by(desc(StockData.volume))
+        .limit(limit)
+    ).all()
+
+    data: List[Dict[str, Any]] = []
+    for sd, sc in rows:
+        data.append(
+            {
+                "symbol": sc.symbol,
+                "company_name": sc.company_name,
+                "last": float(sd.last_trade_price),
+                "change": float(sd.change),
+                "change_percent": float(sd.change_percent),
+                "volume": sd.volume,
+                "turnover": float(sd.turnover),
+            }
+        )
+    return data
+
+
+@router.get("/indices")
+def get_indices(
+    days: int = Query(5, ge=1, le=90),
+    session: Session = Depends(get_session_dep),
+) -> Dict[str, Any]:
+    """Return index levels and short history for sparklines.
+    Currently supports DSEX from MarketSummary; DS30 and DSES are placeholders until scraped.
+    """
+    since = datetime.utcnow() - timedelta(days=days)
+    summaries = session.exec(
+        select(MarketSummary)
+        .where(MarketSummary.date >= since)
+        .order_by(MarketSummary.timestamp.asc())
+    ).all() or []
+
+    def build_series(field_name: str) -> List[Dict[str, Any]]:
+        series: List[Dict[str, Any]] = []
+        for s in summaries:
+            val = getattr(s, field_name, None)
+            if val is not None:
+                series.append({"t": s.timestamp, "v": float(val)})
+        return series
+
+    dsex_series = build_series("dse_index")
+    cse_series = build_series("cse_index")
+
+    latest = summaries[-1] if summaries else None
+
+    return {
+        "DSEX": {
+            "level": float(latest.dse_index) if latest and latest.dse_index is not None else None,
+            "change": float(latest.dse_index_change) if latest and latest.dse_index_change is not None else None,
+            "change_percent": float(latest.dse_index_change_percent) if latest and latest.dse_index_change_percent is not None else None,
+            "series": dsex_series,
+        },
+        "DS30": {
+            "level": None,
+            "change": None,
+            "change_percent": None,
+            "series": [],
+        },
+        "DSES": {
+            "level": None,
+            "change": None,
+            "change_percent": None,
+            "series": [],
+        },
+        "CSE": {
+            "level": float(latest.cse_index) if latest and latest.cse_index is not None else None,
+            "change": float(latest.cse_index_change) if latest and latest.cse_index_change is not None else None,
+            "change_percent": float(latest.cse_index_change_percent) if latest and latest.cse_index_change_percent is not None else None,
+            "series": cse_series,
+        },
+    }
+
+
+@router.get("/turnover/compare")
+def get_turnover_compare(session: Session = Depends(get_session_dep)) -> Dict[str, Any]:
+    """Compare latest total_turnover with previous trading day's total_turnover."""
+    latest = session.exec(
+        select(MarketSummary).order_by(MarketSummary.timestamp.desc()).limit(1)
+    ).first()
+    if not latest:
+        return {"current": 0.0, "previous": 0.0, "change_percent": 0.0}
+
+    # Find previous day's last summary
+    prev = session.exec(
+        select(MarketSummary)
+        .where(MarketSummary.date < latest.date)
+        .order_by(MarketSummary.date.desc(), MarketSummary.timestamp.desc())
+        .limit(1)
+    ).first()
+
+    current_val = float(latest.total_turnover or 0)
+    prev_val = float(prev.total_turnover) if prev and prev.total_turnover is not None else 0.0
+    change_pct = ((current_val - prev_val) / prev_val * 100.0) if prev_val > 0 else 0.0
+    return {"current": current_val, "previous": prev_val, "change_percent": change_pct}
+
+
+@router.get("/flows")
+def get_market_flows(session: Session = Depends(get_session_dep)) -> Dict[str, Any]:
+    """Return placeholder market flow data: insider/institutional/foreign flows.
+    Replace with real data sources when available.
+    """
+    # Placeholder data
+    return {
+        "bulk_trades": [
+            {"symbol": "BULK1", "quantity": 500000, "price": 50.0, "side": "BUY", "date": datetime.utcnow()},
+            {"symbol": "BULK2", "quantity": 350000, "price": 22.7, "side": "SELL", "date": datetime.utcnow()},
+        ],
+        "director_transactions": [
+            {"symbol": "DIR1", "name": "Sponsor A", "side": "BUY", "quantity": 20000, "date": datetime.utcnow()},
+            {"symbol": "DIR2", "name": "Director B", "side": "SELL", "quantity": 15000, "date": datetime.utcnow()},
+        ],
+        "foreign_net_flow": {
+            "net_buy_value": 12_500_000.0,
+            "trend": [ -1.2, 0.5, 0.8, -0.3, 1.9, 2.1, 0.4 ],
+        },
+    }
+
+
+@router.get("/macro")
+def get_macro_snapshot() -> Dict[str, Any]:
+    """Return snapshot of commodities and FX. Placeholder values; integrate real APIs later."""
+    now = datetime.utcnow()
+    return {
+        "timestamp": now,
+        "commodities": {
+            "oil_brent_usd": 85.2,
+            "lng_spot_usd_mmbtu": 10.8,
+            "steel_rebar_usd_ton": 615.0,
+        },
+        "fx": {
+            "usd_bdt": 117.5,
+            "usd_bdt_trend": [116.9, 117.2, 117.1, 117.3, 117.6, 117.4, 117.5],
+        },
+    }
+
+
+@router.get("/events/upcoming")
+def get_upcoming_events(limit: int = Query(20, ge=1, le=100)) -> Dict[str, Any]:
+    """Return upcoming market events (AGMs, EGMs, Record Dates, IPO listings). Placeholder content."""
+    base_date = datetime.utcnow()
+    events: List[Dict[str, Any]] = []
+    for i in range(1, min(limit, 20) + 1):
+        events.append({"type": "AGM", "company": f"COMP{i:03d}", "date": base_date + timedelta(days=i), "note": "Annual General Meeting"})
+        if i % 3 == 0:
+            events.append({"type": "EGM", "company": f"COMP{i:03d}", "date": base_date + timedelta(days=i+1), "note": "Extraordinary General Meeting"})
+        if i % 4 == 0:
+            events.append({"type": "RECORD", "company": f"COMP{i:03d}", "date": base_date + timedelta(days=i+2), "note": "Record Date"})
+        if i % 5 == 0:
+            events.append({"type": "IPO", "company": f"IPO{i:03d}", "date": base_date + timedelta(days=i+3), "note": "IPO Listing"})
+    return {"events": events}
