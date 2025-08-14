@@ -98,4 +98,6 @@ export interface AccountBalance {
   dayTradingBuyingPower: number;
   marginUsed: number;
   maintenanceMargin: number;
+  dayChange?: number;
+  dayChangePercent?: number;
 }
