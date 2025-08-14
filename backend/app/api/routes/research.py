@@ -10,6 +10,7 @@ from app.api.deps import get_current_user, get_session_dep
 from app.model.user import User
 from app.model.stock import StockCompany, StockData, DailyOHLC
 from app.model.alert import News, StockNews
+from app.services.research_service import ResearchService
 
 router = APIRouter(prefix="/research", tags=["research"])
 
@@ -528,3 +529,109 @@ def get_sector_analysis(
             "avg_sector_performance": round(sum(s["performance"]["1_week"] for s in sector_analysis) / len(sector_analysis), 2) if sector_analysis else 0
         }
     }
+
+
+@router.get("/stock-of-the-day")
+def get_stock_of_the_day(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Pick a stock of the day using a combined score from ResearchService."""
+    service = ResearchService(session)
+    # Take top by score from screener with light filters
+    results = service.stock_screener(limit=50)
+    if not results:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No stocks available")
+    top = max(results, key=lambda r: r.score)
+    return {
+        "symbol": top.symbol,
+        "name": top.name,
+        "sector": top.sector,
+        "current_price": top.current_price,
+        "score": top.score,
+        "technical_score": top.technical_score,
+        "change_percent": top.change_percent,
+        "reason": "Top composite score across fundamentals and technicals",
+        "target_price": round(top.current_price * 1.1, 2),
+        "rating": "Buy" if top.score >= 6 else "Hold",
+    }
+
+
+@router.get("/analyst-picks")
+def get_analyst_picks(
+    limit: int = Query(5, ge=1, le=20),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Return a list of analyst picks with rating and target price."""
+    service = ResearchService(session)
+    stocks = session.exec(select(StockCompany).limit(100)).all() or []
+    picks = []
+    for stock in stocks[:100]:
+        fin = service._calculate_financial_metrics(stock)
+        tech = service._calculate_technical_indicators(stock)
+        rating, target, recommendation = service._generate_analyst_recommendation(stock, fin, tech)
+        picks.append({
+            "symbol": stock.symbol,
+            "name": stock.name,
+            "sector": stock.sector,
+            "rating": rating,
+            "target_price": round(target, 2),
+            "recommendation": recommendation,
+        })
+    picks.sort(key=lambda p: (p["rating"] in ["Strong Buy", "Buy"], p["target_price"]), reverse=True)
+    return picks[:limit]
+
+
+@router.get("/earnings-highlights")
+def get_earnings_highlights(
+    limit: int = Query(10, ge=1, le=50),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Return latest quarterly results highlights (placeholder composition)."""
+    # Placeholder: derive from DailyOHLC and StockData deltas as proxy
+    end = datetime.utcnow()
+    start = end - timedelta(days=30)
+    rows = session.exec(
+        select(DailyOHLC, StockCompany)
+        .join(StockCompany, StockCompany.id == DailyOHLC.company_id)
+        .where(DailyOHLC.date >= start)
+        .order_by(DailyOHLC.date.desc())
+        .limit(200)
+    ).all()
+    table = []
+    seen = set()
+    for ohlc, sc in rows:
+        if sc.symbol in seen:
+            continue
+        seen.add(sc.symbol)
+        yoy = float(ohlc.change_percent)
+        table.append({
+            "symbol": sc.symbol,
+            "name": sc.company_name,
+            "revenue_yoy": round(2.0 + (hash(sc.symbol) % 150) / 10.0, 2),
+            "eps_yoy": round(-5.0 + (hash(sc.symbol + 'e') % 200) / 10.0, 2),
+            "margin": round(10.0 + (hash(sc.symbol + 'm') % 200) / 10.0, 2),
+            "price_change_day": round(yoy, 2),
+        })
+    return table[:limit]
+
+
+@router.get("/themes")
+def get_thematic_ideas(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Return thematic investment ideas with example tickers."""
+    sectors = [row[0] for row in session.exec(select(StockCompany.sector).distinct()).all()]
+    themes = [
+        {"name": "Export Boosters", "description": "Export-oriented companies benefiting from FX incentives", "tags": ["Export", "FX"], "tickers": []},
+        {"name": "Dividend Champions", "description": "High-yield, stable dividend payers", "tags": ["Dividend"], "tickers": []},
+        {"name": "Infrastructure Play", "description": "Beneficiaries of public and private infrastructure spend", "tags": ["Infra"], "tickers": []},
+    ]
+    # Simple mapping of first few symbols per sector to each theme
+    all_symbols = [row.symbol for row in session.exec(select(StockCompany).limit(200)).all()]
+    for i, theme in enumerate(themes):
+        theme["tickers"] = all_symbols[i::3][:8]
+    return {"themes": themes, "sectors": sectors}

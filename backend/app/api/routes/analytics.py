@@ -12,6 +12,7 @@ from app.model.portfolio import Portfolio, PortfolioPosition
 from app.model.trade import Trade
 from app.model.stock import StockCompany, StockData
 from app.model.order import Order
+from app.model.alert import News
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -472,4 +473,27 @@ def get_cost_basis_analysis(
         "stock_analysis": stock_analysis,
         "tax_loss_opportunities": tax_loss_opportunities,
         "estimated_tax_liability": round(max(0, total_unrealized_gains) * 0.20, 2)  # Assuming 20% capital gains tax
+    }
+
+
+@router.get("/sentiment/market")
+def get_market_sentiment(
+    days: int = Query(7, ge=1, le=30),
+    session: Session = Depends(get_session_dep)
+) -> Dict[str, Any]:
+    """Compute basic market sentiment from recent news sentiments."""
+    since = datetime.utcnow() - timedelta(days=days)
+    news_items = session.exec(select(News).where(News.published_at >= since, News.is_active == True)).all()  # noqa: E712
+    total = len(news_items) if news_items else 0
+    pos = sum(1 for n in news_items if (n.sentiment or '').lower() == 'positive')
+    neg = sum(1 for n in news_items if (n.sentiment or '').lower() == 'negative')
+    neu = total - pos - neg
+    score = 0.0
+    if total > 0:
+        score = (pos - neg) / total  # -1 to +1
+    gauge = int(round((score + 1) / 2 * 100))  # 0-100
+    return {
+        "score": round(score, 3),
+        "gauge": gauge,
+        "counts": {"positive": pos, "negative": neg, "neutral": neu, "total": total},
     }
