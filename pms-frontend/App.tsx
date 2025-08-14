@@ -541,17 +541,12 @@ export default function App() {
 
       case "fundamentals":
         return (
-          <div className="space-y-6">
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Calculator className="h-8 w-8 text-primary" />
-              </div>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Comprehensive fundamental analysis tools with financial ratios and valuation models
-                coming soon.
-              </p>
-            </div>
-          </div>
+          <Suspense fallback={<div>Loading Fundamentals...</div>}>
+            {(() => {
+              const Fundamentals = lazy(() => import("./components/Fundamentals").then(m => ({ default: m.Fundamentals })));
+              return <Fundamentals />;
+            })()}
+          </Suspense>
         );
 
       case "news":
