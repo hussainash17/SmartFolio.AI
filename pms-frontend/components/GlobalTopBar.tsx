@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -23,6 +23,37 @@ interface GlobalTopBarProps {
 
 export function GlobalTopBar({ accountBalance, onQuickTrade, className }: GlobalTopBarProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState<number | 'off'>('off');
+  const [now, setNow] = useState<Date>(new Date());
+
+  // Auto-update clock
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Persist auto-refresh selection
+  useEffect(() => {
+    try {
+      localStorage.setItem('auto_refresh_minutes', String(autoRefresh));
+    } catch {}
+  }, [autoRefresh]);
+
+  // DSE trading hours: 10:00-14:30 local time (assume Asia/Dhaka)
+  const isTradingHours = (() => {
+    try {
+      const dhakaNow = new Date(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Dhaka', hour12: false, hour: '2-digit', minute: '2-digit' }).format(now));
+      const hours = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Dhaka', hour12: false, hour: '2-digit' }).format(now));
+      const minutes = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Dhaka', hour12: false, minute: '2-digit' }).format(now));
+      const total = hours * 60 + minutes;
+      return total >= 10 * 60 && total <= 14 * 60 + 30;
+    } catch {
+      const h = now.getHours();
+      const m = now.getMinutes();
+      return h >= 10 && (h < 14 || (h === 14 && m <= 30));
+    }
+  })();
+  const timeLabel = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'medium' }).format(now);
   
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -45,8 +76,13 @@ export function GlobalTopBar({ accountBalance, onQuickTrade, className }: Global
   return (
     <div className={`border-b border-sidebar-border bg-background px-6 py-3 ${className || ''}`}>
       <div className="flex items-center justify-between">
-        {/* Left: Financial Metrics */}
+        {/* Left: Title + Time + Trading Hours */}
         <div className="flex items-center gap-6">
+          <div className="hidden sm:flex flex-col mr-2">
+            <span className="text-sm font-semibold">Market News & Insights</span>
+            <span className="text-xs text-muted-foreground">{timeLabel} · {isTradingHours ? 'Market Open (DSE)' : 'Market Closed (DSE)'}
+            </span>
+          </div>
           <div className="flex items-center gap-1">
             <DollarSign className="h-4 w-4 text-muted-foreground" />
             <div className="flex flex-col">
@@ -96,7 +132,7 @@ export function GlobalTopBar({ accountBalance, onQuickTrade, className }: Global
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search stocks, ETFs..."
+              placeholder="Search news by ticker, sector, or keyword"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-input-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
@@ -112,6 +148,23 @@ export function GlobalTopBar({ accountBalance, onQuickTrade, className }: Global
 
         {/* Right: Actions */}
         <div className="flex items-center gap-3">
+          {/* Auto-refresh toggle */}
+          <div className="hidden md:flex items-center gap-2 mr-2">
+            <span className="text-xs text-muted-foreground">Auto-refresh</span>
+            <select
+              value={String(autoRefresh)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setAutoRefresh(v === 'off' ? 'off' : Number(v));
+              }}
+              className="h-8 text-xs bg-input-background border border-border rounded px-2"
+            >
+              <option value="off">Off</option>
+              <option value="1">1m</option>
+              <option value="2">2m</option>
+              <option value="5">5m</option>
+            </select>
+          </div>
           <Button
             variant="default"
             size="sm"
