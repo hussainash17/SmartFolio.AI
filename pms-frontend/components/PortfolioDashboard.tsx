@@ -2,19 +2,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Plus, TrendingUp, TrendingDown, DollarSign, PieChart } from "lucide-react";
-import { usePortfolios } from "../hooks/usePortfolios";
-import { Portfolio } from "../types/portfolio";
+import { Portfolio, PortfolioSummary } from "../types/portfolio";
 
 interface PortfolioDashboardProps {
   onCreatePortfolio: () => void;
   onSelectPortfolio: (portfolio: Portfolio) => void;
   onQuickTrade: (symbol?: string, side?: 'buy' | 'sell') => void;
   onChartStock: (symbol: string) => void;
+  portfolios: Portfolio[];
+  portfolioSummary: PortfolioSummary;
 }
 
-export function PortfolioDashboard({ onCreatePortfolio, onSelectPortfolio, onQuickTrade, onChartStock }: PortfolioDashboardProps) {
-  const { portfolios, portfolioSummary } = usePortfolios();
-
+export function PortfolioDashboard({ onCreatePortfolio, onSelectPortfolio, onQuickTrade, onChartStock, portfolios, portfolioSummary }: PortfolioDashboardProps) {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',

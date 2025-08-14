@@ -118,6 +118,7 @@ export default function App() {
     removeStock,
     setSelectedPortfolioId,
     getAvailableStocks,
+    portfolioSummary,
   } = usePortfolios();
 
   // Trading hooks
@@ -393,6 +394,8 @@ export default function App() {
             onSelectPortfolio={handleSelectPortfolio}
             onQuickTrade={handleQuickTrade}
             onChartStock={handleChartStock}
+            portfolios={portfolios}
+            portfolioSummary={portfolioSummary}
           />
         );
 

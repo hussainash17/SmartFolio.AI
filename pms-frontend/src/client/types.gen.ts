@@ -334,6 +334,7 @@ export type PortfolioPublic = {
     user_id: string;
     created_at: string;
     updated_at: string;
+    cash_balance?: (string | number | null);
 };
 
 export type PortfolioSummary = {
@@ -352,6 +353,7 @@ export type PortfolioUpdate = {
     description?: (string | null);
     is_default?: (boolean | null);
     is_active?: (boolean | null);
+    cash_balance?: (number | string | null);
 };
 
 export type PrivateUserCreate = {

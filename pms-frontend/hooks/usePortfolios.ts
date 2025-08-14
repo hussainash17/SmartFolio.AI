@@ -14,6 +14,35 @@ export function usePortfolios() {
     }
   }, []);
 
+  const SECTOR_MAP: Record<string, string> = {
+    '1': 'Banking',
+    '2': 'NBFI',
+    '3': 'Fuel & Power',
+    '4': 'Cement',
+    '5': 'Ceramics',
+    '6': 'Engineering',
+    '7': 'Food & Allied',
+    '8': 'IT',
+    '9': 'Jute',
+    '10': 'Miscellaneous',
+    '11': 'Paper & Printing',
+    '12': 'Pharmaceuticals & Chemicals',
+    '13': 'Services & Real Estate',
+    '14': 'Tannery',
+    '15': 'Telecommunication',
+    '16': 'Travel & Leisure',
+    '17': 'Textiles',
+    '18': 'Mutual Funds',
+    '19': 'Insurance',
+  };
+
+  const normalizeSector = (value: any): string => {
+    const v = value == null ? '' : String(value).trim();
+    if (!v) return 'Unknown';
+    if (/^\d+$/.test(v)) return SECTOR_MAP[v] || 'Unknown';
+    return v;
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -33,12 +62,12 @@ export function usePortfolios() {
               purchasePrice: Number(row.average_price || 0),
               currentPrice: Number(row.current_price || 0),
               purchaseDate: new Date(row.last_updated).toISOString().split('T')[0],
-              sector: row.stock?.sector,
+              sector: normalizeSector(row.stock?.sector),
             }));
 
             const totalValue = Number((summary as any)?.current_value || 0);
             const totalCost = Number((summary as any)?.total_investment || 0);
-            const cash = 0;
+            const cash = Number((p as any)?.cash_balance || 0);
 
             return {
               id: String(p.id),
@@ -109,6 +138,15 @@ export function usePortfolios() {
         is_active: true,
       },
     });
+
+    // Persist initial cash via update endpoint (backend supports cash_balance)
+    try {
+      await PortfolioService.updatePortfolio({
+        portfolioId: created.id,
+        requestBody: ({ cash_balance: portfolio.cash } as unknown) as any,
+      });
+    } catch {}
+
     setPortfolios((prev) => [
       ...prev,
       {
@@ -132,7 +170,9 @@ export function usePortfolios() {
         description: updates.description,
         is_default: undefined,
         is_active: undefined,
-      },
+        // Allow updating cash when provided
+        ...(updates.cash != null ? ({ cash_balance: updates.cash } as any) : {}),
+      } as any,
     });
     setPortfolios((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
   };
@@ -170,7 +210,7 @@ export function usePortfolios() {
                 purchasePrice: Number(row.average_price || 0),
                 currentPrice: Number(row.current_price || 0),
                 purchaseDate: new Date(row.last_updated).toISOString().split('T')[0],
-                sector: row.stock?.sector,
+                sector: normalizeSector(row.stock?.sector),
               })),
               totalValue: Number((summary as any)?.current_value || 0),
               totalCost: Number((summary as any)?.total_investment || 0),
@@ -204,7 +244,7 @@ export function usePortfolios() {
                 purchasePrice: Number(row.average_price || 0),
                 currentPrice: Number(row.current_price || 0),
                 purchaseDate: new Date(row.last_updated).toISOString().split('T')[0],
-                sector: row.stock?.sector,
+                sector: normalizeSector(row.stock?.sector),
               })),
               totalValue: Number((summary as any)?.current_value || 0),
               totalCost: Number((summary as any)?.total_investment || 0),
@@ -233,7 +273,7 @@ export function usePortfolios() {
                 purchasePrice: Number(row.average_price || 0),
                 currentPrice: Number(row.current_price || 0),
                 purchaseDate: new Date(row.last_updated).toISOString().split('T')[0],
-                sector: row.stock?.sector,
+                sector: normalizeSector(row.stock?.sector),
               })),
               totalValue: Number((summary as any)?.current_value || 0),
               totalCost: Number((summary as any)?.total_investment || 0),
@@ -246,13 +286,10 @@ export function usePortfolios() {
   const getAvailableStocks = () => {
     // This can be wired to MarketService.listStocks later for live search
     const symbols = new Set<string>();
-    const stocks: Stock[] = portfolios.flatMap((p) => p.stocks);
-    return stocks
-      .filter((s) => {
-        if (symbols.has(s.symbol)) return false;
-        symbols.add(s.symbol);
-        return true;
-      })
+    portfolios.forEach((p) => p.stocks.forEach((s) => symbols.add(s.symbol)));
+    return portfolios
+      .flatMap((p) => p.stocks)
+      .filter((s, idx, arr) => arr.findIndex((x) => x.symbol === s.symbol) === idx)
       .map((s) => ({
         symbol: s.symbol,
         companyName: s.companyName,
@@ -264,9 +301,8 @@ export function usePortfolios() {
   return {
     portfolios: updatedPortfolios,
     selectedPortfolio,
-    selectedPortfolioId,
+    loading,
     portfolioSummary,
-    setSelectedPortfolioId,
     addPortfolio,
     updatePortfolio,
     deletePortfolio,
@@ -274,5 +310,6 @@ export function usePortfolios() {
     updateStock,
     removeStock,
     getAvailableStocks,
+    setSelectedPortfolioId,
   };
 }

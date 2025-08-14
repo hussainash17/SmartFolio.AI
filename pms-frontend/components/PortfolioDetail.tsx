@@ -40,7 +40,8 @@ export function PortfolioDetail({
 
   // Calculate sector allocation
   const sectorAllocation = portfolio.stocks.reduce((acc, stock) => {
-    const sector = stock.sector || 'Other';
+    const rawSector = stock.sector;
+    const sector = !rawSector || /^\d+$/.test(String(rawSector)) ? 'Unknown' : rawSector;
     const value = stock.quantity * stock.currentPrice;
     acc[sector] = (acc[sector] || 0) + value;
     return acc;
@@ -99,7 +100,7 @@ export function PortfolioDetail({
           <CardContent>
             <div className="text-2xl">{formatCurrency(portfolio.cash)}</div>
             <p className="text-xs text-muted-foreground">
-              {((portfolio.cash / portfolio.totalValue) * 100).toFixed(1)}% of portfolio
+              {((portfolio.totalValue > 0 ? (portfolio.cash / portfolio.totalValue) * 100 : 0).toFixed(1))}% of portfolio
             </p>
           </CardContent>
         </Card>
@@ -143,13 +144,15 @@ export function PortfolioDetail({
                 const gainLossPercent = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
                 const portfolioPercent = totalStockValue > 0 ? (marketValue / totalStockValue) * 100 : 0;
 
+                const sectorName = !stock.sector || /^\d+$/.test(String(stock.sector)) ? 'Unknown' : stock.sector;
+
                 return (
                   <TableRow key={stock.id}>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span>{stock.symbol}</span>
-                        {stock.sector && (
-                          <Badge variant="outline" className="text-xs">{stock.sector}</Badge>
+                        {sectorName && (
+                          <Badge variant="outline" className="text-xs">{sectorName}</Badge>
                         )}
                       </div>
                     </TableCell>
