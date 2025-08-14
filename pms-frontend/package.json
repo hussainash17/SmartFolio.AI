@@ -35,6 +35,9 @@
     "@radix-ui/react-toggle-group": "^1.1.2",
     "@radix-ui/react-tooltip": "^1.1.8",
     "@tailwindcss/postcss": "^4.1.11",
+    "@tanstack/react-query": "^5.85.2",
+    "@tanstack/react-query-devtools": "^5.85.2",
+    "axios": "^1.9.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -50,17 +53,16 @@
     "recharts": "^2.15.2",
     "sonner": "^2.0.7",
     "tailwind-merge": "^2.5.2",
-    "vaul": "^1.1.2",
-    "axios": "^1.9.0"
+    "vaul": "^1.1.2"
   },
   "devDependencies": {
+    "@hey-api/openapi-ts": "^0.57.0",
     "@types/react": "^18.3.7",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.2",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.41",
     "tailwindcss": "^4.0.0",
-    "@hey-api/openapi-ts": "^0.57.0",
     "typescript": "~5.5.4",
     "vite": "^5.4.3"
   }

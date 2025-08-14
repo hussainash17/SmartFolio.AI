@@ -1,29 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense, lazy } from "react";
 import { TradingSidebar } from "./components/TradingSidebar";
 import { GlobalTopBar } from "./components/GlobalTopBar";
-import { QuickTradeDialog } from "./components/QuickTradeDialog";
-import { ComprehensiveDashboard } from "./components/ComprehensiveDashboard";
-import { TradingInterface } from "./components/TradingInterface";
-import { MarketData } from "./components/MarketData";
-import { OrdersManager } from "./components/OrdersManager";
-import { AccountManager } from "./components/AccountManager";
-import { PortfolioDashboard } from "./components/PortfolioDashboard";
-import { PortfolioDetail } from "./components/PortfolioDetail";
-import { PortfolioForm } from "./components/PortfolioForm";
-import { StockForm } from "./components/StockForm";
-import { TradingViewChart } from "./components/TradingViewChart";
-import { StockScreener } from "./components/StockScreener";
-import { RiskAnalysis } from "./components/RiskAnalysis";
-import { RebalancingManager } from "./components/RebalancingManager";
-import { RiskManagement } from "./components/RiskManagement";
-import { SignupPage } from "./components/SignupPage";
-import { LoginPage } from "./components/LoginPage";
+import { Toaster } from "./components/ui/sonner";
+import { toast } from "sonner";
 import { usePortfolios } from "./hooks/usePortfolios";
 import { useTrading } from "./hooks/useTrading";
 import { useAuth } from "./hooks/useAuth";
 import { Portfolio, Stock } from "./types/portfolio";
-import { Toaster } from "./components/ui/sonner";
-import { toast } from "sonner";
 import {
   PieChart,
   Target,
@@ -39,6 +22,25 @@ import {
   HelpCircle,
   TrendingUp,
 } from "lucide-react";
+
+// Lazy-loaded page components to reduce initial bundle size
+const ComprehensiveDashboard = lazy(() => import("./components/ComprehensiveDashboard").then(m => ({ default: m.ComprehensiveDashboard })));
+const TradingInterface = lazy(() => import("./components/TradingInterface").then(m => ({ default: m.TradingInterface })));
+const MarketData = lazy(() => import("./components/MarketData").then(m => ({ default: m.MarketData })));
+const OrdersManager = lazy(() => import("./components/OrdersManager").then(m => ({ default: m.OrdersManager })));
+const AccountManager = lazy(() => import("./components/AccountManager").then(m => ({ default: m.AccountManager })));
+const PortfolioDashboard = lazy(() => import("./components/PortfolioDashboard").then(m => ({ default: m.PortfolioDashboard })));
+const PortfolioDetail = lazy(() => import("./components/PortfolioDetail").then(m => ({ default: m.PortfolioDetail })));
+const PortfolioForm = lazy(() => import("./components/PortfolioForm").then(m => ({ default: m.PortfolioForm })));
+const StockForm = lazy(() => import("./components/StockForm").then(m => ({ default: m.StockForm })));
+const QuickTradeDialog = lazy(() => import("./components/QuickTradeDialog").then(m => ({ default: m.QuickTradeDialog })));
+const TradingViewChart = lazy(() => import("./components/TradingViewChart").then(m => ({ default: m.TradingViewChart })));
+const StockScreener = lazy(() => import("./components/StockScreener").then(m => ({ default: m.StockScreener })));
+const RiskAnalysis = lazy(() => import("./components/RiskAnalysis").then(m => ({ default: m.RiskAnalysis })));
+const RebalancingManager = lazy(() => import("./components/RebalancingManager").then(m => ({ default: m.RebalancingManager })));
+const RiskManagement = lazy(() => import("./components/RiskManagement").then(m => ({ default: m.RiskManagement })));
+const SignupPage = lazy(() => import("./components/SignupPage").then(m => ({ default: m.SignupPage })));
+const LoginPage = lazy(() => import("./components/LoginPage").then(m => ({ default: m.LoginPage })));
 
 type View =
   | "dashboard"
@@ -375,42 +377,48 @@ export default function App() {
     switch (currentView) {
       case "dashboard":
         return (
-          <ComprehensiveDashboard
-            accountBalance={accountBalance}
-            recentOrders={orders.slice(0, 5)}
-            recentTransactions={transactions.slice(0, 5)}
-            news={news}
-            marketData={marketData}
-            onQuickTrade={handleQuickTrade}
-            onChartStock={handleChartStock}
-            onNavigate={handleViewChange}
-            selectedPortfolioId={selectedPortfolio?.id}
-          />
+          <Suspense fallback={<div>Loading Comprehensive Dashboard...</div>}>
+            <ComprehensiveDashboard
+              accountBalance={accountBalance}
+              recentOrders={orders.slice(0, 5)}
+              recentTransactions={transactions.slice(0, 5)}
+              news={news}
+              marketData={marketData}
+              onQuickTrade={handleQuickTrade}
+              onChartStock={handleChartStock}
+              onNavigate={handleViewChange}
+              selectedPortfolioId={selectedPortfolio?.id}
+            />
+          </Suspense>
         );
 
       case "portfolios":
         return (
-          <PortfolioDashboard
-            onCreatePortfolio={handleCreatePortfolio}
-            onSelectPortfolio={handleSelectPortfolio}
-            onQuickTrade={handleQuickTrade}
-            onChartStock={handleChartStock}
-            portfolios={portfolios}
-            portfolioSummary={portfolioSummary}
-          />
+          <Suspense fallback={<div>Loading Portfolio Dashboard...</div>}>
+            <PortfolioDashboard
+              onCreatePortfolio={handleCreatePortfolio}
+              onSelectPortfolio={handleSelectPortfolio}
+              onQuickTrade={handleQuickTrade}
+              onChartStock={handleChartStock}
+              portfolios={portfolios}
+              portfolioSummary={portfolioSummary}
+            />
+          </Suspense>
         );
 
       case "portfolio-detail":
         return selectedPortfolio ? (
-          <PortfolioDetail
-            portfolio={selectedPortfolio}
-            onBack={handleBackToPortfolios}
-            onAddStock={handleAddStock}
-            onEditStock={handleEditStock}
-            onDeleteStock={handleDeleteStock}
-            onQuickTrade={handleQuickTrade}
-            onChartStock={handleChartStock}
-          />
+          <Suspense fallback={<div>Loading Portfolio Detail...</div>}>
+            <PortfolioDetail
+              portfolio={selectedPortfolio}
+              onBack={handleBackToPortfolios}
+              onAddStock={handleAddStock}
+              onEditStock={handleEditStock}
+              onDeleteStock={handleDeleteStock}
+              onQuickTrade={handleQuickTrade}
+              onChartStock={handleChartStock}
+            />
+          </Suspense>
         ) : null;
 
       case "performance":
@@ -460,27 +468,35 @@ export default function App() {
 
       case "trading":
         return (
-          <TradingInterface
-            marketData={marketData}
-            onPlaceOrder={handlePlaceOrder}
-            buyingPower={accountBalance.buyingPower}
-          />
+          <Suspense fallback={<div>Loading Trading Interface...</div>}>
+            <TradingInterface
+              marketData={marketData}
+              onPlaceOrder={handlePlaceOrder}
+              buyingPower={accountBalance.buyingPower}
+            />
+          </Suspense>
         );
 
       case "orders":
-        return <OrdersManager orders={orders} trades={trades} onCancelOrder={handleCancelOrder} />;
+        return (
+          <Suspense fallback={<div>Loading Orders Manager...</div>}>
+            <OrdersManager orders={orders} trades={trades} onCancelOrder={handleCancelOrder} />
+          </Suspense>
+        );
 
       case "market":
         return (
-          <MarketData
-            marketData={marketData}
-            watchlists={watchlists}
-            news={news}
-            onAddToWatchlist={addToWatchlist}
-            onRemoveFromWatchlist={removeFromWatchlist}
-            onQuickTrade={handleQuickTrade}
-            onChartStock={handleChartStock}
-          />
+          <Suspense fallback={<div>Loading Market Data...</div>}>
+            <MarketData
+              marketData={marketData}
+              watchlists={watchlists}
+              news={news}
+              onAddToWatchlist={addToWatchlist}
+              onRemoveFromWatchlist={removeFromWatchlist}
+              onQuickTrade={handleQuickTrade}
+              onChartStock={handleChartStock}
+            />
+          </Suspense>
         );
 
       case "watchlist":
@@ -499,11 +515,13 @@ export default function App() {
 
       case "screener":
         return (
-          <StockScreener
-            onQuickTrade={handleQuickTrade}
-            onChartStock={handleChartStock}
-            onAddToWatchlist={addToWatchlist}
-          />
+          <Suspense fallback={<div>Loading Stock Screener...</div>}>
+            <StockScreener
+              onQuickTrade={handleQuickTrade}
+              onChartStock={handleChartStock}
+              onAddToWatchlist={addToWatchlist}
+            />
+          </Suspense>
         );
 
       case "research":
@@ -552,19 +570,29 @@ export default function App() {
         );
 
       case "risk-analysis":
-        return <RiskAnalysis onNavigate={handleViewChange} onQuickTrade={handleQuickTrade} />;
+        return (
+          <Suspense fallback={<div>Loading Risk Analysis...</div>}>
+            <RiskAnalysis onNavigate={handleViewChange} onQuickTrade={handleQuickTrade} />
+          </Suspense>
+        );
 
       case "correlation":
         return (
-          <RiskManagement
-            onNavigate={handleViewChange}
-            onQuickTrade={handleQuickTrade}
-            defaultTab="correlation"
-          />
+          <Suspense fallback={<div>Loading Risk Management...</div>}>
+            <RiskManagement
+              onNavigate={handleViewChange}
+              onQuickTrade={handleQuickTrade}
+              defaultTab="correlation"
+            />
+          </Suspense>
         );
 
       case "rebalancing":
-        return <RebalancingManager onNavigate={handleViewChange} onQuickTrade={handleQuickTrade} />;
+        return (
+          <Suspense fallback={<div>Loading Rebalancing Manager...</div>}>
+            <RebalancingManager onNavigate={handleViewChange} onQuickTrade={handleQuickTrade} />
+          </Suspense>
+        );
 
       case "risk-profile":
         return (
@@ -639,7 +667,9 @@ export default function App() {
 
       case "account":
         return (
-          <AccountManager user={user} accountBalance={accountBalance} transactions={transactions} />
+          <Suspense fallback={<div>Loading Account Manager...</div>}>
+            <AccountManager user={user} accountBalance={accountBalance} transactions={transactions} />
+          </Suspense>
         );
 
       case "profile":
@@ -710,17 +740,19 @@ export default function App() {
 
       default:
         return (
-          <ComprehensiveDashboard
-            accountBalance={accountBalance}
-            recentOrders={orders.slice(0, 5)}
-            recentTransactions={transactions.slice(0, 5)}
-            news={news}
-            marketData={marketData}
-            onQuickTrade={handleQuickTrade}
-            onChartStock={handleChartStock}
-            onNavigate={handleViewChange}
-            selectedPortfolioId={selectedPortfolio?.id}
-          />
+          <Suspense fallback={<div>Loading Comprehensive Dashboard...</div>}>
+            <ComprehensiveDashboard
+              accountBalance={accountBalance}
+              recentOrders={orders.slice(0, 5)}
+              recentTransactions={transactions.slice(0, 5)}
+              news={news}
+              marketData={marketData}
+              onQuickTrade={handleQuickTrade}
+              onChartStock={handleChartStock}
+              onNavigate={handleViewChange}
+              selectedPortfolioId={selectedPortfolio?.id}
+            />
+          </Suspense>
         );
     }
   };
