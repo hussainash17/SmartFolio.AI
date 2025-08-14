@@ -384,6 +384,7 @@ export default function App() {
             onQuickTrade={handleQuickTrade}
             onChartStock={handleChartStock}
             onNavigate={handleViewChange}
+            selectedPortfolioId={selectedPortfolio?.id}
           />
         );
 
@@ -718,6 +719,7 @@ export default function App() {
             onQuickTrade={handleQuickTrade}
             onChartStock={handleChartStock}
             onNavigate={handleViewChange}
+            selectedPortfolioId={selectedPortfolio?.id}
           />
         );
     }
