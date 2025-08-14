@@ -11,6 +11,7 @@ from app.model.user import User, UserInvestmentGoal
 from app.model.portfolio import Portfolio, PortfolioPosition
 from app.model.stock import StockData, DailyOHLC
 from app.services.analytics_service import AnalyticsService
+from app.model.order import Order, OrderStatus, OrderSide
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"]) 
 
@@ -78,6 +79,7 @@ def get_dashboard_summary(
 			"risk_score": 0.0,
 			"risk_level": "LOW",
 			"active_goals": len(active_goals),
+			"buying_power": 0.0,
 		}
 
 	# Gather all positions across portfolios
@@ -88,17 +90,13 @@ def get_dashboard_summary(
 
 	# Sum values
 	total_investment = sum(_safe_decimal(pos.total_investment) for pos in positions)
-	stock_value = sum(_safe_decimal(pos.current_value) for pos in positions)
 	cash_balance = sum(_safe_decimal(p.cash_balance) for p in portfolios)
-	total_portfolio_value = stock_value + cash_balance
 
 	# Build map of stock_id -> total quantity and current value for weighting
 	from collections import defaultdict
 	stock_quantity: Dict[UUID, Decimal] = defaultdict(lambda: Decimal(0))
-	stock_current_value: Dict[UUID, Decimal] = defaultdict(lambda: Decimal(0))
 	for pos in positions:
 		stock_quantity[pos.stock_id] += _safe_decimal(pos.quantity)
-		stock_current_value[pos.stock_id] += _safe_decimal(pos.current_value)
 
 	# Fetch latest StockData for each stock for day change and current price
 	company_ids = list(stock_quantity.keys())
@@ -116,6 +114,17 @@ def get_dashboard_summary(
 			if row.company_id not in seen:
 				latest_prices[row.company_id] = row
 				seen.add(row.company_id)
+
+	# Compute stock value using latest prices where available; fallback to stored current_value
+	stock_value_calc = Decimal(0)
+	for pos in positions:
+		data = latest_prices.get(pos.stock_id)
+		if data:
+			stock_value_calc += _safe_decimal(data.last_trade_price) * _safe_decimal(pos.quantity)
+		else:
+			stock_value_calc += _safe_decimal(pos.current_value)
+	stock_value = stock_value_calc
+	total_portfolio_value = stock_value + cash_balance
 
 	# Compute day change using StockData (last - previous_close) * quantity
 	day_change_value = Decimal(0)
@@ -146,11 +155,12 @@ def get_dashboard_summary(
 			if current_data:
 				current_price = _safe_decimal(current_data.last_trade_price)
 			else:
+				# Fallback: derive from positions' stored current_value
 				qty = stock_quantity.get(cid, Decimal(0))
-				cur_val = stock_current_value.get(cid, Decimal(0))
-				current_price = (cur_val / qty) if qty > 0 else Decimal(0)
+				# Approximate current value by distributing total stock_value proportionally is complex; skip when unknown
+				current_price = Decimal(0) if qty <= 0 else Decimal(0)
 			# Weight by current position value
-			position_value = stock_current_value.get(cid, Decimal(0))
+			position_value = (_safe_decimal(current_data.last_trade_price) * qty) if current_data else Decimal(0)
 			if baseline_price > 0 and position_value > 0 and current_price > 0:
 				ret = (current_price / baseline_price) - Decimal(1)
 				ytd_numerator += position_value * ret
@@ -166,7 +176,7 @@ def get_dashboard_summary(
 	for p in portfolios:
 		# Weight by this portfolio's value
 		p_positions = [pos for pos in positions if pos.portfolio_id == p.id]
-		p_value = float(sum(_safe_decimal(pos.current_value) for pos in p_positions))
+		p_value = float(sum((_safe_decimal(latest_prices.get(pos.stock_id).last_trade_price) * _safe_decimal(pos.quantity)) if latest_prices.get(pos.stock_id) else _safe_decimal(pos.current_value) for pos in p_positions))
 		if p_value <= 0:
 			continue
 		try:
@@ -185,6 +195,27 @@ def get_dashboard_summary(
 	
 	risk_score = (weighted_risk_score / weight_sum) if weight_sum > 0 else 0.0
 	risk_level = _risk_level(risk_score)
+
+	# Compute reserved funds for pending/partial BUY orders and derive buying power
+	reserved_funds = Decimal(0)
+	open_buy_orders: List[Order] = session.exec(
+		select(Order).where(
+			Order.user_id == current_user.id,
+			Order.side == OrderSide.BUY,
+			Order.status.in_([OrderStatus.PENDING, OrderStatus.PARTIAL])
+		)
+	).all() or []
+	for o in open_buy_orders:
+		remaining_qty = _safe_decimal(o.quantity) - _safe_decimal(o.filled_quantity or 0)
+		if remaining_qty <= 0:
+			continue
+		lp = latest_prices.get(o.stock_id)
+		ref_price = _safe_decimal(o.price) if o.price is not None else (_safe_decimal(lp.last_trade_price) if lp else Decimal(0))
+		reserved_funds += (ref_price * remaining_qty)
+
+	buying_power_value = cash_balance - reserved_funds
+	if buying_power_value < 0:
+		buying_power_value = Decimal(0)
 
 	# Active goals count
 	active_goals = session.exec(
@@ -206,4 +237,5 @@ def get_dashboard_summary(
 		"risk_score": float(risk_score),
 		"risk_level": risk_level,
 		"active_goals": len(active_goals),
+		"buying_power": float(buying_power_value),
 	}

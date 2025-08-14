@@ -70,9 +70,8 @@ export function GlobalTopBar({ accountBalance, onQuickTrade, className }: Global
     return formatCurrency(amount);
   };
 
-  // Mock daily P&L (1.5% gain)
-  const todayPnL = accountBalance.totalValue * 0.015;
-  const todayPnLPercent = 1.5;
+  const todayPnL = accountBalance.dayChange ?? 0;
+  const todayPnLPercent = accountBalance.dayChangePercent ?? 0;
 
   return (
     <div className={`border-b border-sidebar-border bg-background px-6 py-3 ${className || ''}`}>

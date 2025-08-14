@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { User, Order, Trade, MarketData, Watchlist, Transaction, NewsItem, AccountBalance } from '../types/trading';
-import { MarketService, NewsService, OrdersService } from '../src/client';
+import { MarketService, NewsService, OrdersService, OpenAPI } from '../src/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from './queryKeys';
 
@@ -93,18 +93,41 @@ export function useTrading() {
     },
   });
 
+  const { data: dashboard = { total_portfolio_value: 0, cash_balance: 0, stock_value: 0, buying_power: 0, day_change: 0, day_change_percent: 0 } } = useQuery({
+    queryKey: queryKeys.dashboardSummary,
+    queryFn: async () => {
+      const base = (OpenAPI as any).BASE || '';
+      const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/dashboard/summary`, {
+        headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
+        credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+      });
+      if (!res.ok) return { total_portfolio_value: 0, cash_balance: 0, stock_value: 0, buying_power: 0, day_change: 0, day_change_percent: 0 };
+      const data = await res.json();
+      return {
+        total_portfolio_value: Number(data.total_portfolio_value || 0),
+        cash_balance: Number(data.cash_balance || 0),
+        stock_value: Number(data.stock_value || 0),
+        buying_power: Number(data.buying_power || 0),
+        day_change: Number(data.day_change || 0),
+        day_change_percent: Number(data.day_change_percent || 0),
+      };
+    },
+    staleTime: 30 * 1000,
+  });
+
   const accountBalance: AccountBalance = useMemo(() => {
-    const totalValue = marketData.reduce((sum, s) => sum + s.currentPrice, 0);
     return {
-      totalValue,
-      stockValue: totalValue,
-      cashBalance: 0,
-      buyingPower: Math.max(0, 0),
-      dayTradingBuyingPower: 0,
+      totalValue: Number(dashboard.total_portfolio_value || 0),
+      stockValue: Number(dashboard.stock_value || 0),
+      cashBalance: Number(dashboard.cash_balance || 0),
+      buyingPower: Number(dashboard.buying_power || 0),
+      dayTradingBuyingPower: Number(dashboard.buying_power || 0),
       marginUsed: 0,
       maintenanceMargin: 0,
+      dayChange: Number(dashboard.day_change || 0),
+      dayChangePercent: Number(dashboard.day_change_percent || 0),
     };
-  }, [marketData]);
+  }, [dashboard]);
 
   const placeOrderMutation = useMutation({
     mutationFn: async (orderData: Omit<Order, 'id' | 'orderDate' | 'status' | 'filledQuantity'>) => {
@@ -128,6 +151,7 @@ export function useTrading() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.ordersList });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
     },
   });
 
@@ -138,6 +162,7 @@ export function useTrading() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.ordersList });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
     },
   });
 
