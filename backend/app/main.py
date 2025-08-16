@@ -9,6 +9,8 @@ from app.core.config import settings
 from app.model import Company, Item, User, MarketInformation
 from app.api.main import api_router
 import app.model as _models  # noqa: F401 - ensure all models are imported and mappers registered
+from sqlalchemy.orm import configure_mappers
+configure_mappers()
 from app.scraper.scheduler import start_scheduler
 
 
