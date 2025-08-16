@@ -40,7 +40,7 @@ class AccountTransaction(SQLModel, table=True):
 	created_at: datetime = Field(default_factory=datetime.utcnow)
 
 	# Relationships (optional backrefs)
-	user: "User" = Relationship()
+	user: "User" = Relationship(back_populates="transactions")
 	portfolio: Optional["Portfolio"] = Relationship()
 	order: Optional["Order"] = Relationship()
 	trade: Optional["Trade"] = Relationship()

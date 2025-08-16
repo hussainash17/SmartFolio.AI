@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from .alert import Alert, UserNewsPreference
     from .order import Order
     from .risk_management import UserRiskProfile, RiskAlert, StockScreener
+    from .funds import AccountTransaction
 
 
 class AccountType(str, Enum):
@@ -192,6 +193,9 @@ class User(UserBase, table=True):
     kyc_information: "KYCInformation" = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
     investment_goals: list["UserInvestmentGoal"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
     accounts: list["UserAccount"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
+    
+    # Funds and transactions
+    transactions: list["AccountTransaction"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
 
 
 # KYC Pydantic models for API
@@ -271,20 +275,18 @@ class UserInvestmentGoalUpdate(SQLModel):
 
 class UserInvestmentGoalPublic(UserInvestmentGoalBase):
     id: uuid.UUID
+    user_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
 
 
-# User Account Pydantic models
+# User Account Pydantic models for API
 class UserAccountBase(SQLModel):
     account_type: AccountType
     account_name: str
     account_number: str | None = None
     joint_holder_name: str | None = None
     joint_holder_ssn: str | None = None
-    contribution_limit: int | None = None
-    current_year_contributions: int | None = None
-    is_active: bool = True
 
 
 class UserAccountCreate(UserAccountBase):
@@ -294,15 +296,12 @@ class UserAccountCreate(UserAccountBase):
 class UserAccountUpdate(SQLModel):
     account_name: str | None = None
     account_number: str | None = None
-    joint_holder_name: str | None = None
-    joint_holder_ssn: str | None = None
-    contribution_limit: int | None = None
-    current_year_contributions: int | None = None
     is_active: bool | None = None
 
 
 class UserAccountPublic(UserAccountBase):
     id: uuid.UUID
+    user_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
 
