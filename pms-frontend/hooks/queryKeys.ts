@@ -13,6 +13,7 @@ export const queryKeys = {
   marketList: (limit = 50, offset = 0, q?: string) => ['market', 'list', { limit, offset, q: q || '' }] as const,
   newsList: (limit = 20, offset = 0, symbol?: string) => ['news', 'list', { limit, offset, symbol: symbol || '' }] as const,
   ordersList: ['orders', 'list'] as const,
+  recentTrades: (limit = 20) => ['trades', 'recent', { limit }] as const,
   sectorAnalysis: ['market', 'sector-analysis'] as const,
   indices: ['market', 'indices'] as const,
   topMovers: ['market', 'top-movers'] as const,
