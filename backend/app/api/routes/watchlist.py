@@ -9,6 +9,7 @@ from app.model.portfolio import (
 )
 from app.model.user import User
 from app.model.stock import StockCompany
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/watchlist", tags=["watchlist"])
 
@@ -398,6 +399,121 @@ def add_multiple_stocks(
         "added_count": added_count,
         "skipped_count": skipped_count
     }
+
+
+class BulkRemoveRequest(BaseModel):
+    item_ids: List[UUID] | None = None
+    stock_ids: List[UUID] | None = None
+
+
+@router.post("/{watchlist_id}/items/bulk-remove")
+def remove_multiple_stocks(
+    watchlist_id: UUID,
+    payload: BulkRemoveRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Remove multiple stocks from a watchlist at once.
+    Accepts either explicit watchlist item IDs or stock IDs within the watchlist.
+    """
+    # Verify watchlist belongs to user
+    watchlist = session.exec(
+        select(Watchlist).where(
+            Watchlist.id == watchlist_id,
+            Watchlist.user_id == current_user.id
+        )
+    ).first()
+
+    if not watchlist:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Watchlist not found"
+        )
+
+    removed_count = 0
+
+    # Remove by item_ids
+    if payload.item_ids:
+        items = session.exec(
+            select(WatchlistItem).where(
+                WatchlistItem.watchlist_id == watchlist_id,
+                WatchlistItem.id.in_(payload.item_ids)
+            )
+        ).all()
+        for item in items:
+            session.delete(item)
+            removed_count += 1
+
+    # Remove by stock_ids
+    if payload.stock_ids:
+        items = session.exec(
+            select(WatchlistItem).where(
+                WatchlistItem.watchlist_id == watchlist_id,
+                WatchlistItem.stock_id.in_(payload.stock_ids)
+            )
+        ).all()
+        for item in items:
+            session.delete(item)
+            removed_count += 1
+
+    session.commit()
+    return {"message": f"Removed {removed_count} items from watchlist", "removed_count": removed_count}
+
+
+class BulkSymbolsRequest(BaseModel):
+    symbols: List[str]
+
+
+@router.post("/{watchlist_id}/items/bulk-by-symbols")
+def add_multiple_by_symbols(
+    watchlist_id: UUID,
+    payload: BulkSymbolsRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Add multiple symbols (tickers) to a watchlist by their symbol string.
+    Symbols that do not match any known stock will be skipped.
+    """
+    # Verify watchlist belongs to user
+    watchlist = session.exec(
+        select(Watchlist).where(
+            Watchlist.id == watchlist_id,
+            Watchlist.user_id == current_user.id
+        )
+    ).first()
+
+    if not watchlist:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Watchlist not found"
+        )
+
+    added = 0
+    skipped: List[str] = []
+
+    for sym in payload.symbols:
+        symbol = (sym or "").strip()
+        if not symbol:
+            continue
+        stock = session.exec(
+            select(StockCompany).where(StockCompany.symbol == symbol)
+        ).first()
+        if not stock:
+            skipped.append(symbol)
+            continue
+        existing_item = session.exec(
+            select(WatchlistItem).where(
+                WatchlistItem.watchlist_id == watchlist_id,
+                WatchlistItem.stock_id == stock.id
+            )
+        ).first()
+        if existing_item:
+            continue
+        session.add(WatchlistItem(watchlist_id=watchlist_id, stock_id=stock.id))
+        added += 1
+
+    session.commit()
+    return {"message": f"Added {added} symbols", "added_count": added, "skipped": skipped}
 
 
 # Search stocks to add to watchlist

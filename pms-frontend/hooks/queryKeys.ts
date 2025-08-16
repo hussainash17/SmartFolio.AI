@@ -29,4 +29,9 @@ export const queryKeys = {
   analystPicks: ['research', 'analyst-picks'] as const,
   earningsHighlights: ['research', 'earnings-highlights'] as const,
   themes: ['research', 'themes'] as const,
+
+  // New
+  watchlists: ['watchlists'] as const,
+  watchlistItems: (watchlistId: string) => ['watchlists', watchlistId, 'items'] as const,
+  alerts: ['alerts'] as const,
 };

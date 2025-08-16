@@ -21,7 +21,16 @@ import {
   Settings,
   HelpCircle,
   TrendingUp,
+  Plus,
+  Trash2,
+  Star,
 } from "lucide-react";
+import { Button } from "./components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
+import { Input } from "./components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
+import { OpenAPI, MarketService } from "./src/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 // Lazy-loaded page components to reduce initial bundle size
 const ComprehensiveDashboard = lazy(() => import("./components/ComprehensiveDashboard").then(m => ({ default: m.ComprehensiveDashboard })));
@@ -141,7 +150,10 @@ export default function App() {
     deposit,
     withdraw,
     updateCreditLimit,
+    createWatchlist,
+    createAlert,
   } = useTrading();
+  const queryClient = useQueryClient();
 
   // Show loading screen while checking authentication
   if (authLoading) {
@@ -518,14 +530,248 @@ export default function App() {
       case "watchlist":
         return (
           <div className="space-y-6">
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <BookOpen className="h-8 w-8 text-primary" />
-              </div>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Custom watchlist management and advanced stock monitoring tools coming soon.
-              </p>
-            </div>
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Watchlists</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Input id="new-watchlist-name" placeholder="New watchlist name" className="w-64" />
+                    <Button
+                      onClick={async () => {
+                        const name = (document.getElementById('new-watchlist-name') as HTMLInputElement)?.value?.trim();
+                        if (!name) return;
+                        await createWatchlist(name);
+                        (document.getElementById('new-watchlist-name') as HTMLInputElement).value = '';
+                        toast.success('Watchlist created');
+                      }}
+                      className="gap-2"
+                    >
+                      <Plus className="h-4 w-4" /> Create
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {watchlists.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">No watchlists yet</div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {watchlists.map((wl) => (
+                      <Card key={wl.id} className="border">
+                        <CardHeader className="flex flex-row items-center justify-between">
+                          <CardTitle className="text-base">{wl.name}</CardTitle>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant={wl.isDefault ? "default" : "outline"}
+                              size="sm"
+                              onClick={async () => {
+                                const base = (OpenAPI as any).BASE || '';
+                                await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${wl.id}`, {
+                                  method: 'PUT',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    ...(OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : {},
+                                  },
+                                  credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+                                  body: JSON.stringify({ is_default: true }),
+                                });
+                                toast.success('Set as default watchlist');
+                                (queryClient as any).invalidateQueries({ queryKey: ['watchlists'] });
+                              }}
+                              className={`gap-2 ${wl.isDefault ? '' : ''}`}
+                            >
+                              <Star className={wl.isDefault ? 'h-4 w-4 fill-current' : 'h-4 w-4'} />
+                              {wl.isDefault ? 'Default' : 'Set Default'}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                const newName = prompt('New watchlist name', wl.name) || wl.name;
+                                const newDesc = prompt('Description', wl.description || '') || wl.description || '';
+                                const base = (OpenAPI as any).BASE || '';
+                                await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${wl.id}`, {
+                                  method: 'PUT',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    ...(OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : {},
+                                  },
+                                  credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+                                  body: JSON.stringify({ name: newName, description: newDesc }),
+                                });
+                                toast.success('Watchlist updated');
+                                (queryClient as any).invalidateQueries({ queryKey: ['watchlists'] });
+                              }}
+                              className="gap-2"
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                // Clear all items from this watchlist using bulk-remove
+                                const base = (OpenAPI as any).BASE || '';
+                                const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${wl.id}/items/with-details`, {
+                                  headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
+                                  credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+                                });
+                                const rows = res.ok ? await res.json() : [];
+                                const item_ids = (rows as any[]).map((r: any) => r.id);
+                                await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${wl.id}/items/bulk-remove`, {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    ...(OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : {},
+                                  },
+                                  credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+                                  body: JSON.stringify({ item_ids }),
+                                });
+                                toast.success('Cleared all items');
+                                (queryClient as any).invalidateQueries({ queryKey: ['watchlists'] });
+                              }}
+                              className="gap-2"
+                            >
+                              Clear All
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={async () => {
+                                if (!confirm('Delete this watchlist?')) return;
+                                const base = (OpenAPI as any).BASE || '';
+                                await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${wl.id}`, {
+                                  method: 'DELETE',
+                                  headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
+                                  credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+                                });
+                                toast.success('Watchlist deleted');
+                                (queryClient as any).invalidateQueries({ queryKey: ['watchlists'] });
+                              }}
+                              className="h-8 w-8 p-0 text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex items-center gap-2 mb-4">
+                            <Input id={`add-symbol-${wl.id}`} placeholder="Add symbols (e.g., AAPL, MSFT, TSLA)" className="w-72" />
+                            <Button
+                              onClick={async () => {
+                                const input = document.getElementById(`add-symbol-${wl.id}`) as HTMLInputElement;
+                                const symInput = input?.value?.trim() || '';
+                                if (!symInput) return;
+                                const parts = symInput.split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+                                if (parts.length > 1) {
+                                  // Bulk by symbols
+                                  const base = (OpenAPI as any).BASE || '';
+                                  await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${wl.id}/items/bulk-by-symbols`, {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                      ...(OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : {},
+                                    },
+                                    credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+                                    body: JSON.stringify({ symbols: parts }),
+                                  });
+                                  toast.success(`Added ${parts.length} symbols to ${wl.name}`);
+                                } else {
+                                  await addToWatchlist(parts[0], wl.id);
+                                  toast.success(`Added ${parts[0]} to ${wl.name}`);
+                                }
+                                input.value = '';
+                                (queryClient as any).invalidateQueries({ queryKey: ['watchlists'] });
+                              }}
+                              variant="secondary"
+                              className="gap-2"
+                            >
+                              <Star className="h-4 w-4" /> Add
+                            </Button>
+                          </div>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Symbol</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {(wl.symbols || []).length === 0 ? (
+                                <TableRow>
+                                  <TableCell colSpan={2} className="text-center text-muted-foreground">No symbols yet</TableCell>
+                                </TableRow>
+                              ) : (
+                                wl.symbols.map((symbol) => (
+                                  <TableRow key={`${wl.id}-${symbol}`}>
+                                    <TableCell>{symbol}</TableCell>
+                                    <TableCell className="text-right">
+                                      <div className="flex items-center gap-1 justify-end">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={async () => {
+                                            // Quick alert creator: prompt for type and threshold
+                                            const type = prompt('Alert type: price | percent | volume | news | earnings', 'price');
+                                            if (!type) return;
+                                            let stockId: string | undefined;
+                                            try {
+                                              const stocks = (await MarketService.listStocks({ q: symbol, limit: 1 })) as any[];
+                                              stockId = stocks?.[0]?.id ? String(stocks[0].id) : undefined;
+                                            } catch {}
+                                            let condition = 'above';
+                                            let target = 0;
+                                            if (type === 'price' || type === 'percent' || type === 'volume') {
+                                              const cond = prompt('Condition: above | below | equals', 'above');
+                                              if (!cond) return;
+                                              condition = cond as any;
+                                              const tgt = prompt('Target value (number)', '0');
+                                              if (!tgt) return;
+                                              target = Number(tgt);
+                                              if (!Number.isFinite(target)) return;
+                                            }
+                                            try {
+                                              await createAlert({
+                                                stock_id: stockId,
+                                                alert_type: type,
+                                                condition,
+                                                target_value: target,
+                                                notification_method: 'in_app',
+                                              });
+                                              toast.success('Alert created');
+                                            } catch {
+                                              toast.error('Failed to create alert');
+                                            }
+                                          }}
+                                          className="h-8 w-8 p-0"
+                                        >
+                                          <Bell className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={async () => {
+                                            await removeFromWatchlist(wl.id, symbol);
+                                            toast.success(`Removed ${symbol}`);
+                                          }}
+                                          className="h-8 w-8 p-0 text-destructive"
+                                        >
+                                          <Star className="h-3 w-3 fill-current" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))
+                              )}
+                            </TableBody>
+                          </Table>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         );
 
