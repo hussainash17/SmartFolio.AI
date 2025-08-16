@@ -4,10 +4,10 @@ from fastapi.routing import APIRoute
 from starlette.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from app.api.main import api_router
 from app.core.config import settings
-# Import models to ensure they are initialized before scheduler
+# Import models to ensure they are initialized before any routers/scheduler
 from app.model import Company, Item, User, MarketInformation
+from app.api.main import api_router
 from app.scraper.scheduler import start_scheduler
 
 
