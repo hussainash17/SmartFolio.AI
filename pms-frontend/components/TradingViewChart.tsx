@@ -66,17 +66,17 @@ export function TradingViewChart({ stock, onQuickTrade, className }: TradingView
   return (
     <Card className={className}>
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start sm:items-center gap-4 min-w-0">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <span>{stock.symbol}</span>
-                <Badge variant="outline">{stock.sector}</Badge>
+                <span className="truncate">{stock.symbol}</span>
+                <Badge variant="outline" className="shrink-0">{stock.sector}</Badge>
               </CardTitle>
-              <p className="text-sm text-muted-foreground">{stock.companyName}</p>
+              <p className="text-sm text-muted-foreground truncate max-w-[260px] sm:max-w-none">{stock.companyName}</p>
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <div className="text-right">
                 <p className="text-2xl font-bold">{formatCurrency(stock.currentPrice)}</p>
                 <div className="flex items-center gap-1">
@@ -93,7 +93,7 @@ export function TradingViewChart({ stock, onQuickTrade, className }: TradingView
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
             <Button
               variant="outline"
               size="sm"
@@ -110,18 +110,18 @@ export function TradingViewChart({ stock, onQuickTrade, className }: TradingView
             >
               Sell
             </Button>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0">
               <Maximize2 className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0">
               <Settings className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
         {/* Chart Controls */}
-        <div className="flex items-center justify-between pt-3 border-t">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-3 border-t">
+          <div className="flex items-center gap-4 overflow-x-auto no-scrollbar">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Timeframe:</span>
               <div className="flex gap-1">
@@ -155,7 +155,7 @@ export function TradingViewChart({ stock, onQuickTrade, className }: TradingView
             </div>
           </div>
 
-          <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-4 text-sm shrink-0">
             <div className="flex items-center gap-1">
               <Volume2 className="h-3 w-3 text-muted-foreground" />
               <span className="text-muted-foreground">Vol:</span>
@@ -177,7 +177,7 @@ export function TradingViewChart({ stock, onQuickTrade, className }: TradingView
 
       <CardContent className="p-0">
         {/* Mock TradingView Chart */}
-        <div className="relative bg-gradient-to-b from-background to-muted/20 h-96 overflow-hidden">
+        <div className="relative bg-gradient-to-b from-background to-muted/20 h-80 sm:h-96 overflow-hidden">
           {/* Grid Lines */}
           <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 1 }}>
             {/* Horizontal grid lines */}
@@ -278,11 +278,19 @@ export function TradingViewChart({ stock, onQuickTrade, className }: TradingView
             </Button>
             <Button
               size="sm"
-              onClick={() => onQuickTrade(stock.symbol)}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              variant="outline"
+              onClick={() => onQuickTrade(stock.symbol, 'buy')}
+              className="text-green-600 border-green-200 hover:bg-green-50"
             >
-              <Plus className="h-4 w-4 mr-1" />
-              Quick Trade
+              Buy
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onQuickTrade(stock.symbol, 'sell')}
+              className="text-red-600 border-red-200 hover:bg-red-50"
+            >
+              Sell
             </Button>
           </div>
 

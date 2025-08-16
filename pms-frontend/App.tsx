@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, lazy } from "react";
+import { useState, useEffect, Suspense, lazy, startTransition } from "react";
 import { TradingSidebar } from "./components/TradingSidebar";
 import { GlobalTopBar } from "./components/GlobalTopBar";
 import { Toaster } from "./components/ui/sonner";
@@ -165,9 +165,17 @@ export default function App() {
   if (!isAuthenticated) {
     console.log('🔐 Showing auth pages:', { authView, hasUser: !!user, isAuthenticated });
     if (authView === "signup") {
-      return <SignupPage onSwitchToLogin={() => setAuthView("login")} />;
+      return (
+        <Suspense fallback={<div>Loading sign up...</div>}>
+          <SignupPage onSwitchToLogin={() => setAuthView("login")} />
+        </Suspense>
+      );
     }
-    return <LoginPage onSwitchToSignup={() => setAuthView("signup")} />;
+    return (
+      <Suspense fallback={<div>Loading login...</div>}>
+        <LoginPage onSwitchToSignup={() => setAuthView("signup")} />
+      </Suspense>
+    );
   }
 
   // Show main app
@@ -175,7 +183,9 @@ export default function App() {
 
   // Main app handlers
   const handleViewChange = (view: string) => {
-    setCurrentView(view as View);
+    startTransition(() => {
+      setCurrentView(view as View);
+    });
   };
 
   const handleLogout = () => {
@@ -240,8 +250,8 @@ export default function App() {
     }
   };
 
-  const handlePlaceOrder = (orderData: any) => {
-    const orderId = placeOrder(orderData);
+  const handlePlaceOrder = async (orderData: any) => {
+    const orderId = await placeOrder(orderData);
     toast.success(`Order placed successfully! Order ID: ${orderId.slice(0, 8)}...`);
   };
 
@@ -427,18 +437,20 @@ export default function App() {
 
       case "performance":
         return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {marketData.slice(0, 3).map((stock) => (
-                <TradingViewChart
-                  key={stock.symbol}
-                  stock={stock}
-                  onQuickTrade={handleQuickTrade}
-                  className="h-80"
-                />
-              ))}
+          <Suspense fallback={<div>Loading Performance Analytics...</div>}>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                {marketData.slice(0, 3).map((stock) => (
+                  <TradingViewChart
+                    key={stock.symbol}
+                    stock={stock}
+                    onQuickTrade={handleQuickTrade}
+                    className="h-80"
+                  />
+                ))}
+              </div>
             </div>
-          </div>
+          </Suspense>
         );
 
       case "allocation":
@@ -530,17 +542,19 @@ export default function App() {
 
       case "research":
         return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {marketData.slice(0, 4).map((stock) => (
-                <TradingViewChart
-                  key={stock.symbol}
-                  stock={stock}
-                  onQuickTrade={handleQuickTrade}
-                />
-              ))}
+          <Suspense fallback={<div>Loading Research Tools...</div>}>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {marketData.slice(0, 4).map((stock) => (
+                  <TradingViewChart
+                    key={stock.symbol}
+                    stock={stock}
+                    onQuickTrade={handleQuickTrade}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
+          </Suspense>
         );
 
       case "fundamentals":
@@ -711,22 +725,24 @@ export default function App() {
       case "chart":
         const chartStock = getMarketData(selectedChartStock);
         return chartStock ? (
-          <div className="space-y-6">
-            <TradingViewChart stock={chartStock} onQuickTrade={handleQuickTrade} />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {marketData
-                .filter((s) => s.symbol !== selectedChartStock)
-                .slice(0, 3)
-                .map((stock) => (
-                  <TradingViewChart
-                    key={stock.symbol}
-                    stock={stock}
-                    onQuickTrade={handleQuickTrade}
-                    className="h-64"
-                  />
-                ))}
+          <Suspense fallback={<div>Loading Chart...</div>}>
+            <div className="space-y-6">
+              <TradingViewChart stock={chartStock} onQuickTrade={handleQuickTrade} />
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {marketData
+                  .filter((s) => s.symbol !== selectedChartStock)
+                  .slice(0, 3)
+                  .map((stock) => (
+                    <TradingViewChart
+                      key={stock.symbol}
+                      stock={stock}
+                      onQuickTrade={handleQuickTrade}
+                      className="h-64"
+                    />
+                  ))}
+              </div>
             </div>
-          </div>
+          </Suspense>
         ) : null;
 
       default:
@@ -774,34 +790,43 @@ export default function App() {
         </div>
       </div>
 
-      <PortfolioForm
-        open={isPortfolioFormOpen}
-        onOpenChange={setIsPortfolioFormOpen}
-        onSubmit={handlePortfolioSubmit}
-      />
+      <Suspense fallback={null}>
+        <PortfolioForm
+          open={isPortfolioFormOpen}
+          onOpenChange={setIsPortfolioFormOpen}
+          onSubmit={handlePortfolioSubmit}
+        />
+      </Suspense>
 
-      <StockForm
-        open={isStockFormOpen}
-        onOpenChange={setIsStockFormOpen}
-        onSubmit={handleStockSubmit}
-        initialData={editingStock || undefined}
-        availableStocks={marketData}
-      />
+      <Suspense fallback={null}>
+        <StockForm
+          open={isStockFormOpen}
+          onOpenChange={setIsStockFormOpen}
+          onSubmit={handleStockSubmit}
+          initialData={editingStock || undefined}
+          availableStocks={marketData}
+        />
+      </Suspense>
 
-      <QuickTradeDialog
-        open={isQuickTradeOpen}
-        onOpenChange={(open) => {
-          setIsQuickTradeOpen(open);
-          if (!open) {
-            setQuickTradeSymbol(undefined);
-            setQuickTradeSide(undefined);
-          }
-        }}
-        onPlaceOrder={handlePlaceOrder}
-        marketData={marketData}
-        buyingPower={accountBalance.buyingPower}
-        initialSymbol={quickTradeSymbol}
-      />
+      <Suspense fallback={null}>
+        <QuickTradeDialog
+          open={isQuickTradeOpen}
+          onOpenChange={(open) => {
+            startTransition(() => {
+              setIsQuickTradeOpen(open);
+              if (!open) {
+                setQuickTradeSymbol(undefined);
+                setQuickTradeSide(undefined);
+              }
+            });
+          }}
+          onPlaceOrder={handlePlaceOrder}
+          marketData={marketData}
+          buyingPower={accountBalance.buyingPower}
+          initialSymbol={quickTradeSymbol}
+          initialSide={quickTradeSide}
+        />
+      </Suspense>
 
       <Toaster />
     </div>

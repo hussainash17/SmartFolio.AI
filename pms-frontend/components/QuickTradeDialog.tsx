@@ -17,6 +17,7 @@ interface QuickTradeDialogProps {
   marketData: MarketData[];
   buyingPower: number;
   initialSymbol?: string;
+  initialSide?: 'buy' | 'sell';
 }
 
 export function QuickTradeDialog({ 
@@ -25,7 +26,8 @@ export function QuickTradeDialog({
   onPlaceOrder, 
   marketData, 
   buyingPower,
-  initialSymbol 
+  initialSymbol,
+  initialSide
 }: QuickTradeDialogProps) {
   const [selectedStock, setSelectedStock] = useState<MarketData | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -48,6 +50,13 @@ export function QuickTradeDialog({
       }
     }
   }, [open, initialSymbol, marketData, selectedStock]);
+
+  // Set initial side when dialog opens
+  useEffect(() => {
+    if (open && initialSide) {
+      setOrderDetails(prev => ({ ...prev, side: initialSide }));
+    }
+  }, [open, initialSide]);
 
   // Reset when dialog closes
   useEffect(() => {
