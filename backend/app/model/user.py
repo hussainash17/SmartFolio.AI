@@ -1,11 +1,11 @@
 import uuid
-from typing import TYPE_CHECKING
 from datetime import datetime
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from pydantic import EmailStr
-from sqlmodel import Field, Relationship, SQLModel
 from sqlalchemy import JSON, Column
+from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .item import Item
@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from .subscription import UserSubscription, Payment
     from .alert import Alert, UserNewsPreference
     from .order import Order
+    from .funds import AccountTransaction
     from .risk_management import UserRiskProfile, RiskAlert, StockScreener
     from .funds import AccountTransaction
 
@@ -51,41 +52,41 @@ class InvestmentGoal(str, Enum):
 class KYCInformation(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="user.id")
-    
+
     # Personal Information
     first_name: str = Field(max_length=100)
     last_name: str = Field(max_length=100)
     date_of_birth: datetime
     ssn_last_four: str = Field(max_length=4, description="Last 4 digits of SSN")
     phone_number: str = Field(max_length=20)
-    
+
     # Address Information
     street_address: str = Field(max_length=200)
     city: str = Field(max_length=100)
     state: str = Field(max_length=50)
     zip_code: str = Field(max_length=10)
     country: str = Field(max_length=50, default="USA")
-    
+
     # Employment Information
     employer_name: str | None = Field(default=None, max_length=200)
     occupation: str | None = Field(default=None, max_length=100)
     annual_income: int | None = Field(default=None)
     employment_status: str | None = Field(default=None, max_length=50)
-    
+
     # Financial Information
     net_worth: int | None = Field(default=None)
     liquid_net_worth: int | None = Field(default=None)
     investment_experience: str | None = Field(default=None, max_length=50)  # BEGINNER, INTERMEDIATE, EXPERIENCED
-    
+
     # KYC Status
     kyc_status: KYCStatus = Field(default=KYCStatus.PENDING)
     verification_date: datetime | None = Field(default=None)
     expiry_date: datetime | None = Field(default=None)
     rejection_reason: str | None = Field(default=None, max_length=500)
-    
+
     # Document Information
     documents: dict = Field(default={}, sa_column=Column(JSON))
-    
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -117,15 +118,15 @@ class UserAccount(SQLModel, table=True):
     account_type: AccountType
     account_name: str = Field(max_length=100)
     account_number: str | None = Field(default=None, max_length=50)
-    
+
     # Joint account information
     joint_holder_name: str | None = Field(default=None, max_length=200)
     joint_holder_ssn: str | None = Field(default=None, max_length=11)
-    
+
     # Retirement account information
     contribution_limit: int | None = Field(default=None)
     current_year_contributions: int | None = Field(default=None)
-    
+
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -176,26 +177,35 @@ class User(UserBase, table=True):
     # Optional credit/margin line available to the user, added to buying power
     credit_limit: float | None = Field(default=0.0)
     items: list["Item"] = Relationship(back_populates="owner", sa_relationship_kwargs={"cascade": "all, delete"})
-    
+
     # SmartStock relationships
-    portfolios: list["Portfolio"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
-    watchlists: list["Watchlist"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
-    subscriptions: list["UserSubscription"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
+    portfolios: list["Portfolio"] = Relationship(back_populates="user",
+                                                 sa_relationship_kwargs={"cascade": "all, delete"})
+    watchlists: list["Watchlist"] = Relationship(back_populates="user",
+                                                 sa_relationship_kwargs={"cascade": "all, delete"})
+    subscriptions: list["UserSubscription"] = Relationship(back_populates="user",
+                                                           sa_relationship_kwargs={"cascade": "all, delete"})
     payments: list["Payment"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
     alerts: list["Alert"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
-    news_preferences: list["UserNewsPreference"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
+    news_preferences: list["UserNewsPreference"] = Relationship(back_populates="user",
+                                                                sa_relationship_kwargs={"cascade": "all, delete"})
     orders: list["Order"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
-    risk_profile: "UserRiskProfile" = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
-    risk_alerts: list["RiskAlert"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
-    stock_screeners: list["StockScreener"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
-    
+    risk_profile: "UserRiskProfile" = Relationship(back_populates="user",
+                                                   sa_relationship_kwargs={"cascade": "all, delete"})
+    risk_alerts: list["RiskAlert"] = Relationship(back_populates="user",
+                                                  sa_relationship_kwargs={"cascade": "all, delete"})
+    stock_screeners: list["StockScreener"] = Relationship(back_populates="user",
+                                                          sa_relationship_kwargs={"cascade": "all, delete"})
+    transactions: list["AccountTransaction"] = Relationship(back_populates="user",
+                                                            sa_relationship_kwargs={"cascade": "all, delete"})
+
     # KYC and Account Management relationships
-    kyc_information: "KYCInformation" = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
-    investment_goals: list["UserInvestmentGoal"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
-    accounts: list["UserAccount"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
-    
-    # Funds and transactions
-    transactions: list["AccountTransaction"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
+    kyc_information: "KYCInformation" = Relationship(back_populates="user",
+                                                     sa_relationship_kwargs={"cascade": "all, delete"})
+    investment_goals: list["UserInvestmentGoal"] = Relationship(back_populates="user",
+                                                                sa_relationship_kwargs={"cascade": "all, delete"})
+    accounts: list["UserAccount"] = Relationship(back_populates="user",
+                                                 sa_relationship_kwargs={"cascade": "all, delete"})
 
 
 # KYC Pydantic models for API

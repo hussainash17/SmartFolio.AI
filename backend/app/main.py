@@ -8,6 +8,7 @@ from app.core.config import settings
 # Import models to ensure they are initialized before any routers/scheduler
 from app.model import Company, Item, User, MarketInformation
 from app.api.main import api_router
+import app.model as _models  # noqa: F401 - ensure all models are imported and mappers registered
 from app.scraper.scheduler import start_scheduler
 
 
