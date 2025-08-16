@@ -194,3 +194,9 @@ class MarketDepth(SQLModel):
     bids: list[OrderBookEntry]  # Buy orders
     asks: list[OrderBookEntry]  # Sell orders
     timestamp: datetime 
+
+
+class OrderWithDetails(OrderPublic):
+    """Public order payload with stock details for UI convenience"""
+    symbol: str
+    company_name: str 

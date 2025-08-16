@@ -20,7 +20,6 @@ export function useTrading() {
     dayTradingBuyingPower: 0,
   });
 
-  const [trades] = useState<Trade[]>([]);
   const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
   const [transactions] = useState<Transaction[]>([]);
 
@@ -73,12 +72,18 @@ export function useTrading() {
     queryKey: queryKeys.ordersList,
     enabled: !!(OpenAPI as any).TOKEN,
     queryFn: async () => {
-      const apiOrders = await OrdersService.getUserOrders();
+      const base = (OpenAPI as any).BASE || '';
+      const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/orders/with-details`, {
+        headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
+        credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+      });
+      if (!res.ok) return [] as Order[];
+      const apiOrders = await res.json();
       return (apiOrders as any[]).map((o: any) => ({
         id: String(o.id),
         portfolioId: o.portfolio_id ? String(o.portfolio_id) : '',
-        symbol: '',
-        companyName: '',
+        symbol: o.symbol || '',
+        companyName: o.company_name || '',
         side: String(o.side || '').toLowerCase() as any,
         orderType: String(o.order_type || '').toLowerCase().replace('_', '-') as any,
         quantity: Number(o.quantity || 0),
@@ -117,6 +122,32 @@ export function useTrading() {
       };
     },
     staleTime: 30 * 1000,
+  });
+
+  const { data: trades = [] } = useQuery({
+    queryKey: queryKeys.recentTrades(50),
+    enabled: !!(OpenAPI as any).TOKEN,
+    queryFn: async () => {
+      const base = (OpenAPI as any).BASE || '';
+      const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolio/trades/recent?limit=50`, {
+        headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
+        credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+      });
+      if (!res.ok) return [] as Trade[];
+      const apiTrades = await res.json();
+      return (apiTrades as any[]).map((t: any) => ({
+        id: String(t.id),
+        orderId: '',
+        portfolioId: t.portfolio_id ? String(t.portfolio_id) : '',
+        symbol: t.symbol || '',
+        side: String(t.trade_type || '').toLowerCase() as any,
+        quantity: Number(t.quantity || 0),
+        price: Number(t.price || 0),
+        totalValue: Number(t.total_amount || (Number(t.price || 0) * Number(t.quantity || 0))),
+        fees: Number(t.commission || 0),
+        timestamp: t.trade_date,
+      })) as Trade[];
+    },
   });
 
   const accountBalance: AccountBalance = useMemo(() => {

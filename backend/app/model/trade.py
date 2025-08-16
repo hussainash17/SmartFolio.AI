@@ -68,6 +68,12 @@ class TradePublic(TradeBase):
     created_at: datetime
 
 
+class TradeWithDetails(TradePublic):
+    """Public trade payload with stock details for UI convenience"""
+    symbol: str
+    company_name: str
+
+
 # Trade Summary
 class TradeSummary(SQLModel):
     total_trades: int

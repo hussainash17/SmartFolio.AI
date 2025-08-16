@@ -8,7 +8,8 @@ from app.model.portfolio import (
     PortfolioPosition, PortfolioPositionPublic,
     PortfolioSummary
 )
-from app.model.trade import Trade, TradeCreate, TradeUpdate, TradePublic
+from app.model.trade import Trade, TradeCreate, TradeUpdate, TradePublic, TradeWithDetails
+from app.model.order import Order, OrderStatus, OrderSide
 from app.model.user import User
 from app.model.stock import StockCompany, StockData
 
@@ -622,3 +623,79 @@ def get_portfolio_summary(
         total_positions=len(positions),
         positions=positions
     ) 
+
+
+@router.get("/trades/recent", response_model=List[TradeWithDetails])
+def get_recent_trades(
+    limit: int = 20,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep),
+):
+    """Get recent executed trades across all portfolios for current user"""
+    # Find user's portfolios
+    portfolio_ids = [p.id for p in session.exec(select(Portfolio).where(Portfolio.user_id == current_user.id)).all() or []]
+    if not portfolio_ids:
+        return []
+    rows = session.exec(
+        select(Trade, StockCompany)
+        .join(StockCompany, Trade.stock_id == StockCompany.id)
+        .where(Trade.portfolio_id.in_(portfolio_ids))
+        .order_by(Trade.trade_date.desc())
+        .limit(limit)
+    ).all() or []
+    result: List[TradeWithDetails] = []
+    for trade, stock in rows:
+        result.append(
+            TradeWithDetails(
+                **trade.dict(),
+                symbol=stock.symbol,
+                company_name=stock.company_name,
+            )
+        )
+    return result
+
+
+@router.get("/orders-trades/summary")
+def get_orders_trades_summary(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep),
+):
+    """Summary for Orders & Trades dashboard boxes."""
+    # Pending orders
+    pending = session.exec(
+        select(Order).where(
+            Order.user_id == current_user.id,
+            Order.status == OrderStatus.PENDING,
+        )
+    ).all() or []
+    # Filled today
+    from datetime import datetime as _dt
+    start = _dt.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    filled_today = session.exec(
+        select(Order).where(
+            Order.user_id == current_user.id,
+            Order.status == OrderStatus.FILLED,
+            Order.filled_at >= start,
+        )
+    ).all() or []
+    # Total order value all-time
+    all_orders = session.exec(select(Order).where(Order.user_id == current_user.id)).all() or []
+    from decimal import Decimal as _D
+    pending_total_value = sum(_D(o.total_amount or 0) for o in pending)
+    all_time_total_value = sum(_D(o.total_amount or 0) for o in all_orders)
+    # Recent trades count
+    portfolio_ids = [p.id for p in session.exec(select(Portfolio).where(Portfolio.user_id == current_user.id)).all() or []]
+    recent_trades_count = 0
+    if portfolio_ids:
+        recent_trades_count = len(
+            session.exec(
+                select(Trade).where(Trade.portfolio_id.in_(portfolio_ids)).order_by(Trade.trade_date.desc()).limit(50)
+            ).all() or []
+        )
+    return {
+        "pending_orders_count": len(pending),
+        "pending_orders_total_value": float(pending_total_value),
+        "filled_today_count": len(filled_today),
+        "total_order_value_all_time": float(all_time_total_value),
+        "recent_trades_count": int(recent_trades_count),
+    } 
