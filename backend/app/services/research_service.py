@@ -166,7 +166,7 @@ class ResearchService(BaseService[StockCompany, None, None]):
                     screener_results.append(StockScreenerResult(
                         stock_id=str(stock.id),
                         symbol=stock.symbol,
-                        name=stock.name,
+                        name=stock.company_name,
                         sector=stock.sector or "Unknown",
                         current_price=float(stock.current_price or 0),
                         market_cap=metrics.market_cap,
@@ -263,7 +263,7 @@ class ResearchService(BaseService[StockCompany, None, None]):
                     trending.append({
                         "stock_id": str(stock.id),
                         "symbol": stock.symbol,
-                        "name": stock.name,
+                        "name": stock.company_name,
                         "current_price": float(stock.current_price or 0),
                         "change_percent": change_percent,
                         "volume_ratio": volume_ratio,
@@ -326,7 +326,7 @@ class ResearchService(BaseService[StockCompany, None, None]):
                     change = self._calculate_price_change(stock)
                     top_performers.append({
                         "symbol": stock.symbol,
-                        "name": stock.name,
+                        "name": stock.company_name,
                         "change_percent": change,
                         "current_price": float(stock.current_price or 0)
                     })
@@ -367,7 +367,7 @@ class ResearchService(BaseService[StockCompany, None, None]):
                 select(StockCompany).where(
                     or_(
                         StockCompany.symbol.ilike(f"%{query}%"),
-                        StockCompany.name.ilike(f"%{query}%")
+                        StockCompany.company_name.ilike(f"%{query}%")
                     )
                 ).limit(limit)
             ).all()
@@ -377,7 +377,7 @@ class ResearchService(BaseService[StockCompany, None, None]):
                 results.append({
                     "stock_id": str(stock.id),
                     "symbol": stock.symbol,
-                    "name": stock.name,
+                    "name": stock.company_name,
                     "sector": stock.sector,
                     "current_price": float(stock.current_price or 0),
                     "change_percent": self._calculate_price_change(stock)
@@ -513,14 +513,14 @@ class ResearchService(BaseService[StockCompany, None, None]):
         return [
             {
                 "title": f"Market Analysis: {stock.symbol} Shows Strong Performance",
-                "summary": f"Recent developments in {stock.name} indicate positive market trends...",
+                "summary": f"Recent developments in {stock.company_name} indicate positive market trends...",
                 "published_date": (datetime.now() - timedelta(days=1)).isoformat(),
                 "source": "Financial Times",
                 "sentiment": "positive"
             },
             {
                 "title": f"{stock.symbol} Quarterly Earnings Report",
-                "summary": f"{stock.name} releases quarterly results with key financial metrics...",
+                "summary": f"{stock.company_name} releases quarterly results with key financial metrics...",
                 "published_date": (datetime.now() - timedelta(days=3)).isoformat(),
                 "source": "Bloomberg",
                 "sentiment": "neutral"

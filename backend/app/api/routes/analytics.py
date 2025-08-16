@@ -66,9 +66,9 @@ def get_portfolio_performance(
     trades = session.exec(
         select(Trade).where(
             Trade.portfolio_id == portfolio_id,
-            Trade.executed_at >= start_date,
-            Trade.executed_at <= end_date
-        ).order_by(Trade.executed_at)
+            Trade.trade_date >= start_date,
+            Trade.trade_date <= end_date
+        ).order_by(Trade.trade_date)
     ).all()
     
     # Calculate metrics
@@ -194,7 +194,7 @@ def get_portfolio_allocation(
         stock_allocations.append({
             "stock_id": str(stock.id),
             "symbol": stock.symbol,
-            "name": stock.name,
+            "name": stock.company_name,
             "sector": stock.sector,
             "current_value": float(position.current_value),
             "allocation_percent": round(allocation_percent, 2),
@@ -349,7 +349,7 @@ def get_dividend_analysis(
             dividend_stocks.append({
                 "stock_id": str(stock.id),
                 "symbol": stock.symbol,
-                "name": stock.name,
+                "name": stock.company_name,
                 "sector": stock.sector,
                 "position_value": float(position.current_value),
                 "dividend_yield": mock_dividend_yield,
@@ -399,7 +399,7 @@ def get_cost_basis_analysis(
         select(Trade, StockCompany)
         .join(StockCompany, Trade.stock_id == StockCompany.id)
         .where(Trade.portfolio_id == portfolio_id)
-        .order_by(Trade.executed_at)
+        .order_by(Trade.trade_date)
     ).all()
     
     # Get current positions
@@ -419,7 +419,7 @@ def get_cost_basis_analysis(
         if stock_id not in stock_analysis:
             stock_analysis[stock_id] = {
                 "symbol": stock.symbol,
-                "name": stock.name,
+                "name": stock.company_name,
                 "current_quantity": position.quantity,
                 "average_cost": float(position.average_price),
                 "total_cost": float(position.total_investment),
@@ -437,12 +437,12 @@ def get_cost_basis_analysis(
     for trade, stock in trades:
         stock_id = str(stock.id)
         if stock_id in stock_analysis:
-            days_held = (datetime.utcnow() - trade.executed_at).days
+            days_held = (datetime.utcnow() - trade.trade_date).days
             is_long_term = days_held > 365
             
             lot_info = {
                 "trade_id": str(trade.id),
-                "date": trade.executed_at,
+                "date": trade.trade_date,
                 "quantity": trade.quantity,
                 "price": float(trade.price),
                 "total_cost": float(trade.total_amount),
