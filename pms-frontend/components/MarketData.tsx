@@ -22,7 +22,7 @@ interface MarketDataProps {
   marketData: MarketDataType[];
   watchlists: Watchlist[];
   news: NewsItem[];
-  onAddToWatchlist: (watchlistId: string, symbol: string) => void;
+  onAddToWatchlist: (symbol: string) => void;
   onRemoveFromWatchlist: (watchlistId: string, symbol: string) => void;
   onQuickTrade: (symbol?: string, side?: 'buy' | 'sell') => void;
   onChartStock: (symbol: string) => void;
@@ -287,7 +287,7 @@ export function MarketData({
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => onAddToWatchlist(watchlists[0]?.id, stock.symbol)}
+                            onClick={() => onAddToWatchlist(stock.symbol)}
                             className="h-8 w-8 p-0"
                           >
                             <Star className="h-3 w-3" />
@@ -399,6 +399,14 @@ export function MarketData({
                             className="h-6 w-6 p-0"
                           >
                             <ShoppingCart className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onAddToWatchlist(stock.symbol)}
+                            className="h-6 w-6 p-0"
+                          >
+                            <Star className="h-3 w-3" />
                           </Button>
                         </div>
                       </div>

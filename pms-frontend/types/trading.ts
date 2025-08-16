@@ -69,6 +69,8 @@ export interface Watchlist {
   name: string;
   symbols: string[];
   createdDate: string;
+  description?: string;
+  isDefault?: boolean;
 }
 
 export interface Transaction {

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { User, Order, Trade, MarketData, Watchlist, Transaction, NewsItem, AccountBalance } from '../types/trading';
-import { MarketService, NewsService, OrdersService, OpenAPI } from '../src/client';
+import { MarketService, NewsService, OrdersService, OpenAPI, WatchlistService, AlertsService } from '../src/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from './queryKeys';
 
@@ -19,9 +19,6 @@ export function useTrading() {
     buyingPower: 0,
     dayTradingBuyingPower: 0,
   });
-
-  const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   const queryClient = useQueryClient();
 
@@ -65,6 +62,37 @@ export function useTrading() {
         timestamp: n.published_at,
         url: n.source_url || '#',
       })) as NewsItem[];
+    },
+  });
+
+  const fetchWatchlistItems = async (watchlistId: string) => {
+    try {
+      const items = await WatchlistService.getWatchlistItemsWithDetails({ watchlistId });
+      const symbols = (items as any[]).map((row: any) => String(row?.stock?.symbol || ''))
+        .filter(Boolean);
+      return Array.from(new Set(symbols));
+    } catch {
+      return [] as string[];
+    }
+  };
+
+  const { data: watchlists = [] } = useQuery({
+    queryKey: queryKeys.watchlists,
+    enabled: !!(OpenAPI as any).TOKEN,
+    queryFn: async () => {
+      const lists = await WatchlistService.getUserWatchlists();
+      const enriched = await Promise.all((lists as any[]).map(async (wl: any) => {
+        const symbols = await fetchWatchlistItems(String(wl.id));
+        return {
+          id: String(wl.id),
+          name: wl.name,
+          createdDate: wl.created_at,
+          symbols,
+          description: wl.description || '',
+          isDefault: !!wl.is_default,
+        } as Watchlist;
+      }));
+      return enriched;
     },
   });
 
@@ -159,7 +187,6 @@ export function useTrading() {
         date: t.created_at,
         status: 'completed',
       }));
-      setTransactions(mapped);
       return mapped;
     },
     staleTime: 15 * 1000,
@@ -246,6 +273,50 @@ export function useTrading() {
     },
   });
 
+  const addToWatchlist = async (...args: any[]) => {
+    let symbol: string | undefined;
+    let targetWatchlistId: string | undefined;
+    if (args.length === 1) {
+      symbol = String(args[0] ?? '');
+    } else if (args.length >= 2) {
+      targetWatchlistId = String(args[0] ?? '');
+      symbol = String(args[1] ?? '');
+    }
+    if (!symbol) return;
+    if (!targetWatchlistId) {
+      targetWatchlistId = (watchlists[0]?.id as string | undefined);
+    }
+    if (!targetWatchlistId) return;
+    const stocks = (await MarketService.listStocks({ q: symbol, limit: 1 })) as any[];
+    const stock = stocks && stocks[0];
+    if (!stock) return;
+    await WatchlistService.addWatchlistItem({
+      watchlistId: targetWatchlistId,
+      requestBody: { stock_id: stock.id },
+    });
+    queryClient.invalidateQueries({ queryKey: queryKeys.watchlists });
+  };
+
+  const removeFromWatchlist = async (watchlistId: string, symbol: string) => {
+    const base = (OpenAPI as any).BASE || '';
+    const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${watchlistId}/items/with-details`, {
+      headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
+      credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+    });
+    if (!res.ok) return;
+    const rows = await res.json();
+    const row = (rows as any[]).find((r: any) => String(r?.stock?.symbol || '') === symbol);
+    if (!row) return;
+    await WatchlistService.removeWatchlistItem({ watchlistId, itemId: String(row.id) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.watchlists });
+  };
+
+  const createWatchlist = async (name: string, description?: string, is_default?: boolean) => {
+    const created = await WatchlistService.createWatchlist({ requestBody: { name, description, is_default } });
+    queryClient.invalidateQueries({ queryKey: queryKeys.watchlists });
+    return created.id as string;
+  };
+
   const deposit = async (amount: number) => {
     const base = (OpenAPI as any).BASE || '';
     await fetch(`${String(base).replace(/\/$/, '')}/api/v1/funds/deposit`, {
@@ -302,11 +373,9 @@ export function useTrading() {
   ) => {
     try {
       const created = await placeOrderMutation.mutateAsync(orderData);
-      // Return an ID if possible else fallback
       return String((created as any)?.id ?? `order_${Date.now()}`);
     } catch {
       const fallbackId = `order_${Date.now()}`;
-      // Optimistic fallback is not persisted in query cache; leave for now
       return fallbackId;
     }
   };
@@ -319,37 +388,26 @@ export function useTrading() {
     }
   };
 
-  const addToWatchlist = (symbol: string, watchlistId?: string) => {
-    const targetWatchlistId = watchlistId || watchlists[0]?.id;
-    if (!targetWatchlistId) return;
-    setWatchlists((prev) =>
-      prev.map((watchlist) =>
-        watchlist.id === targetWatchlistId
-          ? { ...watchlist, symbols: [...new Set([...watchlist.symbols, symbol])] }
-          : watchlist
-      )
-    );
+  const createAlert = async (payload: { stock_id?: string; alert_type: string; condition: string; target_value: number; notification_method?: string; is_recurring?: boolean; frequency?: string | null; notes?: string | null; }) => {
+    const created = await AlertsService.createAlert({ requestBody: {
+      stock_id: payload.stock_id,
+      alert_type: payload.alert_type,
+      condition: payload.condition,
+      target_value: payload.target_value as unknown as any,
+      notification_method: payload.notification_method || 'in_app',
+      is_recurring: payload.is_recurring || false,
+      frequency: payload.frequency || null,
+      notes: payload.notes || null,
+    }});
+    return created;
   };
 
-  const removeFromWatchlist = (watchlistId: string, symbol: string) => {
-    setWatchlists((prev) =>
-      prev.map((watchlist) =>
-        watchlist.id === watchlistId
-          ? { ...watchlist, symbols: watchlist.symbols.filter((s) => s !== symbol) }
-          : watchlist
-      )
-    );
+  const deleteAlert = async (alertId: string) => {
+    await AlertsService.deleteAlert({ alertId });
   };
 
-  const createWatchlist = (name: string) => {
-    const newWatchlist: Watchlist = {
-      id: `watchlist_${Date.now()}`,
-      name,
-      symbols: [],
-      createdDate: new Date().toISOString().split('T')[0],
-    };
-    setWatchlists((prev) => [...prev, newWatchlist]);
-    return newWatchlist.id;
+  const evaluateAlert = async (alertId: string) => {
+    return await AlertsService.evaluateAlert({ alertId });
   };
 
   return {
@@ -357,7 +415,7 @@ export function useTrading() {
     orders,
     trades,
     watchlists,
-    transactions,
+    transactions: [] as Transaction[],
     news,
     marketData,
     accountBalance,
@@ -367,6 +425,10 @@ export function useTrading() {
     addToWatchlist,
     removeFromWatchlist,
     createWatchlist,
+    createAlert,
+    deleteAlert,
+    evaluateAlert,
+    fetchWatchlistItems,
     deposit,
     withdraw,
     updateCreditLimit,
