@@ -163,6 +163,8 @@ export function useTrading() {
       return mapped;
     },
     staleTime: 15 * 1000,
+  });
+
   const { data: trades = [] } = useQuery({
     queryKey: queryKeys.recentTrades(50),
     enabled: !!(OpenAPI as any).TOKEN,
