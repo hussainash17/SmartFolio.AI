@@ -213,7 +213,9 @@ def get_dashboard_summary(
 		ref_price = _safe_decimal(o.price) if o.price is not None else (_safe_decimal(lp.last_trade_price) if lp else Decimal(0))
 		reserved_funds += (ref_price * remaining_qty)
 
-	buying_power_value = cash_balance - reserved_funds
+	# Include user credit limit (leverage) in buying power
+	credit_limit = _safe_decimal(getattr(current_user, "credit_limit", 0))
+	buying_power_value = cash_balance + credit_limit - reserved_funds
 	if buying_power_value < 0:
 		buying_power_value = Decimal(0)
 

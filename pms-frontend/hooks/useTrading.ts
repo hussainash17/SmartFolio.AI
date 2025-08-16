@@ -21,7 +21,7 @@ export function useTrading() {
   });
 
   const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
-  const [transactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   const queryClient = useQueryClient();
 
@@ -124,6 +124,45 @@ export function useTrading() {
     staleTime: 30 * 1000,
   });
 
+  // Funds: summary + transactions
+  const { data: fundsSummary = { cash_balance: 0, buying_power: 0, credit_limit: 0 } } = useQuery({
+    queryKey: queryKeys.fundsSummary,
+    enabled: !!(OpenAPI as any).TOKEN,
+    queryFn: async () => {
+      const base = (OpenAPI as any).BASE || '';
+      const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/funds/summary`, {
+        headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
+        credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+      });
+      if (!res.ok) return { cash_balance: 0, buying_power: 0, credit_limit: 0 };
+      return await res.json();
+    },
+    staleTime: 15 * 1000,
+  });
+
+  useQuery({
+    queryKey: queryKeys.transactions,
+    enabled: !!(OpenAPI as any).TOKEN,
+    queryFn: async () => {
+      const base = (OpenAPI as any).BASE || '';
+      const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/funds/transactions`, {
+        headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
+        credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+      });
+      if (!res.ok) return [] as Transaction[];
+      const rows = await res.json();
+      const mapped: Transaction[] = (rows as any[]).map((t: any) => ({
+        id: String(t.id),
+        type: String(t.type || '').toLowerCase() as any,
+        amount: Number(t.amount || 0) * (String(t.type).toUpperCase() === 'WITHDRAWAL' ? -1 : 1),
+        description: t.description || '',
+        date: t.created_at,
+        status: 'completed',
+      }));
+      setTransactions(mapped);
+      return mapped;
+    },
+    staleTime: 15 * 1000,
   const { data: trades = [] } = useQuery({
     queryKey: queryKeys.recentTrades(50),
     enabled: !!(OpenAPI as any).TOKEN,
@@ -154,15 +193,15 @@ export function useTrading() {
     return {
       totalValue: Number(dashboard.total_portfolio_value || 0),
       stockValue: Number(dashboard.stock_value || 0),
-      cashBalance: Number(dashboard.cash_balance || 0),
-      buyingPower: Number(dashboard.buying_power || 0),
-      dayTradingBuyingPower: Number(dashboard.buying_power || 0),
+      cashBalance: Number(dashboard.cash_balance || fundsSummary.cash_balance || 0),
+      buyingPower: Number(dashboard.buying_power || fundsSummary.buying_power || 0),
+      dayTradingBuyingPower: Number(dashboard.buying_power || fundsSummary.buying_power || 0),
       marginUsed: 0,
       maintenanceMargin: 0,
       dayChange: Number(dashboard.day_change || 0),
       dayChangePercent: Number(dashboard.day_change_percent || 0),
     };
-  }, [dashboard]);
+  }, [dashboard, fundsSummary]);
 
   const placeOrderMutation = useMutation({
     mutationFn: async (orderData: Omit<Order, 'id' | 'orderDate' | 'status' | 'filledQuantity'>) => {
@@ -187,6 +226,8 @@ export function useTrading() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.ordersList });
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
+      queryClient.invalidateQueries({ queryKey: queryKeys.fundsSummary });
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions });
     },
   });
 
@@ -198,8 +239,57 @@ export function useTrading() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.ordersList });
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
+      queryClient.invalidateQueries({ queryKey: queryKeys.fundsSummary });
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions });
     },
   });
+
+  const deposit = async (amount: number) => {
+    const base = (OpenAPI as any).BASE || '';
+    await fetch(`${String(base).replace(/\/$/, '')}/api/v1/funds/deposit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : {},
+      },
+      credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+      body: JSON.stringify({ amount }),
+    });
+    queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
+    queryClient.invalidateQueries({ queryKey: queryKeys.fundsSummary });
+    queryClient.invalidateQueries({ queryKey: queryKeys.transactions });
+  };
+
+  const withdraw = async (amount: number) => {
+    const base = (OpenAPI as any).BASE || '';
+    await fetch(`${String(base).replace(/\/$/, '')}/api/v1/funds/withdraw`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : {},
+      },
+      credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+      body: JSON.stringify({ amount }),
+    });
+    queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
+    queryClient.invalidateQueries({ queryKey: queryKeys.fundsSummary });
+    queryClient.invalidateQueries({ queryKey: queryKeys.transactions });
+  };
+
+  const updateCreditLimit = async (credit_limit: number) => {
+    const base = (OpenAPI as any).BASE || '';
+    await fetch(`${String(base).replace(/\/$/, '')}/api/v1/funds/settings`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : {},
+      },
+      credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+      body: JSON.stringify({ credit_limit }),
+    });
+    queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
+    queryClient.invalidateQueries({ queryKey: queryKeys.fundsSummary });
+  };
 
   const getMarketData = (symbol: string) => {
     return marketData.find((data) => data.symbol === symbol);
@@ -275,5 +365,8 @@ export function useTrading() {
     addToWatchlist,
     removeFromWatchlist,
     createWatchlist,
+    deposit,
+    withdraw,
+    updateCreditLimit,
   };
 }

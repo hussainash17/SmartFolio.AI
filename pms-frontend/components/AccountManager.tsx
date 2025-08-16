@@ -17,14 +17,24 @@ import {
 } from "lucide-react";
 import { AuthUser } from "../hooks/useAuth";
 import { AccountBalance, Transaction } from "../types/trading";
+import { useState } from "react";
+import { toast } from "sonner";
 
 interface AccountManagerProps {
   user: AuthUser | null;
   accountBalance: AccountBalance;
   transactions: Transaction[];
+  // Optional action props injected from parent
+  onDeposit?: (amount: number) => Promise<void> | void;
+  onWithdraw?: (amount: number) => Promise<void> | void;
+  onUpdateCreditLimit?: (amount: number) => Promise<void> | void;
 }
 
-export function AccountManager({ user, accountBalance, transactions }: AccountManagerProps) {
+export function AccountManager({ user, accountBalance, transactions, onDeposit, onWithdraw, onUpdateCreditLimit }: AccountManagerProps) {
+  const [depositAmount, setDepositAmount] = useState<string>("");
+  const [withdrawAmount, setWithdrawAmount] = useState<string>("");
+  const [creditLimit, setCreditLimit] = useState<string>("");
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -89,6 +99,29 @@ export function AccountManager({ user, accountBalance, transactions }: AccountMa
 
   const marginUtilization = (accountBalance.marginUsed / accountBalance.dayTradingBuyingPower) * 100;
 
+  const handleDeposit = async () => {
+    const amt = Number(depositAmount || 0);
+    if (!amt || amt <= 0) return;
+    await onDeposit?.(amt);
+    toast.success('Deposit successful');
+    setDepositAmount('');
+  };
+
+  const handleWithdraw = async () => {
+    const amt = Number(withdrawAmount || 0);
+    if (!amt || amt <= 0) return;
+    await onWithdraw?.(amt);
+    toast.success('Withdrawal successful');
+    setWithdrawAmount('');
+  };
+
+  const handleUpdateCredit = async () => {
+    const amt = Number(creditLimit || 0);
+    if (amt < 0) return;
+    await onUpdateCreditLimit?.(amt);
+    toast.success('Credit limit updated');
+  };
+
   return (
     <div className="space-y-6">
       {/* Account Overview Cards */}
@@ -136,16 +169,32 @@ export function AccountManager({ user, accountBalance, transactions }: AccountMa
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm">Account Type</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm">Quick Funds</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <Badge className={accountTypeColors[getAccountType() as keyof typeof accountTypeColors]}>
-              {getAccountType().charAt(0).toUpperCase() + getAccountType().slice(1)}
-            </Badge>
-            <p className="text-xs text-muted-foreground mt-2">
-              Member since {formatDate(getJoinDate())}
-            </p>
+          <CardContent className="space-y-3">
+            <div className="flex gap-2">
+              <input
+                className="flex-1 border rounded px-2 py-1 text-sm"
+                placeholder="Deposit amount"
+                value={depositAmount}
+                onChange={(e) => setDepositAmount(e.target.value)}
+                type="number"
+                min={0}
+              />
+              <Button size="sm" onClick={handleDeposit}>Deposit</Button>
+            </div>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 border rounded px-2 py-1 text-sm"
+                placeholder="Withdraw amount"
+                value={withdrawAmount}
+                onChange={(e) => setWithdrawAmount(e.target.value)}
+                type="number"
+                min={0}
+              />
+              <Button size="sm" variant="outline" onClick={handleWithdraw}>Withdraw</Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -211,6 +260,10 @@ export function AccountManager({ user, accountBalance, transactions }: AccountMa
                     <span className="font-medium">{formatCurrency(accountBalance.maintenanceMargin)}</span>
                   </div>
                   <hr className="my-2" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Buying Power</span>
+                    <span className="font-medium">{formatCurrency(accountBalance.buyingPower)}</span>
+                  </div>
                   <div className="flex justify-between items-center">
                     <span className="font-medium">Total Account Value</span>
                     <span className="font-bold text-lg">{formatCurrency(accountBalance.totalValue)}</span>
@@ -392,6 +445,23 @@ export function AccountManager({ user, accountBalance, transactions }: AccountMa
                   <Button variant="outline">Manage</Button>
                 </div>
                 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      className="flex-1 border rounded px-2 py-1 text-sm"
+                      placeholder="Credit limit"
+                      value={creditLimit}
+                      onChange={(e) => setCreditLimit(e.target.value)}
+                      type="number"
+                      min={0}
+                    />
+                    <Button variant="outline" onClick={handleUpdateCredit}>Update Credit</Button>
+                  </div>
+                  <div className="text-sm text-muted-foreground self-center">
+                    Boost buying power: Cash + Credit - Reserved
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-medium">Account Statements</h4>
