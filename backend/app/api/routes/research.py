@@ -91,7 +91,7 @@ def stock_screener(
         screener_results.append({
             "stock_id": str(stock.id),
             "symbol": stock.symbol,
-            "name": stock.name,
+            "name": stock.company_name,
             "sector": stock.sector,
             "current_price": float(stock.current_price or 0),
             "market_cap": mock_market_cap,
@@ -150,7 +150,7 @@ def get_fundamental_analysis(
     fundamental_data = {
         "basic_info": {
             "symbol": stock.symbol,
-            "name": stock.name,
+            "name": stock.company_name,
             "sector": stock.sector,
             "current_price": current_price,
             "market_cap": current_price * 1000000,  # Mock shares outstanding
@@ -243,7 +243,7 @@ def get_technical_analysis(
     
     price_data = session.exec(
         select(DailyOHLC)
-        .where(DailyOHLC.stock_id == stock.id)
+        .where(DailyOHLC.company_id == stock.id)
         .where(DailyOHLC.date >= start_date)
         .where(DailyOHLC.date <= end_date)
         .order_by(DailyOHLC.date)
@@ -478,7 +478,7 @@ def get_stock_news(
     
     return {
         "symbol": symbol,
-        "stock_name": stock.name,
+        "stock_name": stock.company_name,
         "total_articles": len(news_articles),
         "articles": news_articles
     }
@@ -573,7 +573,7 @@ def get_analyst_picks(
         rating, target, recommendation = service._generate_analyst_recommendation(stock, fin, tech)
         picks.append({
             "symbol": stock.symbol,
-            "name": stock.name,
+            "name": stock.company_name,
             "sector": stock.sector,
             "rating": rating,
             "target_price": round(target, 2),
