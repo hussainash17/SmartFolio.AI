@@ -8,8 +8,8 @@ from typing import Optional, TYPE_CHECKING
 
 from sqlmodel import Field, Relationship, SQLModel
 
+from .user import User
 if TYPE_CHECKING:
-	from .user import User
 	from .portfolio import Portfolio
 	from .order import Order
 	from .trade import Trade
