@@ -51,6 +51,7 @@ const RiskManagement = lazy(() => import("./components/RiskManagement").then(m =
 const SignupPage = lazy(() => import("./components/SignupPage").then(m => ({ default: m.SignupPage })));
 const LoginPage = lazy(() => import("./components/LoginPage").then(m => ({ default: m.LoginPage })));
 const MarketNewsInsights = lazy(() => import("./components/MarketNewsInsights").then(m => ({ default: m.default })));
+const AssetAllocation = lazy(() => import("./components/AssetAllocation").then(m => ({ default: m.AssetAllocation })));
 
 type View =
   | "dashboard"
@@ -467,17 +468,12 @@ export default function App() {
 
       case "allocation":
         return (
-          <div className="space-y-6">
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <PieChart className="h-8 w-8 text-primary" />
-              </div>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Interactive asset allocation visualization with detailed breakdown and rebalancing
-                suggestions coming soon.
-              </p>
-            </div>
-          </div>
+          <Suspense fallback={<div>Loading Asset Allocation...</div>}>
+            <AssetAllocation 
+              portfolioId={selectedPortfolio?.id}
+              onNavigate={handleViewChange}
+            />
+          </Suspense>
         );
 
       case "goals":

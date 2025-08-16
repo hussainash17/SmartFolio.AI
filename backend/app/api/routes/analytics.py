@@ -13,6 +13,8 @@ from app.model.trade import Trade
 from app.model.stock import StockCompany, StockData
 from app.model.order import Order
 from app.model.alert import News
+from app.model.portfolio import AllocationTarget, AllocationTargetPublic, AllocationTargetCreate
+from fastapi import Body
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -497,3 +499,89 @@ def get_market_sentiment(
         "gauge": gauge,
         "counts": {"positive": pos, "negative": neg, "neutral": neu, "total": total},
     }
+
+
+@router.get("/portfolio/{portfolio_id}/allocation/targets", response_model=List[AllocationTargetPublic])
+def get_allocation_targets(
+    portfolio_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Get saved target allocation for a portfolio"""
+    portfolio = session.exec(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        )
+    ).first()
+
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portfolio not found"
+        )
+
+    targets = session.exec(
+        select(AllocationTarget).where(
+            AllocationTarget.portfolio_id == portfolio_id,
+            AllocationTarget.user_id == current_user.id
+        )
+    ).all()
+    return targets
+
+
+@router.put("/portfolio/{portfolio_id}/allocation/targets", response_model=List[AllocationTargetPublic])
+def upsert_allocation_targets(
+    portfolio_id: UUID,
+    targets: List[AllocationTargetCreate] = Body(..., embed=True),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Replace target allocation entries for a portfolio"""
+    portfolio = session.exec(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        )
+    ).first()
+
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portfolio not found"
+        )
+
+    # Delete existing targets for this user/portfolio
+    existing = session.exec(
+        select(AllocationTarget).where(
+            AllocationTarget.portfolio_id == portfolio_id,
+            AllocationTarget.user_id == current_user.id
+        )
+    ).all()
+    for row in existing:
+        session.delete(row)
+    session.commit()
+
+    # Insert new targets
+    saved: List[AllocationTarget] = []
+    from datetime import datetime as _dt
+    now = _dt.utcnow()
+    for t in targets:
+        row = AllocationTarget(
+            user_id=current_user.id,
+            portfolio_id=portfolio_id,
+            category=t.category,
+            category_type=t.category_type or "SECTOR",
+            target_percent=t.target_percent,
+            min_percent=t.min_percent,
+            max_percent=t.max_percent,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(row)
+        saved.append(row)
+    session.commit()
+    for row in saved:
+        session.refresh(row)
+
+    return saved

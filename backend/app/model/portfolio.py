@@ -210,3 +210,45 @@ class PortfolioSummary(SQLModel):
     unrealized_pnl_percent: Decimal
     total_positions: int
     positions: list[PortfolioPositionPublic]
+
+
+# Allocation Target models
+class AllocationTarget(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+    portfolio_id: uuid.UUID = Field(foreign_key="portfolio.id")
+    category: str = Field(max_length=100)
+    category_type: str = Field(default="SECTOR", max_length=30)
+    target_percent: Decimal = Field(max_digits=5, decimal_places=2)
+    min_percent: Optional[Decimal] = Field(default=None, max_digits=5, decimal_places=2)
+    max_percent: Optional[Decimal] = Field(default=None, max_digits=5, decimal_places=2)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AllocationTargetBase(SQLModel):
+    category: str
+    category_type: str = "SECTOR"
+    target_percent: Decimal
+    min_percent: Optional[Decimal] = None
+    max_percent: Optional[Decimal] = None
+
+
+class AllocationTargetCreate(AllocationTargetBase):
+    pass
+
+
+class AllocationTargetUpdate(SQLModel):
+    category: Optional[str] = None
+    category_type: Optional[str] = None
+    target_percent: Optional[Decimal] = None
+    min_percent: Optional[Decimal] = None
+    max_percent: Optional[Decimal] = None
+
+
+class AllocationTargetPublic(AllocationTargetBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    portfolio_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
