@@ -15,6 +15,7 @@ export const queryKeys = {
   ordersList: ['orders', 'list'] as const,
   fundsSummary: ['funds', 'summary'] as const,
   transactions: ['funds', 'transactions'] as const,
+  recentTrades: (limit = 20) => ['trades', 'recent', { limit }] as const,
   sectorAnalysis: ['market', 'sector-analysis'] as const,
   indices: ['market', 'indices'] as const,
   topMovers: ['market', 'top-movers'] as const,

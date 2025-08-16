@@ -6,10 +6,10 @@ from app.api.deps import get_current_user, get_session_dep
 from datetime import datetime
 from decimal import Decimal
 from app.model.order import (
-	Order, OrderCreate, OrderUpdate, OrderPublic,
-	OrderExecution, OrderExecutionPublic,
-	OrderSummary, OrderType, OrderSide, OrderStatus, OrderValidity
-)
+    Order, OrderCreate, OrderUpdate, OrderPublic,
+    OrderExecution, OrderExecutionPublic,
+    OrderSummary, OrderType, OrderSide, OrderStatus, OrderValidity,
+    OrderWithDetails)
 from app.model.portfolio import Portfolio
 from app.model.stock import StockCompany, StockData
 from app.model.user import User
@@ -135,6 +135,36 @@ def get_user_orders(
 	
 	orders = session.exec(query.order_by(Order.placed_at.desc())).all()
 	return orders
+
+
+@router.get("/with-details", response_model=List[OrderWithDetails])
+def get_user_orders_with_details(
+    portfolio_id: Optional[UUID] = None,
+    status: Optional[OrderStatus] = None,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep),
+):
+    """Get all orders for the current user including stock symbol and company name"""
+    query = select(Order, StockCompany).join(StockCompany, Order.stock_id == StockCompany.id).where(Order.user_id == current_user.id)
+
+    if portfolio_id:
+        query = query.where(Order.portfolio_id == portfolio_id)
+
+    if status:
+        query = query.where(Order.status == status)
+
+    rows = session.exec(query.order_by(Order.placed_at.desc())).all() or []
+
+    results: List[OrderWithDetails] = []
+    for order, stock in rows:
+        results.append(
+            OrderWithDetails(
+                **order.dict(),
+                symbol=stock.symbol,
+                company_name=stock.company_name,
+            )
+        )
+    return results
 
 
 @router.get("/{order_id}", response_model=OrderPublic)
