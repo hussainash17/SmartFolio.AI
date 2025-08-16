@@ -138,6 +138,9 @@ export default function App() {
     addToWatchlist,
     removeFromWatchlist,
     getMarketData,
+    deposit,
+    withdraw,
+    updateCreditLimit,
   } = useTrading();
 
   // Show loading screen while checking authentication
@@ -656,7 +659,7 @@ export default function App() {
       case "account":
         return (
           <Suspense fallback={<div>Loading Account Manager...</div>}>
-            <AccountManager user={user} accountBalance={accountBalance} transactions={transactions} />
+            <AccountManager user={user} accountBalance={accountBalance} transactions={transactions} onDeposit={deposit} onWithdraw={withdraw} onUpdateCreditLimit={updateCreditLimit} />
           </Suspense>
         );
 

@@ -179,6 +179,7 @@ from .risk_management import (
     RiskMetricType,
     RiskProfile,
 )
+from .funds import AccountTransaction, AccountTransactionPublic, TransactionType
 
 __all__ = [
     "SQLModel",
@@ -329,4 +330,7 @@ __all__ = [
     "RiskSummary",
     "RiskMetricType",
     "RiskProfile",
+    "AccountTransaction",
+    "AccountTransactionPublic",
+    "TransactionType",
 ]

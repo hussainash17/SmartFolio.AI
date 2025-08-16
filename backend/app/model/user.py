@@ -172,6 +172,8 @@ class UpdatePassword(SQLModel):
 class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     hashed_password: str
+    # Optional credit/margin line available to the user, added to buying power
+    credit_limit: float | None = Field(default=0.0)
     items: list["Item"] = Relationship(back_populates="owner", sa_relationship_kwargs={"cascade": "all, delete"})
     
     # SmartStock relationships
