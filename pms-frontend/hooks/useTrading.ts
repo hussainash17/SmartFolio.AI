@@ -234,11 +234,20 @@ export function useTrading() {
 
   const placeOrderMutation = useMutation({
     mutationFn: async (orderData: Omit<Order, 'id' | 'orderDate' | 'status' | 'filledQuantity'>) => {
-      const stocks = (await MarketService.listStocks({ q: orderData.symbol, limit: 1 })) as any[];
-      const stock = stocks && stocks[0];
+      let stockId: string | undefined;
+      try {
+        const stockResp = await MarketService.getStock({ symbol: orderData.symbol });
+        stockId = (stockResp as any)?.id as string | undefined;
+      } catch {
+        const stocks = (await MarketService.listStocks({ q: orderData.symbol, limit: 1 })) as any[];
+        stockId = stocks && stocks[0]?.id;
+      }
+      if (!stockId) {
+        throw new Error(`Unknown symbol: ${orderData.symbol}`);
+      }
       const created = await OrdersService.createOrder({
         requestBody: {
-          stock_id: stock?.id,
+          stock_id: stockId,
           portfolio_id: orderData.portfolioId || undefined,
           order_type: (orderData.orderType || 'market').toUpperCase().replace('-', '_') as any,
           side: (orderData.side || 'buy').toUpperCase() as any,

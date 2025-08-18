@@ -57,7 +57,7 @@ export function TradingInterface({ marketData, onPlaceOrder, buyingPower }: Trad
     if (!selectedStock || !orderDetails.quantity) return;
 
     const order: Omit<Order, 'id' | 'orderDate' | 'status' | 'filledQuantity'> = {
-      portfolioId: '1', // Default portfolio
+      portfolioId: undefined,
       symbol: selectedStock.symbol,
       companyName: selectedStock.companyName,
       side: orderDetails.side,

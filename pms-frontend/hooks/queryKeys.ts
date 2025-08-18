@@ -7,6 +7,7 @@ export const queryKeys = {
   dashboardSummary: ['dashboard', 'summary'] as const,
   portfolioAnalytics: (portfolioId: string) => ['analytics', 'portfolio', portfolioId] as const,
   portfolioAllocation: (portfolioId: string) => ['allocation', 'portfolio', portfolioId] as const,
+  allocationTargets: (portfolioId: string) => ['allocation', 'targets', portfolioId] as const,
   investmentGoals: ['kyc', 'goals'] as const,
   goalProgress: ['kyc', 'goals', 'progress'] as const,
   goalContributions: (goalId: string) => ['kyc', 'goals', goalId, 'contributions'] as const,

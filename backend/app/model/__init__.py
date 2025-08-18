@@ -83,6 +83,11 @@ from .portfolio import (
     WatchlistItemCreate,
     WatchlistItemPublic,
     PortfolioSummary,
+    AllocationTarget,
+    AllocationTargetBase,
+    AllocationTargetCreate,
+    AllocationTargetUpdate,
+    AllocationTargetPublic,
 )
 from .trade import (
     Trade,
@@ -245,6 +250,11 @@ __all__ = [
     "WatchlistItemCreate",
     "WatchlistItemPublic",
     "PortfolioSummary",
+    "AllocationTarget",
+    "AllocationTargetBase",
+    "AllocationTargetCreate",
+    "AllocationTargetUpdate",
+    "AllocationTargetPublic",
     "Trade",
     "TradeBase",
     "TradeCreate",
