@@ -478,6 +478,66 @@ export class KycService {
     }
     
     /**
+     * List Goal Contributions
+     * @param data The data for the request.
+     * @param data.goalId
+     * @returns UserInvestmentGoalContributionPublic Successful Response
+     * @throws ApiError
+     */
+    public static listGoalContributions(data: KycListGoalContributionsData): CancelablePromise<KycListGoalContributionsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/kyc/goals/{goal_id}/contributions',
+            path: {
+                goal_id: data.goalId
+            }
+        });
+    }
+
+    /**
+     * Create Goal Contribution
+     * @param data The data for the request.
+     * @param data.goalId
+     * @param data.requestBody
+     * @returns UserInvestmentGoalContributionPublic Successful Response
+     * @throws ApiError
+     */
+    public static createGoalContribution(data: KycCreateGoalContributionData): CancelablePromise<KycCreateGoalContributionResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/kyc/goals/{goal_id}/contributions',
+            path: {
+                goal_id: data.goalId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+
+    /**
+     * Delete Goal Contribution
+     * @param data The data for the request.
+     * @param data.contributionId
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static deleteGoalContribution(data: KycDeleteGoalContributionData): CancelablePromise<KycDeleteGoalContributionResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/kyc/goals/contributions/{contribution_id}',
+            path: {
+                contribution_id: data.contributionId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
      * Get User Accounts
      * Get user's accounts.
      * @returns UserAccountPublic Successful Response

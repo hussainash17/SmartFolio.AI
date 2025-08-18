@@ -109,6 +109,7 @@ class UserInvestmentGoal(SQLModel, table=True):
 
     # Relationships
     user: "User" = Relationship(back_populates="investment_goals")
+    contributions: list["UserInvestmentGoalContribution"] = Relationship(back_populates="goal")
 
 
 # User Account Model for multiple account types
@@ -288,6 +289,25 @@ class UserInvestmentGoalPublic(UserInvestmentGoalBase):
     user_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+
+
+# Contribution Pydantic models
+class UserInvestmentGoalContributionBase(SQLModel):
+    amount: int
+    contributed_at: datetime | None = None
+    notes: str | None = None
+
+
+class UserInvestmentGoalContributionCreate(UserInvestmentGoalContributionBase):
+    pass
+
+
+class UserInvestmentGoalContributionPublic(UserInvestmentGoalContributionBase):
+    id: uuid.UUID
+    goal_id: uuid.UUID
+    user_id: uuid.UUID
+    contributed_at: datetime
+    created_at: datetime
 
 
 # User Account Pydantic models for API

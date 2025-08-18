@@ -8,6 +8,8 @@ export const queryKeys = {
   portfolioAnalytics: (portfolioId: string) => ['analytics', 'portfolio', portfolioId] as const,
   portfolioAllocation: (portfolioId: string) => ['allocation', 'portfolio', portfolioId] as const,
   investmentGoals: ['kyc', 'goals'] as const,
+  goalProgress: ['kyc', 'goals', 'progress'] as const,
+  goalContributions: (goalId: string) => ['kyc', 'goals', goalId, 'contributions'] as const,
   riskAlerts: (portfolioId?: string) => ['risk', 'alerts', portfolioId ?? 'none'] as const,
 
   marketList: (limit = 50, offset = 0, q?: string) => ['market', 'list', { limit, offset, q: q || '' }] as const,

@@ -568,6 +568,22 @@ export type UserInvestmentGoalUpdate = {
     is_active?: (boolean | null);
 };
 
+export type UserInvestmentGoalContributionBase = {
+    amount: number;
+    contributed_at?: (string | null);
+    notes?: (string | null);
+};
+
+export type UserInvestmentGoalContributionCreate = UserInvestmentGoalContributionBase;
+
+export type UserInvestmentGoalContributionPublic = (UserInvestmentGoalContributionBase & {
+    id: string;
+    goal_id: string;
+    user_id: string;
+    contributed_at: string;
+    created_at: string;
+});
+
 export type UserPublic = {
     email: string;
     is_active?: boolean;
@@ -1345,3 +1361,22 @@ export type WatchlistGetWatchlistItemsWithDetailsData = {
 };
 
 export type WatchlistGetWatchlistItemsWithDetailsResponse = (unknown);
+
+export type KycListGoalContributionsData = {
+    goalId: string;
+};
+
+export type KycListGoalContributionsResponse = (Array<UserInvestmentGoalContributionPublic>);
+
+export type KycCreateGoalContributionData = {
+    goalId: string;
+    requestBody: UserInvestmentGoalContributionCreate;
+};
+
+export type KycCreateGoalContributionResponse = (UserInvestmentGoalContributionPublic);
+
+export type KycDeleteGoalContributionData = {
+    contributionId: string;
+};
+
+export type KycDeleteGoalContributionResponse = (unknown);

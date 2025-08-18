@@ -28,6 +28,10 @@ from .user import (
     UserInvestmentGoalCreate,
     UserInvestmentGoalUpdate,
     UserInvestmentGoalPublic,
+    UserInvestmentGoalContribution,
+    UserInvestmentGoalContributionBase,
+    UserInvestmentGoalContributionCreate,
+    UserInvestmentGoalContributionPublic,
     UserAccount,
     UserAccountBase,
     UserAccountCreate,
@@ -37,6 +41,7 @@ from .user import (
     KYCStatus,
     InvestmentGoal,
 )
+
 from .item import Item, ItemBase, ItemCreate, ItemPublic, ItemUpdate, ItemsPublic
 
 # SmartStock Models
@@ -333,4 +338,15 @@ __all__ = [
     "AccountTransaction",
     "AccountTransactionPublic",
     "TransactionType",
+    "UserInvestmentGoal",
+    "UserInvestmentGoalBase",
+    "UserInvestmentGoalCreate",
+    "UserInvestmentGoalUpdate",
+    "UserInvestmentGoalPublic",
+    "UserInvestmentGoalContribution",
+    "UserInvestmentGoalContributionBase",
+    "UserInvestmentGoalContributionCreate",
+    "UserInvestmentGoalContributionPublic",
+    "UserAccount",
+    "UserAccountBase",
 ]

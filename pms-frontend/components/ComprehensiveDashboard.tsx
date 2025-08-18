@@ -163,6 +163,23 @@ export function ComprehensiveDashboard({
     },
   });
 
+  const { data: goalProgressMap = {} } = useQuery({
+    queryKey: ['kyc', 'goals', 'progress'],
+    queryFn: async () => {
+      const result: Record<string, number> = {};
+      for (const g of (investmentGoals as any[])) {
+        try {
+          const contribs = await KycService.listGoalContributions({ goalId: g.id });
+          const sum = (contribs as any[]).reduce((acc, c) => acc + Number(c.amount || 0), 0);
+          const target = Number(g.target_amount || 0);
+          result[g.id] = target > 0 ? Math.min(100, (sum / target) * 100) : 0;
+        } catch {}
+      }
+      return result;
+    },
+    enabled: (investmentGoals as any[]).length > 0,
+  });
+
   const { data: riskAlerts = [] } = useQuery({
     queryKey: queryKeys.riskAlerts(selectedPortfolioId),
     enabled: !!selectedPortfolioId,
@@ -503,10 +520,10 @@ export function ComprehensiveDashboard({
                         <div className="text-sm text-muted-foreground">Target: {formatCurrency(goal.target)} • Due: {goal.timeframe}</div>
                       </div>
                       <div className="text-right">
-                        <div className="font-medium">{goal.progress.toFixed(1)}%</div>
+                        <div className="font-medium">{Number((goalProgressMap as any)[goal.id] || 0).toFixed(1)}%</div>
                       </div>
                     </div>
-                    <Progress value={goal.progress} className="h-2" />
+                    <Progress value={Number((goalProgressMap as any)[goal.id] || 0)} className="h-2" />
                   </div>
                 ))}
               </div>

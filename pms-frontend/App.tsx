@@ -51,6 +51,7 @@ const RiskManagement = lazy(() => import("./components/RiskManagement").then(m =
 const SignupPage = lazy(() => import("./components/SignupPage").then(m => ({ default: m.SignupPage })));
 const LoginPage = lazy(() => import("./components/LoginPage").then(m => ({ default: m.LoginPage })));
 const MarketNewsInsights = lazy(() => import("./components/MarketNewsInsights").then(m => ({ default: m.default })));
+const InvestmentGoals = lazy(() => import("./components/InvestmentGoals").then(m => ({ default: m.InvestmentGoals })));
 
 type View =
   | "dashboard"
@@ -482,16 +483,9 @@ export default function App() {
 
       case "goals":
         return (
-          <div className="space-y-6">
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Target className="h-8 w-8 text-primary" />
-              </div>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Goal-based investment planning and progress tracking tools coming soon.
-              </p>
-            </div>
-          </div>
+          <Suspense fallback={<div>Loading Investment Goals...</div>}> 
+            <InvestmentGoals />
+          </Suspense>
         );
 
       case "trading":
