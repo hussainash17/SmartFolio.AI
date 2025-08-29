@@ -22,6 +22,8 @@ from app.model.user import (
     UserAccountCreate,
     UserAccountUpdate,
     UserAccountPublic,
+    UserInvestmentGoalContributionCreate,
+    UserInvestmentGoalContributionPublic,
 )
 from app.services.kyc_service import KYCService, InvestmentGoalService, UserAccountService, ServiceException
 
@@ -165,6 +167,53 @@ def delete_investment_goal(
                 detail="Investment goal not found"
             )
         return {"message": "Investment goal deleted successfully"}
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+# Goal Contributions Management
+@router.post("/goals/{goal_id}/contributions", response_model=UserInvestmentGoalContributionPublic)
+def create_goal_contribution(
+    goal_id: UUID,
+    contribution: UserInvestmentGoalContributionCreate,
+    current_user: User = Depends(get_current_user),
+    goal_service: InvestmentGoalService = Depends(get_investment_goal_service)
+):
+    """Add a contribution to an investment goal."""
+    try:
+        return goal_service.add_contribution(current_user.id, goal_id, contribution)
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.get("/goals/{goal_id}/contributions", response_model=List[UserInvestmentGoalContributionPublic])
+def list_goal_contributions(
+    goal_id: UUID,
+    current_user: User = Depends(get_current_user),
+    goal_service: InvestmentGoalService = Depends(get_investment_goal_service)
+):
+    """List contributions for an investment goal."""
+    try:
+        return goal_service.list_contributions(current_user.id, goal_id)
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.delete("/goals/contributions/{contribution_id}")
+def delete_goal_contribution(
+    contribution_id: UUID,
+    current_user: User = Depends(get_current_user),
+    goal_service: InvestmentGoalService = Depends(get_investment_goal_service)
+):
+    """Delete an investment goal contribution."""
+    try:
+        success = goal_service.delete_contribution(current_user.id, contribution_id)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Contribution not found"
+            )
+        return {"message": "Contribution deleted successfully"}
     except ServiceException as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
 

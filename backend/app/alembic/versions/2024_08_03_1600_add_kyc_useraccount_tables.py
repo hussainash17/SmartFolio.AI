@@ -83,6 +83,7 @@ def upgrade():
         sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
         sa.PrimaryKeyConstraint('id')
     )
+    op.create_index('ix_userinvestmentgoal_user_id', 'userinvestmentgoal', ['user_id'])
 
 
 def downgrade():
