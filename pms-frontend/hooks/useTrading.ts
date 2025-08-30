@@ -320,6 +320,20 @@ export function useTrading() {
     queryClient.invalidateQueries({ queryKey: queryKeys.watchlists });
   };
 
+  const updateWatchlistItemNote = async (watchlistId: string, symbol: string, notes: string) => {
+    const base = (OpenAPI as any).BASE || '';
+    const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${watchlistId}/items/with-details`, {
+      headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
+      credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+    });
+    if (!res.ok) return;
+    const rows = await res.json();
+    const row = (rows as any[]).find((r: any) => String(r?.stock?.symbol || '') === symbol);
+    if (!row) return;
+    await WatchlistService.updateWatchlistItem({ watchlistId, itemId: String(row.id), notes });
+    queryClient.invalidateQueries({ queryKey: queryKeys.watchlists });
+  };
+
   const createWatchlist = async (name: string, description?: string, is_default?: boolean) => {
     const created = await WatchlistService.createWatchlist({ requestBody: { name, description, is_default } });
     queryClient.invalidateQueries({ queryKey: queryKeys.watchlists });
@@ -433,6 +447,7 @@ export function useTrading() {
     cancelOrder,
     addToWatchlist,
     removeFromWatchlist,
+    updateWatchlistItemNote: updateWatchlistItemNote,
     createWatchlist,
     createAlert,
     deleteAlert,
