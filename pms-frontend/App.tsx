@@ -24,11 +24,15 @@ import {
   Plus,
   Trash2,
   Star,
+  Copy,
+  Download,
+  GitBranch,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Input } from "./components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
+import { Badge } from "./components/ui/badge";
 import { OpenAPI, MarketService } from "./src/client";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -154,6 +158,7 @@ export default function App() {
     updateCreditLimit,
     createWatchlist,
     createAlert,
+    updateWatchlistItemNote,
   } = useTrading();
   const queryClient = useQueryClient();
 
@@ -280,6 +285,14 @@ export default function App() {
     setSelectedChartStock(symbol);
     setCurrentView("chart");
   };
+
+  const positionsBySymbol = useMemo(() => {
+    const map: Record<string, { quantity: number; averagePrice: number }> = {};
+    (selectedPortfolio?.stocks || []).forEach((s) => {
+      map[s.symbol] = { quantity: s.quantity, averagePrice: s.purchasePrice };
+    });
+    return map;
+  }, [selectedPortfolio]);
 
   const getPageTitle = () => {
     switch (currentView) {
@@ -513,6 +526,12 @@ export default function App() {
               onRemoveFromWatchlist={removeFromWatchlist}
               onQuickTrade={handleQuickTrade}
               onChartStock={handleChartStock}
+              heldSymbols={new Set((selectedPortfolio?.stocks || []).map(s => s.symbol))}
+              onUpdateWatchlistNote={async (watchlistId: string, symbol: string, notes: string) => {
+                await updateWatchlistItemNote(watchlistId, symbol, notes);
+                toast.success('Note saved');
+              }}
+              positionsBySymbol={positionsBySymbol}
             />
           </Suspense>
         );
@@ -577,6 +596,39 @@ export default function App() {
                               variant="outline"
                               size="sm"
                               onClick={async () => {
+                                const newName = `${wl.name} Copy`;
+                                const newId = await createWatchlist(newName, wl.description || '');
+                                try {
+                                  const base = (OpenAPI as any).BASE || '';
+                                  const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${wl.id}/items/with-details`, {
+                                    headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
+                                    credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+                                  });
+                                  const rows = res.ok ? await res.json() : [];
+                                  const stock_ids = (rows as any[]).map((r: any) => r.stock?.id).filter(Boolean);
+                                  await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${newId}/items/bulk`, {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                      ...(OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : {},
+                                    },
+                                    credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+                                    body: JSON.stringify(stock_ids),
+                                  });
+                                  toast.success('Watchlist duplicated');
+                                } catch {
+                                  toast.error('Failed to duplicate');
+                                }
+                                (queryClient as any).invalidateQueries({ queryKey: ['watchlists'] });
+                              }}
+                              className="gap-2"
+                            >
+                              <Copy className="h-4 w-4" /> Duplicate
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
                                 const newName = prompt('New watchlist name', wl.name) || wl.name;
                                 const newDesc = prompt('Description', wl.description || '') || wl.description || '';
                                 const base = (OpenAPI as any).BASE || '';
@@ -595,6 +647,52 @@ export default function App() {
                               className="gap-2"
                             >
                               Edit
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                const symbols = (wl.symbols || []).join('\n');
+                                const blob = new Blob([`symbol\n${symbols}`], { type: 'text/csv;charset=utf-8;' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `${wl.name.replace(/\s+/g, '_')}.csv`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              }}
+                              className="gap-2"
+                            >
+                              <Download className="h-4 w-4" /> Export
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                const target = watchlists.find(x => x.isDefault && x.id !== wl.id) || watchlists.find(x => x.id !== wl.id);
+                                if (!target) return;
+                                const base = (OpenAPI as any).BASE || '';
+                                const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${wl.id}/items/with-details`, {
+                                  headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
+                                  credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+                                });
+                                const rows = res.ok ? await res.json() : [];
+                                const stock_ids = (rows as any[]).map((r: any) => r.stock?.id).filter(Boolean);
+                                await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${target.id}/items/bulk`, {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    ...(OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : {},
+                                  },
+                                  credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+                                  body: JSON.stringify(stock_ids),
+                                });
+                                toast.success(`Merged into ${target.name}`);
+                                (queryClient as any).invalidateQueries({ queryKey: ['watchlists'] });
+                              }}
+                              className="gap-2"
+                            >
+                              <GitBranch className="h-4 w-4" /> Merge
                             </Button>
                             <Button
                               variant="outline"
@@ -683,18 +781,26 @@ export default function App() {
                             <TableHeader>
                               <TableRow>
                                 <TableHead>Symbol</TableHead>
+                                <TableHead>
+                                  <span className="sr-only">Held</span>
+                                </TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {(wl.symbols || []).length === 0 ? (
                                 <TableRow>
-                                  <TableCell colSpan={2} className="text-center text-muted-foreground">No symbols yet</TableCell>
+                                  <TableCell colSpan={3} className="text-center text-muted-foreground">No symbols yet</TableCell>
                                 </TableRow>
                               ) : (
                                 wl.symbols.map((symbol) => (
                                   <TableRow key={`${wl.id}-${symbol}`}>
                                     <TableCell>{symbol}</TableCell>
+                                    <TableCell>
+                                      {selectedPortfolio?.stocks?.some(s => s.symbol === symbol) && (
+                                        <Badge variant="secondary" className="text-xs">Held</Badge>
+                                      )}
+                                    </TableCell>
                                     <TableCell className="text-right">
                                       <div className="flex items-center gap-1 justify-end">
                                         <Button

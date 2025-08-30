@@ -5,6 +5,7 @@ import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -26,6 +27,8 @@ interface MarketDataProps {
   onRemoveFromWatchlist: (watchlistId: string, symbol: string) => void;
   onQuickTrade: (symbol?: string, side?: 'buy' | 'sell') => void;
   onChartStock: (symbol: string) => void;
+  heldSymbols?: Set<string>;
+  onUpdateWatchlistNote?: (watchlistId: string, symbol: string, notes: string) => void;
 }
 
 export function MarketData({ 
@@ -35,11 +38,16 @@ export function MarketData({
   onAddToWatchlist, 
   onRemoveFromWatchlist,
   onQuickTrade,
-  onChartStock
+  onChartStock,
+  heldSymbols,
+  onUpdateWatchlistNote
 }: MarketDataProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'symbol' | 'price' | 'change' | 'volume'>('symbol');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [selectedWatchlistId, setSelectedWatchlistId] = useState<string | undefined>(
+    (watchlists.find(w => w.isDefault)?.id) || (watchlists[0]?.id)
+  );
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -104,6 +112,30 @@ export function MarketData({
       setSortOrder('asc');
     }
   };
+
+  const selectedWatchlist = watchlists.find(w => w.id === selectedWatchlistId);
+  const selectedWatchlistStocks = (selectedWatchlist?.symbols || [])
+    .map(sym => marketData.find(s => s.symbol === sym))
+    .filter(Boolean) as MarketDataType[];
+  const filteredWatchlistStocks = selectedWatchlistStocks
+    .filter(stock =>
+      stock.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      stock.companyName.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      let aVal: number | string, bVal: number | string;
+      switch (sortBy) {
+        case 'symbol': aVal = a.symbol; bVal = b.symbol; break;
+        case 'price': aVal = a.currentPrice; bVal = b.currentPrice; break;
+        case 'change': aVal = a.changePercent; bVal = b.changePercent; break;
+        case 'volume': aVal = a.volume; bVal = b.volume; break;
+        default: aVal = a.symbol; bVal = b.symbol;
+      }
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      }
+      return sortOrder === 'asc' ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
+    });
 
   const topGainers = marketData
     .filter(stock => stock.changePercent > 0)
@@ -305,48 +337,114 @@ export function MarketData({
         <TabsContent value="watchlist" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>My Watchlist</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>My Watchlist</CardTitle>
+                <div className="flex items-center gap-2">
+                  <div className="w-56">
+                    <Select value={selectedWatchlistId} onValueChange={setSelectedWatchlistId}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {watchlists.map(w => (
+                          <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 w-64"
+                    />
+                  </div>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              {watchlists[0] && watchlists[0].symbols.length > 0 ? (
+              {selectedWatchlist && (selectedWatchlist.symbols || []).length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Symbol</TableHead>
+                      <TableHead>
+                        <Button variant="ghost" onClick={() => handleSort('symbol')} className="p-0 h-auto font-medium">
+                          Symbol {sortBy === 'symbol' && (sortOrder === 'asc' ? '↑' : '↓')}
+                        </Button>
+                      </TableHead>
                       <TableHead>Company</TableHead>
-                      <TableHead className="text-right">Price</TableHead>
-                      <TableHead className="text-right">Change</TableHead>
+                      <TableHead className="text-right">
+                        <Button variant="ghost" onClick={() => handleSort('price')} className="p-0 h-auto font-medium">
+                          Price {sortBy === 'price' && (sortOrder === 'asc' ? '↑' : '↓')}
+                        </Button>
+                      </TableHead>
+                      <TableHead className="text-right">
+                        <Button variant="ghost" onClick={() => handleSort('change')} className="p-0 h-auto font-medium">
+                          Change {sortBy === 'change' && (sortOrder === 'asc' ? '↑' : '↓')}
+                        </Button>
+                      </TableHead>
+                      <TableHead className="text-right">Market Cap</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {watchlists[0].symbols.map((symbol) => {
-                      const stock = marketData.find(s => s.symbol === symbol);
-                      if (!stock) return null;
-                      
-                      return (
-                        <TableRow key={symbol}>
-                          <TableCell className="font-medium">{stock.symbol}</TableCell>
-                          <TableCell>{stock.companyName}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(stock.currentPrice)}</TableCell>
-                          <TableCell className="text-right">
-                            <div className={stock.change >= 0 ? 'text-green-600' : 'text-red-600'}>
-                              {formatCurrency(stock.change)} ({formatPercent(stock.changePercent)})
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
+                    {filteredWatchlistStocks.map((stock) => (
+                      <TableRow key={`${selectedWatchlist.id}-${stock.symbol}`}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{stock.symbol}</span>
+                            {heldSymbols?.has(stock.symbol) && (
+                              <Badge variant="secondary" className="text-xs">Held</Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="max-w-[200px]">
+                            <p className="truncate">{stock.companyName}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(stock.currentPrice)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className={stock.change >= 0 ? 'text-green-600' : 'text-red-600'}>
+                            {formatCurrency(stock.change)} ({formatPercent(stock.changePercent)})
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">{formatCurrency(stock.marketCap)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center gap-1 justify-end">
+                            <Button variant="ghost" size="sm" onClick={() => onChartStock(stock.symbol)} className="h-8 w-8 p-0">
+                              <BarChart3 className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => onQuickTrade(stock.symbol)} className="h-8 w-8 p-0">
+                              <ShoppingCart className="h-3 w-3" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => onRemoveFromWatchlist(watchlists[0].id, symbol)}
+                              onClick={() => onRemoveFromWatchlist(selectedWatchlist.id, stock.symbol)}
                               className="h-8 w-8 p-0 text-destructive"
                             >
                               <Star className="h-3 w-3 fill-current" />
                             </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                            {onUpdateWatchlistNote && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const note = prompt('Add/Edit note for ' + stock.symbol, '') || '';
+                                  if (note != null) onUpdateWatchlistNote(selectedWatchlist.id, stock.symbol, note);
+                                }}
+                                className="h-8 px-2"
+                              >
+                                Note
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               ) : (
@@ -509,11 +607,33 @@ export function MarketData({
         <TabsContent value="news" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Market News</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Market News</CardTitle>
+                {watchlists.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm text-muted-foreground">Filter by watchlist</div>
+                    <div className="w-56">
+                      <Select value={selectedWatchlistId} onValueChange={setSelectedWatchlistId}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {watchlists.map(w => (
+                            <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {news.map((article) => (
+                {(selectedWatchlistId
+                  ? news.filter(a => !a.symbols || a.symbols.some(s => (watchlists.find(w => w.id === selectedWatchlistId)?.symbols || []).includes(s)))
+                  : news
+                ).map((article) => (
                   <div key={article.id} className="border-b border-border pb-4 last:border-b-0">
                     <h3 className="font-medium mb-2">{article.title}</h3>
                     <p className="text-sm text-muted-foreground mb-3">
