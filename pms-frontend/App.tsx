@@ -286,6 +286,14 @@ export default function App() {
     setCurrentView("chart");
   };
 
+  const positionsBySymbol = useMemo(() => {
+    const map: Record<string, { quantity: number; averagePrice: number }> = {};
+    (selectedPortfolio?.stocks || []).forEach((s) => {
+      map[s.symbol] = { quantity: s.quantity, averagePrice: s.purchasePrice };
+    });
+    return map;
+  }, [selectedPortfolio]);
+
   const getPageTitle = () => {
     switch (currentView) {
       case "dashboard":
@@ -523,6 +531,7 @@ export default function App() {
                 await updateWatchlistItemNote(watchlistId, symbol, notes);
                 toast.success('Note saved');
               }}
+              positionsBySymbol={positionsBySymbol}
             />
           </Suspense>
         );
