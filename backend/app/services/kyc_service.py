@@ -25,7 +25,7 @@ from app.model.user import (
     UserAccountUpdate,
     AccountType,
     InvestmentGoal,
-    UserInvestmentGoalContribution,
+    # UserInvestmentGoalContribution,
     UserInvestmentGoalContributionCreate,
 )
 
@@ -424,61 +424,20 @@ class InvestmentGoalService(BaseService[UserInvestmentGoal, UserInvestmentGoalCr
         logger.info(f"Deactivated investment goal {goal_id} for user {user_id}")
         return True
     
-    def add_contribution(self, user_id: UUID, goal_id: UUID, data: UserInvestmentGoalContributionCreate) -> UserInvestmentGoalContribution:
+    def add_contribution(self, user_id: UUID, goal_id: UUID, data: UserInvestmentGoalContributionCreate):
         """Add a contribution to a goal."""
-        goal = self.get_by_id(goal_id)
-        if not goal or goal.user_id != user_id:
-            raise ServiceException("Investment goal not found", status_code=404)
-        if data.amount is None or data.amount <= 0:
-            raise ServiceException("Contribution amount must be positive")
-        contribution = UserInvestmentGoalContribution(
-            user_id=user_id,
-            goal_id=goal_id,
-            amount=int(data.amount),
-            contributed_at=data.contributed_at or datetime.utcnow(),
-            notes=data.notes or None,
-            created_at=datetime.utcnow(),
-        )
-        try:
-            self.session.add(contribution)
-            self.session.commit()
-            self.session.refresh(contribution)
-            return contribution
-        except Exception as e:
-            self.session.rollback()
-            logger.error(f"Error creating contribution for goal {goal_id}: {e}")
-            raise ServiceException("Failed to create goal contribution")
+        # TODO: Implement when UserInvestmentGoalContribution table is created
+        raise ServiceException("Goal contributions not yet implemented", status_code=501)
 
-    def list_contributions(self, user_id: UUID, goal_id: UUID) -> List[UserInvestmentGoalContribution]:
+    def list_contributions(self, user_id: UUID, goal_id: UUID):
         """List contributions for a goal."""
-        goal = self.get_by_id(goal_id)
-        if not goal or goal.user_id != user_id:
-            raise ServiceException("Investment goal not found", status_code=404)
-        try:
-            return self.session.exec(
-                select(UserInvestmentGoalContribution)
-                .where(UserInvestmentGoalContribution.goal_id == goal_id)
-                .order_by(UserInvestmentGoalContribution.contributed_at.desc())
-            ).all()
-        except Exception as e:
-            logger.error(f"Error listing contributions for goal {goal_id}: {e}")
-            raise ServiceException("Failed to list goal contributions")
+        # TODO: Implement when UserInvestmentGoalContribution table is created
+        return []
 
     def delete_contribution(self, user_id: UUID, contribution_id: UUID) -> bool:
         """Delete a contribution if it belongs to the user."""
-        try:
-            contrib = self.session.get(UserInvestmentGoalContribution, contribution_id)
-            if not contrib or contrib.user_id != user_id:
-                raise ServiceException("Contribution not found", status_code=404)
-            self.session.delete(contrib)
-            self.session.commit()
-            return True
-        except ServiceException:
-            raise
-        except Exception as e:
-            self.session.rollback()
-            logger.error(f"Error deleting contribution {contribution_id}: {e}")
-            raise ServiceException("Failed to delete goal contribution")
+        # TODO: Implement when UserInvestmentGoalContribution table is created
+        raise ServiceException("Goal contributions not yet implemented", status_code=501)
     
     def _validate_goal_data(self, goal_data: UserInvestmentGoalCreate) -> None:
         """Validate investment goal data."""

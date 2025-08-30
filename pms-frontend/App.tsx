@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, lazy, startTransition } from "react";
+import { useState, useEffect, Suspense, lazy, startTransition, useMemo } from "react";
 import { TradingSidebar } from "./components/TradingSidebar";
 import { GlobalTopBar } from "./components/GlobalTopBar";
 import { Toaster } from "./components/ui/sonner";
@@ -162,6 +162,15 @@ export default function App() {
   } = useTrading();
   const queryClient = useQueryClient();
 
+  // Compute positions map (must be before any early returns)
+  const positionsBySymbol = useMemo(() => {
+    const map: Record<string, { quantity: number; averagePrice: number }> = {};
+    (selectedPortfolio?.stocks || []).forEach((s) => {
+      map[s.symbol] = { quantity: s.quantity, averagePrice: s.purchasePrice };
+    });
+    return map;
+  }, [selectedPortfolio]);
+
   // Show loading screen while checking authentication
   if (authLoading) {
     console.log('⏳ Showing loading screen');
@@ -285,14 +294,6 @@ export default function App() {
     setSelectedChartStock(symbol);
     setCurrentView("chart");
   };
-
-  const positionsBySymbol = useMemo(() => {
-    const map: Record<string, { quantity: number; averagePrice: number }> = {};
-    (selectedPortfolio?.stocks || []).forEach((s) => {
-      map[s.symbol] = { quantity: s.quantity, averagePrice: s.purchasePrice };
-    });
-    return map;
-  }, [selectedPortfolio]);
 
   const getPageTitle = () => {
     switch (currentView) {

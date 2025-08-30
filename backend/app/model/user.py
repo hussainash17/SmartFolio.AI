@@ -109,7 +109,7 @@ class UserInvestmentGoal(SQLModel, table=True):
 
     # Relationships
     user: "User" = Relationship(back_populates="investment_goals")
-    contributions: list["UserInvestmentGoalContribution"] = Relationship(back_populates="goal")
+    # contributions: list["UserInvestmentGoalContribution"] = Relationship(back_populates="goal")
 
 
 # User Account Model for multiple account types
