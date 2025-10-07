@@ -224,6 +224,18 @@ def add_position(
         )
 
     total_investment = quantity * average_price
+    total_cost = Decimal(str(total_investment))
+
+    # Check if portfolio has sufficient cash balance
+    current_cash = portfolio.cash_balance or Decimal(0)
+    if current_cash < total_cost:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Insufficient cash balance. Available: {float(current_cash)}, Required: {float(total_cost)}"
+        )
+
+    # Deduct cash from portfolio
+    portfolio.cash_balance = current_cash - total_cost
 
     position = PortfolioPosition(
         portfolio_id=portfolio_id,
@@ -236,7 +248,18 @@ def add_position(
         unrealized_pnl_percent=0
     )
 
+    # Create transaction record for audit trail
+    transaction = AccountTransaction(
+        user_id=current_user.id,
+        portfolio_id=portfolio.id,
+        type=TransactionType.BUY,
+        amount=total_cost,
+        description=f"Added position: {stock.symbol} - {quantity} shares @ {average_price}"
+    )
+
     session.add(position)
+    session.add(portfolio)
+    session.add(transaction)
     session.commit()
     session.refresh(position)
     return position
@@ -368,6 +391,15 @@ def update_position(
             detail="Position not found"
         )
 
+    # Get stock details for transaction description
+    stock = session.exec(
+        select(StockCompany).where(StockCompany.id == position.stock_id)
+    ).first()
+
+    # Calculate old total investment
+    old_total_investment = Decimal(str(position.total_investment))
+
+    # Update position fields
     if quantity is not None:
         position.quantity = quantity
     if average_price is not None:
@@ -375,8 +407,45 @@ def update_position(
 
     # Recalculate total investment
     position.total_investment = position.quantity * position.average_price
+    new_total_investment = Decimal(str(position.total_investment))
+
+    # Calculate cash adjustment needed
+    cash_difference = new_total_investment - old_total_investment
+    current_cash = portfolio.cash_balance or Decimal(0)
+
+    # If position value increased, check if there's enough cash
+    if cash_difference > 0:
+        if current_cash < cash_difference:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Insufficient cash balance. Available: {float(current_cash)}, Required: {float(cash_difference)}"
+            )
+        portfolio.cash_balance = current_cash - cash_difference
+        transaction_type = TransactionType.BUY
+        description = f"Position increase: {stock.symbol if stock else 'Unknown'} - {position.quantity} shares @ {position.average_price}"
+    elif cash_difference < 0:
+        # Position value decreased, return cash
+        portfolio.cash_balance = current_cash + abs(cash_difference)
+        transaction_type = TransactionType.SELL
+        description = f"Position decrease: {stock.symbol if stock else 'Unknown'} - {position.quantity} shares @ {position.average_price}"
+    else:
+        # No cash adjustment needed
+        transaction_type = None
+        description = None
+
+    # Create transaction record if there was a cash adjustment
+    if transaction_type and cash_difference != 0:
+        transaction = AccountTransaction(
+            user_id=current_user.id,
+            portfolio_id=portfolio.id,
+            type=transaction_type,
+            amount=abs(cash_difference),
+            description=description
+        )
+        session.add(transaction)
 
     session.add(position)
+    session.add(portfolio)
     session.commit()
     session.refresh(position)
     return position
@@ -389,7 +458,7 @@ def remove_position(
         current_user: User = Depends(get_current_user),
         session: Session = Depends(get_session_dep)
 ):
-    """Remove a position from portfolio"""
+    """Remove a position from portfolio and return cash"""
     # Verify portfolio belongs to user
     portfolio = session.exec(
         select(Portfolio).where(
@@ -417,9 +486,30 @@ def remove_position(
             detail="Position not found"
         )
 
+    # Get stock details for transaction description
+    stock = session.exec(
+        select(StockCompany).where(StockCompany.id == position.stock_id)
+    ).first()
+
+    # Return cash to portfolio based on total investment
+    cash_to_return = Decimal(str(position.total_investment))
+    current_cash = portfolio.cash_balance or Decimal(0)
+    portfolio.cash_balance = current_cash + cash_to_return
+
+    # Create transaction record for the position removal
+    transaction = AccountTransaction(
+        user_id=current_user.id,
+        portfolio_id=portfolio.id,
+        type=TransactionType.SELL,
+        amount=cash_to_return,
+        description=f"Position removed: {stock.symbol if stock else 'Unknown'} - {position.quantity} shares @ {position.average_price}"
+    )
+
+    session.add(portfolio)
+    session.add(transaction)
     session.delete(position)
     session.commit()
-    return {"message": "Position removed successfully"}
+    return {"message": "Position removed successfully", "cash_returned": float(cash_to_return)}
 
 
 # Trade Management APIs
