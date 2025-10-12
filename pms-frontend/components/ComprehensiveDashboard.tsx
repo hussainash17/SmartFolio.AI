@@ -200,12 +200,6 @@ export function ComprehensiveDashboard({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1>Portfolio Dashboard</h1>
-          <p className="text-muted-foreground">
-            Comprehensive view of your investment portfolio and financial goals
-          </p>
-        </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => onNavigate('reports')}>
             <BarChart3 className="h-4 w-4 mr-2" />

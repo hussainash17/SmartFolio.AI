@@ -9,15 +9,17 @@ import { Badge } from "./ui/badge";
 import { Separator } from "./ui/separator";
 import { TrendingUp, TrendingDown, Search } from "lucide-react";
 import { MarketData, Order } from "../types/trading";
+import { Portfolio } from "../types/portfolio";
 
 interface QuickTradeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPlaceOrder: (order: Omit<Order, 'id' | 'orderDate' | 'status' | 'filledQuantity'>) => void;
   marketData: MarketData[];
-  buyingPower: number;
   initialSymbol?: string;
   initialSide?: 'buy' | 'sell';
+  portfolios: Portfolio[];
+  selectedPortfolioId?: string;
 }
 
 export function QuickTradeDialog({ 
@@ -25,12 +27,16 @@ export function QuickTradeDialog({
   onOpenChange, 
   onPlaceOrder, 
   marketData, 
-  buyingPower,
   initialSymbol,
-  initialSide
+  initialSide,
+  portfolios,
+  selectedPortfolioId: initialPortfolioId
 }: QuickTradeDialogProps) {
   const [selectedStock, setSelectedStock] = useState<MarketData | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedPortfolioId, setSelectedPortfolioId] = useState<string>(
+    initialPortfolioId || (portfolios.length > 0 ? portfolios[0].id : '')
+  );
   const [orderDetails, setOrderDetails] = useState({
     side: 'buy' as 'buy' | 'sell',
     orderType: 'market' as 'market' | 'limit' | 'stop' | 'stop-limit',
@@ -39,6 +45,17 @@ export function QuickTradeDialog({
     stopPrice: '',
     timeInForce: 'day' as 'day' | 'gtc',
   });
+
+  // Get selected portfolio for buying power
+  const selectedPortfolio = portfolios.find(p => p.id === selectedPortfolioId);
+  const portfolioCash = selectedPortfolio?.cash || 0;
+
+  // Update portfolio selection when it changes in parent
+  useEffect(() => {
+    if (initialPortfolioId && initialPortfolioId !== selectedPortfolioId) {
+      setSelectedPortfolioId(initialPortfolioId);
+    }
+  }, [initialPortfolioId]);
 
   // Set initial symbol when dialog opens
   useEffect(() => {
@@ -97,13 +114,13 @@ export function QuickTradeDialog({
       selectedStock.currentPrice
     ) : 0;
 
-  const canAfford = estimatedTotal <= buyingPower;
+  const canAfford = orderDetails.side === 'sell' || estimatedTotal <= portfolioCash;
 
   const handlePlaceOrder = () => {
-    if (!selectedStock || !orderDetails.quantity) return;
+    if (!selectedStock || !orderDetails.quantity || !selectedPortfolioId) return;
 
     const order: Omit<Order, 'id' | 'orderDate' | 'status' | 'filledQuantity'> = {
-      portfolioId: undefined,
+      portfolioId: selectedPortfolioId,
       symbol: selectedStock.symbol,
       companyName: selectedStock.companyName,
       side: orderDetails.side,
@@ -217,6 +234,30 @@ export function QuickTradeDialog({
           <div className="space-y-4">
             {selectedStock ? (
               <>
+                {/* Portfolio Selection */}
+                <div className="space-y-2">
+                  <Label>Portfolio</Label>
+                  <Select value={selectedPortfolioId} onValueChange={setSelectedPortfolioId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select portfolio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {portfolios.map(portfolio => (
+                        <SelectItem key={portfolio.id} value={portfolio.id}>
+                          {portfolio.name} (Cash: {formatCurrency(portfolio.cash)})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedPortfolio && (
+                    <p className="text-xs text-muted-foreground">
+                      Available Cash: {formatCurrency(portfolioCash)}
+                    </p>
+                  )}
+                </div>
+
+                <Separator />
+
                 <Tabs value={orderDetails.side} onValueChange={(value) => setOrderDetails(prev => ({ ...prev, side: value as 'buy' | 'sell' }))}>
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="buy" className="data-[state=active]:bg-green-100 data-[state=active]:text-green-800">
@@ -384,19 +425,19 @@ export function QuickTradeDialog({
                       <span className="font-semibold">{formatCurrency(estimatedTotal)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Buying Power:</span>
-                      <span>{formatCurrency(buyingPower)}</span>
+                      <span>Portfolio Cash:</span>
+                      <span className="font-semibold text-blue-600">{formatCurrency(portfolioCash)}</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between">
                       <span>Available After Trade:</span>
                       <span className={canAfford ? 'text-green-600' : 'text-red-600'}>
-                        {formatCurrency(buyingPower - estimatedTotal)}
+                        {formatCurrency(portfolioCash - estimatedTotal)}
                       </span>
                     </div>
                     {!canAfford && (
                       <Badge variant="destructive" className="w-full justify-center">
-                        Insufficient Buying Power
+                        Insufficient Cash in Portfolio
                       </Badge>
                     )}
                   </div>

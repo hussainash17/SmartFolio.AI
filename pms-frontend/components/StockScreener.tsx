@@ -21,6 +21,10 @@ import {
   Download,
   Bookmark
 } from "lucide-react";
+import { useWatchlist } from "../hooks/useWatchlist";
+import { AddToWatchlistDialog } from "./AddToWatchlistDialog";
+import { MarketService } from "../src/client";
+import { toast } from "sonner";
 
 interface StockScreenerProps {
   onQuickTrade: (symbol?: string, side?: 'buy' | 'sell') => void;
@@ -98,6 +102,17 @@ export function StockScreener({ onQuickTrade, onChartStock, onAddToWatchlist }: 
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('marketCap');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  
+  // Watchlist dialog state
+  const [addToWatchlistDialogOpen, setAddToWatchlistDialogOpen] = useState(false);
+  const [selectedStockForWatchlist, setSelectedStockForWatchlist] = useState<{ symbol: string; companyName: string } | null>(null);
+  
+  // Use watchlist hook
+  const {
+    watchlists,
+    addStockToWatchlist,
+    createWatchlist,
+  } = useWatchlist();
   const [activeFilters, setActiveFilters] = useState(0);
 
   // Mock screener results
@@ -200,6 +215,52 @@ export function StockScreener({ onQuickTrade, onChartStock, onAddToWatchlist }: 
     'Utilities', 'Real Estate', 'Materials'
   ];
 
+  // Handle adding stock to watchlist using dialog
+  const handleAddToWatchlistClick = (symbol: string, companyName: string) => {
+    setSelectedStockForWatchlist({ symbol, companyName });
+    setAddToWatchlistDialogOpen(true);
+  };
+
+  const handleAddStockToWatchlist = async (watchlistId: string, notes?: string) => {
+    if (!selectedStockForWatchlist) return;
+    
+    try {
+      // Find stock ID from the symbol
+      const stocks = (await MarketService.listStocks({ q: selectedStockForWatchlist.symbol, limit: 1 })) as any[];
+      const stockId = stocks?.[0]?.id;
+      
+      if (!stockId) {
+        toast.error(`Stock ${selectedStockForWatchlist.symbol} not found`);
+        return;
+      }
+      
+      const success = await addStockToWatchlist(watchlistId, stockId, notes);
+      if (success) {
+        toast.success(`Added ${selectedStockForWatchlist.symbol} to watchlist`);
+      } else {
+        toast.error('Failed to add stock to watchlist');
+      }
+    } catch (error) {
+      toast.error('Error adding stock to watchlist');
+    }
+  };
+
+  const handleCreateWatchlist = async (name: string, description?: string) => {
+    const result = await createWatchlist({
+      name,
+      description,
+      is_default: false,
+    });
+    
+    if (result) {
+      toast.success(`Watchlist "${name}" created`);
+      return result.id;
+    }
+    
+    toast.error('Failed to create watchlist');
+    return '';
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -262,12 +323,6 @@ export function StockScreener({ onQuickTrade, onChartStock, onAddToWatchlist }: 
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1>Stock Screener</h1>
-          <p className="text-muted-foreground">
-            Find stocks that match your investment criteria using fundamental and technical filters
-          </p>
-        </div>
         <div className="flex gap-2">
           <Button variant="outline">
             <Bookmark className="h-4 w-4 mr-2" />
@@ -609,7 +664,7 @@ export function StockScreener({ onQuickTrade, onChartStock, onAddToWatchlist }: 
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => onAddToWatchlist(stock.symbol)}
+                              onClick={() => handleAddToWatchlistClick(stock.symbol, stock.companyName)}
                               className="h-8 w-8 p-0"
                             >
                               <Star className="h-3 w-3" />
@@ -625,6 +680,19 @@ export function StockScreener({ onQuickTrade, onChartStock, onAddToWatchlist }: 
           </Card>
         </div>
       </div>
+
+      {/* Add to Watchlist Dialog */}
+      {selectedStockForWatchlist && (
+        <AddToWatchlistDialog
+          open={addToWatchlistDialogOpen}
+          onOpenChange={setAddToWatchlistDialogOpen}
+          symbol={selectedStockForWatchlist.symbol}
+          companyName={selectedStockForWatchlist.companyName}
+          watchlists={watchlists}
+          onAdd={handleAddStockToWatchlist}
+          onCreateWatchlist={handleCreateWatchlist}
+        />
+      )}
     </div>
   );
 }

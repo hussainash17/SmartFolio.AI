@@ -1,7 +1,7 @@
 from sqlmodel import SQLModel
 
 # Import all models to ensure they are registered with SQLModel
-from .company import Company
+from .company import Company, CompanyBase, CompanyCreate, CompanyUpdate, CompanyPublic
 from .market_information import MarketInformation
 from .user import (
     Message,
@@ -191,9 +191,47 @@ from .risk_management import (
 )
 from .funds import AccountTransaction, AccountTransactionPublic, TransactionType
 
+# Fundamental data models
+from .fundamental import (
+    DividendInformation,
+    DividendInformationBase,
+    DividendInformationCreate,
+    DividendInformationUpdate,
+    DividendInformationPublic,
+    FinancialPerformance,
+    FinancialPerformanceBase,
+    FinancialPerformanceCreate,
+    FinancialPerformanceUpdate,
+    FinancialPerformancePublic,
+    QuarterlyPerformance,
+    QuarterlyPerformanceBase,
+    QuarterlyPerformanceCreate,
+    QuarterlyPerformanceUpdate,
+    QuarterlyPerformancePublic,
+    ShareholdingPattern,
+    ShareholdingPatternBase,
+    ShareholdingPatternCreate,
+    ShareholdingPatternUpdate,
+    ShareholdingPatternPublic,
+    LoanStatus,
+    LoanStatusBase,
+    LoanStatusCreate,
+    LoanStatusUpdate,
+    LoanStatusPublic,
+    ScraperLog,
+    ScraperLogBase,
+    ScraperLogCreate,
+    ScraperLogUpdate,
+    ScraperLogPublic,
+)
+
 __all__ = [
     "SQLModel",
     "Company",
+    "CompanyBase",
+    "CompanyCreate",
+    "CompanyUpdate",
+    "CompanyPublic",
     "Item",
     "ItemBase", 
     "ItemCreate",
@@ -359,4 +397,46 @@ __all__ = [
     "UserInvestmentGoalContributionPublic",
     "UserAccount",
     "UserAccountBase",
+    "UserAccountCreate",
+    "UserAccountUpdate",
+    "UserAccountPublic",
+    "AccountType",
+    "KYCStatus",
+    "InvestmentGoal",
+    "KYCInformation",
+    "KYCInformationBase",
+    "KYCInformationCreate",
+    "KYCInformationUpdate",
+    "KYCInformationPublic",
+    # Fundamental data models
+    "DividendInformation",
+    "DividendInformationBase",
+    "DividendInformationCreate",
+    "DividendInformationUpdate",
+    "DividendInformationPublic",
+    "FinancialPerformance",
+    "FinancialPerformanceBase",
+    "FinancialPerformanceCreate",
+    "FinancialPerformanceUpdate",
+    "FinancialPerformancePublic",
+    "QuarterlyPerformance",
+    "QuarterlyPerformanceBase",
+    "QuarterlyPerformanceCreate",
+    "QuarterlyPerformanceUpdate",
+    "QuarterlyPerformancePublic",
+    "ShareholdingPattern",
+    "ShareholdingPatternBase",
+    "ShareholdingPatternCreate",
+    "ShareholdingPatternUpdate",
+    "ShareholdingPatternPublic",
+    "LoanStatus",
+    "LoanStatusBase",
+    "LoanStatusCreate",
+    "LoanStatusUpdate",
+    "LoanStatusPublic",
+    "ScraperLog",
+    "ScraperLogBase",
+    "ScraperLogCreate",
+    "ScraperLogUpdate",
+    "ScraperLogPublic",
 ]

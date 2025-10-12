@@ -10,7 +10,8 @@ from app.api.deps import get_current_user, get_session_dep
 from app.model.user import User
 from app.model.portfolio import Portfolio, PortfolioPosition
 from app.model.trade import Trade
-from app.model.stock import StockCompany, StockData
+from app.model.stock import StockData
+from app.model.company import Company
 from app.model.order import Order
 from app.model.alert import News
 from app.model.portfolio import AllocationTarget, AllocationTargetPublic, AllocationTargetCreate
@@ -169,8 +170,8 @@ def get_portfolio_allocation(
     
     # Get positions with stock information
     positions_query = session.exec(
-        select(PortfolioPosition, StockCompany)
-        .join(StockCompany, PortfolioPosition.stock_id == StockCompany.id)
+        select(PortfolioPosition, Company)
+        .join(Company, PortfolioPosition.stock_id == Company.id)
         .where(PortfolioPosition.portfolio_id == portfolio_id)
     ).all()
     
@@ -195,7 +196,7 @@ def get_portfolio_allocation(
         allocation_percent = float(position.current_value) / total_value * 100
         stock_allocations.append({
             "stock_id": str(stock.id),
-            "symbol": stock.symbol,
+            "symbol": stock.trading_code,
             "name": stock.company_name,
             "sector": stock.sector,
             "current_value": float(position.current_value),
@@ -330,8 +331,8 @@ def get_dividend_analysis(
     
     # Get dividend-paying positions
     positions_query = session.exec(
-        select(PortfolioPosition, StockCompany)
-        .join(StockCompany, PortfolioPosition.stock_id == StockCompany.id)
+        select(PortfolioPosition, Company)
+        .join(Company, PortfolioPosition.stock_id == Company.id)
         .where(PortfolioPosition.portfolio_id == portfolio_id)
     ).all()
     
@@ -350,7 +351,7 @@ def get_dividend_analysis(
         if mock_dividend_yield > 0:
             dividend_stocks.append({
                 "stock_id": str(stock.id),
-                "symbol": stock.symbol,
+                "symbol": stock.trading_code,
                 "name": stock.company_name,
                 "sector": stock.sector,
                 "position_value": float(position.current_value),
@@ -398,16 +399,16 @@ def get_cost_basis_analysis(
     
     # Get all trades for cost basis calculation
     trades = session.exec(
-        select(Trade, StockCompany)
-        .join(StockCompany, Trade.stock_id == StockCompany.id)
+        select(Trade, Company)
+        .join(Company, Trade.stock_id == Company.id)
         .where(Trade.portfolio_id == portfolio_id)
         .order_by(Trade.trade_date)
     ).all()
     
     # Get current positions
     positions = session.exec(
-        select(PortfolioPosition, StockCompany)
-        .join(StockCompany, PortfolioPosition.stock_id == StockCompany.id)
+        select(PortfolioPosition, Company)
+        .join(Company, PortfolioPosition.stock_id == Company.id)
         .where(PortfolioPosition.portfolio_id == portfolio_id)
     ).all()
     
@@ -420,7 +421,7 @@ def get_cost_basis_analysis(
         stock_id = str(stock.id)
         if stock_id not in stock_analysis:
             stock_analysis[stock_id] = {
-                "symbol": stock.symbol,
+                "symbol": stock.trading_code,
                 "name": stock.company_name,
                 "current_quantity": position.quantity,
                 "average_cost": float(position.average_price),

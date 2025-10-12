@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -15,9 +15,18 @@ import {
   Activity,
   BarChart3,
   Volume2,
-  ShoppingCart
+  ShoppingCart,
+  ChevronLeft,
+  ChevronRight,
+  Loader2
 } from "lucide-react";
 import { MarketData as MarketDataType, Watchlist, NewsItem } from "../types/trading";
+import { useQuery } from "@tanstack/react-query";
+import { MarketService, OpenAPI } from "../src/client";
+import { queryKeys } from "../hooks/queryKeys";
+import { useWatchlist } from "../hooks/useWatchlist";
+import { AddToWatchlistDialog } from "./AddToWatchlistDialog";
+import { toast } from "sonner";
 
 interface MarketDataProps {
   marketData: MarketDataType[];
@@ -48,6 +57,176 @@ export function MarketData({
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<string | undefined>(
     (watchlists.find(w => w.isDefault)?.id) || (watchlists[0]?.id)
   );
+  const [watchlistStocksWithPrices, setWatchlistStocksWithPrices] = useState<MarketDataType[]>([]);
+  
+  // Pagination state for All Stocks tab
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  
+  // Watchlist dialog state
+  const [addToWatchlistDialogOpen, setAddToWatchlistDialogOpen] = useState(false);
+  const [selectedStockForWatchlist, setSelectedStockForWatchlist] = useState<{ symbol: string; companyName: string } | null>(null);
+  
+  // Use watchlist hook
+  const {
+    watchlists: watchlistsFromHook,
+    currentWatchlist,
+    watchlistItems,
+    isLoading: isLoadingWatchlist,
+    addStockToWatchlist,
+    createWatchlist,
+    setCurrentWatchlist,
+    removeStockFromWatchlist,
+    updateWatchlistItemNotes,
+  } = useWatchlist();
+  
+  // Fetch paginated stocks for All Stocks tab
+  const { data: paginatedStocksResponse, isLoading: isLoadingPaginatedStocks } = useQuery({
+    queryKey: queryKeys.marketList(pageSize, (currentPage - 1) * pageSize),
+    enabled: !!(OpenAPI as any).TOKEN,
+    queryFn: async () => {
+      const list = (await MarketService.listStocks({ 
+        limit: pageSize, 
+        offset: (currentPage - 1) * pageSize 
+      })) as any[];
+      return list || [];
+    },
+    staleTime: 30 * 1000,
+  });
+  
+  // Map paginated stocks to MarketData format
+  const paginatedStocks: MarketDataType[] = (paginatedStocksResponse || []).map((it: any) => ({
+    symbol: it.symbol,
+    companyName: it.company_name,
+    currentPrice: Number(it.last || 0),
+    change: Number(it.change || 0),
+    changePercent: Number(it.change_percent || 0),
+    volume: Number(it.volume || 0),
+    high52Week: 0,
+    low52Week: 0,
+    marketCap: Number(it.market_cap || 0),
+    peRatio: undefined,
+    dividend: undefined,
+    dividendYield: undefined,
+    sector: it.sector || 'Unknown',
+    industry: it.industry || 'Unknown',
+    lastUpdated: it.timestamp || new Date().toISOString(),
+  }));
+
+  // Set default watchlist when watchlists load
+  useEffect(() => {
+    if (watchlistsFromHook.length > 0 && !currentWatchlist) {
+      const defaultWatchlist = watchlistsFromHook.find(w => w.is_default) || watchlistsFromHook[0];
+      setCurrentWatchlist(defaultWatchlist);
+    }
+  }, [watchlistsFromHook, currentWatchlist, setCurrentWatchlist]);
+
+  // Fetch market data for watchlist stocks
+  useEffect(() => {
+    const fetchWatchlistStockPrices = async () => {
+      if (!watchlistItems || watchlistItems.length === 0) {
+        setWatchlistStocksWithPrices([]);
+        return;
+      }
+
+      try {
+        const stocksWithPrices = await Promise.all(
+          watchlistItems.map(async (item) => {
+            try {
+              const stockData = await MarketService.getStock({ symbol: item.stock.symbol });
+              return {
+                symbol: item.stock.symbol,
+                companyName: item.stock.company_name,
+                currentPrice: Number((stockData as any).last || 0),
+                change: Number((stockData as any).change || 0),
+                changePercent: Number((stockData as any).change_percent || 0),
+                volume: Number((stockData as any).volume || 0),
+                high52Week: 0,
+                low52Week: 0,
+                marketCap: Number((stockData as any).market_cap || 0),
+                peRatio: undefined,
+                dividend: undefined,
+                dividendYield: undefined,
+                sector: item.stock.sector || 'Unknown',
+                industry: item.stock.industry || 'Unknown',
+                lastUpdated: (stockData as any).timestamp || new Date().toISOString(),
+              } as MarketDataType;
+            } catch (error) {
+              // Return basic data if price fetch fails
+              return {
+                symbol: item.stock.symbol,
+                companyName: item.stock.company_name,
+                currentPrice: 0,
+                change: 0,
+                changePercent: 0,
+                volume: 0,
+                high52Week: 0,
+                low52Week: 0,
+                marketCap: 0,
+                peRatio: undefined,
+                dividend: undefined,
+                dividendYield: undefined,
+                sector: item.stock.sector || 'Unknown',
+                industry: item.stock.industry || 'Unknown',
+                lastUpdated: new Date().toISOString(),
+              } as MarketDataType;
+            }
+          })
+        );
+        setWatchlistStocksWithPrices(stocksWithPrices);
+      } catch (error) {
+        console.error('Error fetching watchlist stock prices:', error);
+      }
+    };
+
+    fetchWatchlistStockPrices();
+  }, [watchlistItems]);
+
+  // Handle adding stock to watchlist using dialog
+  const handleAddToWatchlistClick = (symbol: string, companyName: string) => {
+    setSelectedStockForWatchlist({ symbol, companyName });
+    setAddToWatchlistDialogOpen(true);
+  };
+
+  const handleAddStockToWatchlist = async (watchlistId: string, notes?: string) => {
+    if (!selectedStockForWatchlist) return;
+    
+    try {
+      // Find stock ID from the symbol
+      const stocks = (await MarketService.listStocks({ q: selectedStockForWatchlist.symbol, limit: 1 })) as any[];
+      const stockId = stocks?.[0]?.id;
+      
+      if (!stockId) {
+        toast.error(`Stock ${selectedStockForWatchlist.symbol} not found`);
+        return;
+      }
+      
+      const success = await addStockToWatchlist(watchlistId, stockId, notes);
+      if (success) {
+        toast.success(`Added ${selectedStockForWatchlist.symbol} to watchlist`);
+      } else {
+        toast.error('Failed to add stock to watchlist');
+      }
+    } catch (error) {
+      toast.error('Error adding stock to watchlist');
+    }
+  };
+
+  const handleCreateWatchlist = async (name: string, description?: string) => {
+    const result = await createWatchlist({
+      name,
+      description,
+      is_default: false,
+    });
+    
+    if (result) {
+      toast.success(`Watchlist "${name}" created`);
+      return result.id;
+    }
+    
+    toast.error('Failed to create watchlist');
+    return '';
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -67,7 +246,8 @@ export function MarketData({
     return num.toString();
   };
 
-  const filteredAndSortedData = marketData
+  // For All Stocks tab, use paginated data; for other tabs use marketData
+  const filteredAndSortedData = paginatedStocks
     .filter(stock =>
       stock.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
       stock.companyName.toLowerCase().includes(searchTerm.toLowerCase())
@@ -113,29 +293,7 @@ export function MarketData({
     }
   };
 
-  const selectedWatchlist = watchlists.find(w => w.id === selectedWatchlistId);
-  const selectedWatchlistStocks = (selectedWatchlist?.symbols || [])
-    .map(sym => marketData.find(s => s.symbol === sym))
-    .filter(Boolean) as MarketDataType[];
-  const filteredWatchlistStocks = selectedWatchlistStocks
-    .filter(stock =>
-      stock.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      stock.companyName.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .sort((a, b) => {
-      let aVal: number | string, bVal: number | string;
-      switch (sortBy) {
-        case 'symbol': aVal = a.symbol; bVal = b.symbol; break;
-        case 'price': aVal = a.currentPrice; bVal = b.currentPrice; break;
-        case 'change': aVal = a.changePercent; bVal = b.changePercent; break;
-        case 'volume': aVal = a.volume; bVal = b.volume; break;
-        default: aVal = a.symbol; bVal = b.symbol;
-      }
-      if (typeof aVal === 'string' && typeof bVal === 'string') {
-        return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-      }
-      return sortOrder === 'asc' ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
-    });
+  // Removed old watchlist filtering code - now using useWatchlist hook with watchlistStocksWithPrices
 
   const topGainers = marketData
     .filter(stock => stock.changePercent > 0)
@@ -238,36 +396,46 @@ export function MarketData({
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>
-                      <Button variant="ghost" onClick={() => handleSort('symbol')} className="p-0 h-auto font-medium">
-                        Symbol {sortBy === 'symbol' && (sortOrder === 'asc' ? '↑' : '↓')}
-                      </Button>
-                    </TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead className="text-right">
-                      <Button variant="ghost" onClick={() => handleSort('price')} className="p-0 h-auto font-medium">
-                        Price {sortBy === 'price' && (sortOrder === 'asc' ? '↑' : '↓')}
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-right">
-                      <Button variant="ghost" onClick={() => handleSort('change')} className="p-0 h-auto font-medium">
-                        Change {sortBy === 'change' && (sortOrder === 'asc' ? '↑' : '↓')}
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-right">
-                      <Button variant="ghost" onClick={() => handleSort('volume')} className="p-0 h-auto font-medium">
-                        Volume {sortBy === 'volume' && (sortOrder === 'asc' ? '↑' : '↓')}
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-right">Market Cap</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredAndSortedData.map((stock) => (
+              {isLoadingPaginatedStocks ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center">
+                    <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
+                    <p className="mt-2 text-sm text-muted-foreground">Loading stocks...</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>
+                          <Button variant="ghost" onClick={() => handleSort('symbol')} className="p-0 h-auto font-medium">
+                            Symbol {sortBy === 'symbol' && (sortOrder === 'asc' ? '↑' : '↓')}
+                          </Button>
+                        </TableHead>
+                        <TableHead>Company</TableHead>
+                        <TableHead className="text-right">
+                          <Button variant="ghost" onClick={() => handleSort('price')} className="p-0 h-auto font-medium">
+                            Price {sortBy === 'price' && (sortOrder === 'asc' ? '↑' : '↓')}
+                          </Button>
+                        </TableHead>
+                        <TableHead className="text-right">
+                          <Button variant="ghost" onClick={() => handleSort('change')} className="p-0 h-auto font-medium">
+                            Change {sortBy === 'change' && (sortOrder === 'asc' ? '↑' : '↓')}
+                          </Button>
+                        </TableHead>
+                        <TableHead className="text-right">
+                          <Button variant="ghost" onClick={() => handleSort('volume')} className="p-0 h-auto font-medium">
+                            Volume {sortBy === 'volume' && (sortOrder === 'asc' ? '↑' : '↓')}
+                          </Button>
+                        </TableHead>
+                        <TableHead className="text-right">Market Cap</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredAndSortedData.length > 0 ? (
+                        filteredAndSortedData.map((stock) => (
                     <TableRow key={stock.symbol}>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -319,17 +487,74 @@ export function MarketData({
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => onAddToWatchlist(stock.symbol)}
+                            onClick={() => handleAddToWatchlistClick(stock.symbol, stock.companyName)}
                             className="h-8 w-8 p-0"
                           >
                             <Star className="h-3 w-3" />
                           </Button>
                         </div>
                       </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                        </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                            No stocks found
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                  
+                  {/* Pagination Controls */}
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Rows per page:</span>
+                  <Select
+                    value={pageSize.toString()}
+                    onValueChange={(value) => {
+                      setPageSize(Number(value));
+                      setCurrentPage(1); // Reset to first page when changing page size
+                    }}
+                  >
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">
+                    Page {currentPage} - Showing {filteredAndSortedData.length} stocks
+                  </span>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1 || isLoadingPaginatedStocks}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => p + 1)}
+                      disabled={filteredAndSortedData.length < pageSize || isLoadingPaginatedStocks}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -340,18 +565,28 @@ export function MarketData({
               <div className="flex items-center justify-between">
                 <CardTitle>My Watchlist</CardTitle>
                 <div className="flex items-center gap-2">
-                  <div className="w-56">
-                    <Select value={selectedWatchlistId} onValueChange={setSelectedWatchlistId}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {watchlists.map(w => (
-                          <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {watchlistsFromHook.length > 0 && (
+                    <div className="w-56">
+                      <Select 
+                        value={currentWatchlist?.id} 
+                        onValueChange={(value) => {
+                          const selected = watchlistsFromHook.find(w => w.id === value);
+                          if (selected) setCurrentWatchlist(selected);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select watchlist" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {watchlistsFromHook.map(w => (
+                            <SelectItem key={w.id} value={w.id}>
+                              {w.name} {w.is_default && "(Default)"}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="relative">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -365,95 +600,120 @@ export function MarketData({
               </div>
             </CardHeader>
             <CardContent>
-              {selectedWatchlist && (selectedWatchlist.symbols || []).length > 0 ? (
+              {isLoadingWatchlist ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : !currentWatchlist ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No watchlists available</p>
+                  <p className="text-sm text-muted-foreground mt-2">Create a watchlist to start tracking stocks</p>
+                </div>
+              ) : watchlistStocksWithPrices.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>
-                        <Button variant="ghost" onClick={() => handleSort('symbol')} className="p-0 h-auto font-medium">
-                          Symbol {sortBy === 'symbol' && (sortOrder === 'asc' ? '↑' : '↓')}
-                        </Button>
-                      </TableHead>
+                      <TableHead>Symbol</TableHead>
                       <TableHead>Company</TableHead>
-                      <TableHead className="text-right">
-                        <Button variant="ghost" onClick={() => handleSort('price')} className="p-0 h-auto font-medium">
-                          Price {sortBy === 'price' && (sortOrder === 'asc' ? '↑' : '↓')}
-                        </Button>
-                      </TableHead>
-                      <TableHead className="text-right">
-                        <Button variant="ghost" onClick={() => handleSort('change')} className="p-0 h-auto font-medium">
-                          Change {sortBy === 'change' && (sortOrder === 'asc' ? '↑' : '↓')}
-                        </Button>
-                      </TableHead>
+                      <TableHead>Sector</TableHead>
+                      <TableHead className="text-right">Price</TableHead>
+                      <TableHead className="text-right">Change</TableHead>
+                      <TableHead className="text-right">Volume</TableHead>
                       <TableHead className="text-right">Market Cap</TableHead>
+                      <TableHead className="text-right">Notes</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredWatchlistStocks.map((stock) => (
-                      <TableRow key={`${selectedWatchlist.id}-${stock.symbol}`}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{stock.symbol}</span>
-                            {heldSymbols?.has(stock.symbol) && (
-                              <Badge variant="secondary" className="text-xs">Held</Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="max-w-[200px]">
-                            <p className="truncate">{stock.companyName}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-medium">{formatCurrency(stock.currentPrice)}</TableCell>
-                        <TableCell className="text-right">
-                          <div className={stock.change >= 0 ? 'text-green-600' : 'text-red-600'}>
-                            {formatCurrency(stock.change)} ({formatPercent(stock.changePercent)})
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">{formatCurrency(stock.marketCap)}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center gap-1 justify-end">
-                            <Button variant="ghost" size="sm" onClick={() => onChartStock(stock.symbol)} className="h-8 w-8 p-0">
-                              <BarChart3 className="h-3 w-3" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => onQuickTrade(stock.symbol)} className="h-8 w-8 p-0">
-                              <ShoppingCart className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => onRemoveFromWatchlist(selectedWatchlist.id, stock.symbol)}
-                              className="h-8 w-8 p-0 text-destructive"
-                            >
-                              <Star className="h-3 w-3 fill-current" />
-                            </Button>
-                            {onUpdateWatchlistNote && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  const note = prompt('Add/Edit note for ' + stock.symbol, '') || '';
-                                  if (note != null) onUpdateWatchlistNote(selectedWatchlist.id, stock.symbol, note);
+                    {watchlistStocksWithPrices
+                      .filter(stock =>
+                        stock.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        stock.companyName.toLowerCase().includes(searchTerm.toLowerCase())
+                      )
+                      .map((stock) => {
+                        const item = watchlistItems.find(i => i.stock.symbol === stock.symbol);
+                        return (
+                          <TableRow key={`${currentWatchlist.id}-${stock.symbol}`}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{stock.symbol}</span>
+                                {heldSymbols?.has(stock.symbol) && (
+                                  <Badge variant="secondary" className="text-xs">Held</Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="max-w-[200px]">
+                                <p className="truncate">{stock.companyName}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">{stock.sector}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(stock.currentPrice)}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                {stock.change >= 0 ? (
+                                  <TrendingUp className="h-3 w-3 text-green-600" />
+                                ) : (
+                                  <TrendingDown className="h-3 w-3 text-red-600" />
+                                )}
+                                <div className={stock.change >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                  <div>{formatCurrency(stock.change)}</div>
+                                  <div className="text-xs">{formatPercent(stock.changePercent)}</div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">{formatNumber(stock.volume)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(stock.marketCap)}</TableCell>
+                            <TableCell className="text-right max-w-[150px]">
+                              <Input
+                                value={item?.notes || ""}
+                                onChange={(e) => {
+                                  if (item) {
+                                    updateWatchlistItemNotes(currentWatchlist.id, item.id, e.target.value);
+                                  }
                                 }}
-                                className="h-8 px-2"
-                              >
-                                Note
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                                placeholder="Add notes..."
+                                className="h-8 text-xs"
+                              />
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center gap-1 justify-end">
+                                <Button variant="ghost" size="sm" onClick={() => onChartStock(stock.symbol)} className="h-8 w-8 p-0">
+                                  <BarChart3 className="h-3 w-3" />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => onQuickTrade(stock.symbol)} className="h-8 w-8 p-0">
+                                  <ShoppingCart className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={async () => {
+                                    if (item) {
+                                      const success = await removeStockFromWatchlist(currentWatchlist.id, item.id);
+                                      if (success) {
+                                        toast.success(`Removed ${stock.symbol} from watchlist`);
+                                      } else {
+                                        toast.error('Failed to remove stock');
+                                      }
+                                    }
+                                  }}
+                                  className="h-8 w-8 p-0 text-destructive"
+                                >
+                                  <Star className="h-3 w-3 fill-current" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                   </TableBody>
                 </Table>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-muted-foreground">No stocks in your watchlist</p>
-                  <Button variant="outline" className="mt-2">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Stocks
-                  </Button>
+                  <p className="text-muted-foreground">No stocks in this watchlist</p>
+                  <p className="text-sm text-muted-foreground mt-2">Add stocks from the "All Stocks" tab</p>
                 </div>
               )}
             </CardContent>
@@ -501,7 +761,7 @@ export function MarketData({
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => onAddToWatchlist(stock.symbol)}
+                            onClick={() => handleAddToWatchlistClick(stock.symbol, stock.companyName)}
                             className="h-6 w-6 p-0"
                           >
                             <Star className="h-3 w-3" />
@@ -666,6 +926,19 @@ export function MarketData({
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Add to Watchlist Dialog */}
+      {selectedStockForWatchlist && (
+        <AddToWatchlistDialog
+          open={addToWatchlistDialogOpen}
+          onOpenChange={setAddToWatchlistDialogOpen}
+          symbol={selectedStockForWatchlist.symbol}
+          companyName={selectedStockForWatchlist.companyName}
+          watchlists={watchlistsFromHook}
+          onAdd={handleAddStockToWatchlist}
+          onCreateWatchlist={handleCreateWatchlist}
+        />
+      )}
     </div>
   );
 }

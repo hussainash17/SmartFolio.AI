@@ -10,7 +10,8 @@ from sqlmodel import Session, select
 
 from app.api.deps import get_current_user, get_session_dep
 from app.model.alert import Alert, AlertCreate, AlertPublic, AlertUpdate, News
-from app.model.stock import StockCompany, StockData
+from app.model.stock import StockData
+from app.model.company import Company
 from app.model.user import User
 
 router = APIRouter(prefix="/alerts", tags=["alerts"]) 

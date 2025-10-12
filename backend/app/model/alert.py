@@ -9,14 +9,14 @@ from sqlalchemy import Column
 
 if TYPE_CHECKING:
     from .user import User
-    from .stock import StockCompany
+    from .company import Company
 
 
 # Alert Model
 class Alert(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="user.id")
-    stock_id: Optional[uuid.UUID] = Field(default=None, foreign_key="stockcompany.id")
+    stock_id: Optional[uuid.UUID] = Field(default=None, foreign_key="company.id")
     alert_type: str = Field(max_length=50)  # price_target, volume_spike, technical_indicator
     condition: str = Field(max_length=20)  # above, below, equals
     target_value: Decimal = Field(max_digits=10, decimal_places=2)
@@ -33,7 +33,7 @@ class Alert(SQLModel, table=True):
     
     # Relationships
     user: "User" = Relationship(back_populates="alerts")
-    stock: Optional["StockCompany"] = Relationship(back_populates="alerts")
+    stock: Optional["Company"] = Relationship(back_populates="alerts")
     notifications: list["AlertNotification"] = Relationship(back_populates="alert")
 
 
@@ -78,13 +78,13 @@ class News(SQLModel, table=True):
 class StockNews(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     news_id: uuid.UUID = Field(foreign_key="news.id")
-    stock_id: uuid.UUID = Field(foreign_key="stockcompany.id")
+    stock_id: uuid.UUID = Field(foreign_key="company.id")
     relevance_score: Optional[Decimal] = Field(default=None, max_digits=3, decimal_places=2)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationships
     news: News = Relationship(back_populates="stock_news")
-    stock: "StockCompany" = Relationship(back_populates="news_relations")
+    stock: "Company" = Relationship(back_populates="news_relations")
 
 
 # Market News

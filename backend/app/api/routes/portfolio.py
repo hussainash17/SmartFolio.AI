@@ -13,7 +13,7 @@ from app.model.portfolio import (
     PortfolioPosition, PortfolioPositionPublic,
     PortfolioSummary
 )
-from app.model.stock import StockCompany
+from app.model.company import Company
 from app.model.trade import Trade, TradeCreate, TradeUpdate, TradePublic, TradeWithDetails
 from app.model.user import User
 
@@ -200,7 +200,7 @@ def add_position(
 
     # Verify stock exists by symbol
     stock = session.exec(
-        select(StockCompany).where(StockCompany.symbol == stock_symbol.upper())
+        select(Company).where(Company.trading_code == stock_symbol.upper())
     ).first()
 
     if not stock:
@@ -254,7 +254,7 @@ def add_position(
         portfolio_id=portfolio.id,
         type=TransactionType.BUY,
         amount=total_cost,
-        description=f"Added position: {stock.symbol} - {quantity} shares @ {average_price}"
+        description=f"Added position: {stock.trading_code} - {quantity} shares @ {average_price}"
     )
 
     session.add(position)
@@ -317,8 +317,8 @@ def get_portfolio_positions_with_details(
         )
 
     rows = session.exec(
-        select(PortfolioPosition, StockCompany)
-        .join(StockCompany, PortfolioPosition.stock_id == StockCompany.id)
+        select(PortfolioPosition, Company)
+        .join(Company, PortfolioPosition.stock_id == Company.id)
         .where(PortfolioPosition.portfolio_id == portfolio_id)
     ).all()
 
@@ -345,7 +345,7 @@ def get_portfolio_positions_with_details(
             "current_price": current_price,
             "stock": {
                 "id": stock.id,
-                "symbol": stock.symbol,
+                "symbol": stock.trading_code,
                 "company_name": stock.company_name,
                 "sector": stock.sector,
                 "industry": stock.industry,
@@ -393,7 +393,7 @@ def update_position(
 
     # Get stock details for transaction description
     stock = session.exec(
-        select(StockCompany).where(StockCompany.id == position.stock_id)
+        select(Company).where(Company.id == position.stock_id)
     ).first()
 
     # Calculate old total investment
@@ -422,12 +422,12 @@ def update_position(
             )
         portfolio.cash_balance = current_cash - cash_difference
         transaction_type = TransactionType.BUY
-        description = f"Position increase: {stock.symbol if stock else 'Unknown'} - {position.quantity} shares @ {position.average_price}"
+        description = f"Position increase: {stock.trading_code if stock else 'Unknown'} - {position.quantity} shares @ {position.average_price}"
     elif cash_difference < 0:
         # Position value decreased, return cash
         portfolio.cash_balance = current_cash + abs(cash_difference)
         transaction_type = TransactionType.SELL
-        description = f"Position decrease: {stock.symbol if stock else 'Unknown'} - {position.quantity} shares @ {position.average_price}"
+        description = f"Position decrease: {stock.trading_code if stock else 'Unknown'} - {position.quantity} shares @ {position.average_price}"
     else:
         # No cash adjustment needed
         transaction_type = None
@@ -488,7 +488,7 @@ def remove_position(
 
     # Get stock details for transaction description
     stock = session.exec(
-        select(StockCompany).where(StockCompany.id == position.stock_id)
+        select(Company).where(Company.id == position.stock_id)
     ).first()
 
     # Return cash to portfolio based on total investment
@@ -502,7 +502,7 @@ def remove_position(
         portfolio_id=portfolio.id,
         type=TransactionType.SELL,
         amount=cash_to_return,
-        description=f"Position removed: {stock.symbol if stock else 'Unknown'} - {position.quantity} shares @ {position.average_price}"
+        description=f"Position removed: {stock.trading_code if stock else 'Unknown'} - {position.quantity} shares @ {position.average_price}"
     )
 
     session.add(portfolio)
@@ -537,7 +537,7 @@ def add_trade(
 
     # Verify stock exists
     stock = session.exec(
-        select(StockCompany).where(StockCompany.id == trade.stock_id)
+        select(Company).where(Company.id == trade.stock_id)
     ).first()
 
     if not stock:
@@ -571,7 +571,7 @@ def add_trade(
         trade_id=db_trade.id,
         type=tx_type,
         amount=amount.copy_abs(),
-        description=f"{trade.trade_type.title()} {stock.symbol}"
+        description=f"{trade.trade_type.title()} {stock.trading_code}"
     )
 
     session.add(db_trade)
@@ -758,8 +758,8 @@ def get_recent_trades(
     if not portfolio_ids:
         return []
     rows = session.exec(
-        select(Trade, StockCompany)
-        .join(StockCompany, Trade.stock_id == StockCompany.id)
+        select(Trade, Company)
+        .join(Company, Trade.stock_id == Company.id)
         .where(Trade.portfolio_id.in_(portfolio_ids))
         .order_by(Trade.trade_date.desc())
         .limit(limit)
@@ -769,7 +769,7 @@ def get_recent_trades(
         result.append(
             TradeWithDetails(
                 **trade.dict(),
-                symbol=stock.symbol,
+                symbol=stock.trading_code,
                 company_name=stock.company_name,
             )
         )

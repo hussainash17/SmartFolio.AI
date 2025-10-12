@@ -8,7 +8,7 @@ from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .portfolio import Portfolio
-    from .stock import StockCompany
+    from .company import Company
     from .user import User
 
 
@@ -50,7 +50,7 @@ class Order(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="user.id")
     portfolio_id: Optional[uuid.UUID] = Field(default=None, foreign_key="portfolio.id")
-    stock_id: uuid.UUID = Field(foreign_key="stockcompany.id")
+    stock_id: uuid.UUID = Field(foreign_key="company.id")
     
     # Order details
     order_type: OrderType = Field(max_length=20)
@@ -85,7 +85,7 @@ class Order(SQLModel, table=True):
     # Relationships
     user: "User" = Relationship(back_populates="orders")
     portfolio: Optional["Portfolio"] = Relationship(back_populates="orders")
-    stock: "StockCompany" = Relationship(back_populates="orders")
+    stock: "Company" = Relationship(back_populates="orders")
     executions: list["OrderExecution"] = Relationship(back_populates="order")
 
 

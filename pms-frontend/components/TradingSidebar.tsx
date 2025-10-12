@@ -180,7 +180,7 @@ export function TradingSidebar({ currentView, onViewChange, user, onLogout }: Tr
                 <TrendingUp className="h-6 w-6 text-primary-foreground" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-foreground">PortfolioMax</h3>
+                <h3 className="text-lg font-semibold text-foreground">SmartFolio.AI</h3>
                 <p className="text-xs text-muted-foreground">Investment Platform</p>
               </div>
             </div>

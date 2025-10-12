@@ -59,5 +59,5 @@ def get_stock_news(
         .order_by(News.published_at.desc())
     )
     news = session.exec(stmt).all()
-    # If symbol is needed strictly, consider joining StockCompany as well. Placeholder for now.
+    # If symbol is needed strictly, consider joining Company as well. Placeholder for now.
     return news
