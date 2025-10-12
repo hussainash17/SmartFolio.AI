@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { usePortfolios } from "./hooks/usePortfolios";
 import { useTrading } from "./hooks/useTrading";
 import { useAuth } from "./hooks/useAuth";
+import { useWatchlist } from "./hooks/useWatchlist";
 import { Portfolio, Stock } from "./types/portfolio";
 import {
   PieChart,
@@ -33,8 +34,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Input } from "./components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
 import { Badge } from "./components/ui/badge";
-import { OpenAPI, MarketService } from "./src/client";
+import { OpenAPI, MarketService, PortfolioService } from "./src/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "./hooks/queryKeys";
 
 // Lazy-loaded page components to reduce initial bundle size
 const ComprehensiveDashboard = lazy(() => import("./components/ComprehensiveDashboard").then(m => ({ default: m.ComprehensiveDashboard })));
@@ -57,6 +59,8 @@ const LoginPage = lazy(() => import("./components/LoginPage").then(m => ({ defau
 const MarketNewsInsights = lazy(() => import("./components/MarketNewsInsights").then(m => ({ default: m.default })));
 const InvestmentGoals = lazy(() => import("./components/InvestmentGoals").then(m => ({ default: m.InvestmentGoals })));
 const AssetAllocation = lazy(() => import("./components/AssetAllocation").then(m => ({ default: m.AssetAllocation })));
+const WatchlistManager = lazy(() => import("./components/WatchlistManager").then(m => ({ default: m.WatchlistManager })));
+const AddToWatchlistDialog = lazy(() => import("./components/AddToWatchlistDialog").then(m => ({ default: m.AddToWatchlistDialog })));
 
 type View =
   | "dashboard"
@@ -181,7 +185,7 @@ export default function App() {
             <TrendingUp className="h-7 w-7 text-primary-foreground animate-pulse" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">PortfolioMax</h1>
+            <h1 className="text-2xl font-bold text-foreground">SmartFolio.AI</h1>
             <p className="text-muted-foreground">Loading your investment platform...</p>
           </div>
         </div>
@@ -279,8 +283,98 @@ export default function App() {
   };
 
   const handlePlaceOrder = async (orderData: any) => {
+    try {
+      // For real-time trading, get LIVE market price
+      let executionPrice = 0;
+      
+      if (orderData.orderType === 'market') {
+        // Fetch real-time price from API for market orders
+        try {
+          const stockData = await MarketService.getStock({ symbol: orderData.symbol });
+          executionPrice = Number((stockData as any).last || (stockData as any).close || 0);
+          
+          if (!executionPrice || executionPrice <= 0) {
+            throw new Error('Invalid market price received');
+          }
+        } catch (error) {
+          console.error('Error fetching real-time price:', error);
+          toast.error(`Failed to get real-time price for ${orderData.symbol}`);
+          return;
+        }
+      } else {
+        // For limit orders, use the limit price
+        executionPrice = orderData.limitPrice || 0;
+      }
+      
+      if (!executionPrice || executionPrice <= 0) {
+        toast.error('Invalid execution price');
+        return;
+      }
+      
+      // Place order with filled status immediately
     const orderId = await placeOrder(orderData);
-    toast.success(`Order placed successfully! Order ID: ${orderId.slice(0, 8)}...`);
+      
+      // Add trade to the portfolio immediately
+      if (orderData.portfolioId && orderData.symbol) {
+        try {
+          // Get stock ID from the stocks list
+          const stocks = (await MarketService.listStocks({ q: orderData.symbol, limit: 1 })) as any[];
+          const stockId = stocks?.[0]?.id;
+          
+          if (!stockId) {
+            toast.error(`Stock ${orderData.symbol} not found in system`);
+            return;
+          }
+          
+          // Calculate trade amounts for real-time trading
+          const totalAmount = executionPrice * orderData.quantity;
+          const commission = orderData.fees || 0;
+          const netAmount = totalAmount + commission;
+          
+          // Add trade to portfolio with real-time execution price
+          await PortfolioService.addTrade({
+            portfolioId: orderData.portfolioId,
+            requestBody: {
+              stock_id: stockId,
+              trade_type: orderData.side.toUpperCase() as 'BUY' | 'SELL',
+              quantity: orderData.quantity,
+              price: executionPrice,
+              total_amount: totalAmount,
+              commission: commission,
+              net_amount: netAmount,
+              trade_date: new Date().toISOString(),
+              notes: `Auto-filled ${orderData.orderType} order at ${executionPrice.toFixed(2)}`,
+              is_simulated: true  // Set to true for demo/testing, change to false for real trading
+            }
+          });
+          
+          // Invalidate queries to refresh portfolio data in real-time
+          queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
+          queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
+          queryClient.invalidateQueries({ queryKey: queryKeys.fundsSummary });
+          
+          // Success notification with execution details
+          toast.success(
+            `Order filled! ${orderData.side === 'buy' ? 'Bought' : 'Sold'} ${orderData.quantity} shares of ${orderData.symbol} @ ${formatCurrency(executionPrice)} (Total: ${formatCurrency(totalAmount)})`
+          );
+        } catch (error: any) {
+          console.error('Error adding trade to portfolio:', error);
+          toast.error(`Failed to add trade to portfolio: ${error?.message || 'Unknown error'}`);
+        }
+      } else {
+        toast.error('Portfolio ID is required to place order');
+      }
+    } catch (error: any) {
+      console.error('Error placing order:', error);
+      toast.error(`Failed to place order: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
   };
 
   const handleCancelOrder = (orderId: string) => {
@@ -504,7 +598,8 @@ export default function App() {
             <TradingInterface
               marketData={marketData}
               onPlaceOrder={handlePlaceOrder}
-              buyingPower={accountBalance.buyingPower}
+              portfolios={portfolios}
+              selectedPortfolioId={selectedPortfolio?.id}
             />
           </Suspense>
         );
@@ -539,337 +634,12 @@ export default function App() {
 
       case "watchlist":
         return (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Watchlists</CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Input id="new-watchlist-name" placeholder="New watchlist name" className="w-64" />
-                    <Button
-                      onClick={async () => {
-                        const name = (document.getElementById('new-watchlist-name') as HTMLInputElement)?.value?.trim();
-                        if (!name) return;
-                        await createWatchlist(name);
-                        (document.getElementById('new-watchlist-name') as HTMLInputElement).value = '';
-                        toast.success('Watchlist created');
-                      }}
-                      className="gap-2"
-                    >
-                      <Plus className="h-4 w-4" /> Create
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {watchlists.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">No watchlists yet</div>
-                ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {watchlists.map((wl) => (
-                      <Card key={wl.id} className="border">
-                        <CardHeader className="flex flex-row items-center justify-between">
-                          <CardTitle className="text-base">{wl.name}</CardTitle>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant={wl.isDefault ? "default" : "outline"}
-                              size="sm"
-                              onClick={async () => {
-                                const base = (OpenAPI as any).BASE || '';
-                                await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${wl.id}`, {
-                                  method: 'PUT',
-                                  headers: {
-                                    'Content-Type': 'application/json',
-                                    ...(OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : {},
-                                  },
-                                  credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-                                  body: JSON.stringify({ is_default: true }),
-                                });
-                                toast.success('Set as default watchlist');
-                                (queryClient as any).invalidateQueries({ queryKey: ['watchlists'] });
-                              }}
-                              className={`gap-2 ${wl.isDefault ? '' : ''}`}
-                            >
-                              <Star className={wl.isDefault ? 'h-4 w-4 fill-current' : 'h-4 w-4'} />
-                              {wl.isDefault ? 'Default' : 'Set Default'}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={async () => {
-                                const newName = `${wl.name} Copy`;
-                                const newId = await createWatchlist(newName, wl.description || '');
-                                try {
-                                  const base = (OpenAPI as any).BASE || '';
-                                  const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${wl.id}/items/with-details`, {
-                                    headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
-                                    credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-                                  });
-                                  const rows = res.ok ? await res.json() : [];
-                                  const stock_ids = (rows as any[]).map((r: any) => r.stock?.id).filter(Boolean);
-                                  await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${newId}/items/bulk`, {
-                                    method: 'POST',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                      ...(OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : {},
-                                    },
-                                    credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-                                    body: JSON.stringify(stock_ids),
-                                  });
-                                  toast.success('Watchlist duplicated');
-                                } catch {
-                                  toast.error('Failed to duplicate');
-                                }
-                                (queryClient as any).invalidateQueries({ queryKey: ['watchlists'] });
-                              }}
-                              className="gap-2"
-                            >
-                              <Copy className="h-4 w-4" /> Duplicate
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={async () => {
-                                const newName = prompt('New watchlist name', wl.name) || wl.name;
-                                const newDesc = prompt('Description', wl.description || '') || wl.description || '';
-                                const base = (OpenAPI as any).BASE || '';
-                                await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${wl.id}`, {
-                                  method: 'PUT',
-                                  headers: {
-                                    'Content-Type': 'application/json',
-                                    ...(OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : {},
-                                  },
-                                  credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-                                  body: JSON.stringify({ name: newName, description: newDesc }),
-                                });
-                                toast.success('Watchlist updated');
-                                (queryClient as any).invalidateQueries({ queryKey: ['watchlists'] });
-                              }}
-                              className="gap-2"
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={async () => {
-                                const symbols = (wl.symbols || []).join('\n');
-                                const blob = new Blob([`symbol\n${symbols}`], { type: 'text/csv;charset=utf-8;' });
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = `${wl.name.replace(/\s+/g, '_')}.csv`;
-                                a.click();
-                                URL.revokeObjectURL(url);
-                              }}
-                              className="gap-2"
-                            >
-                              <Download className="h-4 w-4" /> Export
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={async () => {
-                                const target = watchlists.find(x => x.isDefault && x.id !== wl.id) || watchlists.find(x => x.id !== wl.id);
-                                if (!target) return;
-                                const base = (OpenAPI as any).BASE || '';
-                                const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${wl.id}/items/with-details`, {
-                                  headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
-                                  credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-                                });
-                                const rows = res.ok ? await res.json() : [];
-                                const stock_ids = (rows as any[]).map((r: any) => r.stock?.id).filter(Boolean);
-                                await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${target.id}/items/bulk`, {
-                                  method: 'POST',
-                                  headers: {
-                                    'Content-Type': 'application/json',
-                                    ...(OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : {},
-                                  },
-                                  credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-                                  body: JSON.stringify(stock_ids),
-                                });
-                                toast.success(`Merged into ${target.name}`);
-                                (queryClient as any).invalidateQueries({ queryKey: ['watchlists'] });
-                              }}
-                              className="gap-2"
-                            >
-                              <GitBranch className="h-4 w-4" /> Merge
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={async () => {
-                                // Clear all items from this watchlist using bulk-remove
-                                const base = (OpenAPI as any).BASE || '';
-                                const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${wl.id}/items/with-details`, {
-                                  headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
-                                  credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-                                });
-                                const rows = res.ok ? await res.json() : [];
-                                const item_ids = (rows as any[]).map((r: any) => r.id);
-                                await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${wl.id}/items/bulk-remove`, {
-                                  method: 'POST',
-                                  headers: {
-                                    'Content-Type': 'application/json',
-                                    ...(OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : {},
-                                  },
-                                  credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-                                  body: JSON.stringify({ item_ids }),
-                                });
-                                toast.success('Cleared all items');
-                                (queryClient as any).invalidateQueries({ queryKey: ['watchlists'] });
-                              }}
-                              className="gap-2"
-                            >
-                              Clear All
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={async () => {
-                                if (!confirm('Delete this watchlist?')) return;
-                                const base = (OpenAPI as any).BASE || '';
-                                await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${wl.id}`, {
-                                  method: 'DELETE',
-                                  headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
-                                  credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-                                });
-                                toast.success('Watchlist deleted');
-                                (queryClient as any).invalidateQueries({ queryKey: ['watchlists'] });
-                              }}
-                              className="h-8 w-8 p-0 text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="flex items-center gap-2 mb-4">
-                            <Input id={`add-symbol-${wl.id}`} placeholder="Add symbols (e.g., AAPL, MSFT, TSLA)" className="w-72" />
-                            <Button
-                              onClick={async () => {
-                                const input = document.getElementById(`add-symbol-${wl.id}`) as HTMLInputElement;
-                                const symInput = input?.value?.trim() || '';
-                                if (!symInput) return;
-                                const parts = symInput.split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
-                                if (parts.length > 1) {
-                                  // Bulk by symbols
-                                  const base = (OpenAPI as any).BASE || '';
-                                  await fetch(`${String(base).replace(/\/$/, '')}/api/v1/watchlist/${wl.id}/items/bulk-by-symbols`, {
-                                    method: 'POST',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                      ...(OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : {},
-                                    },
-                                    credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-                                    body: JSON.stringify({ symbols: parts }),
-                                  });
-                                  toast.success(`Added ${parts.length} symbols to ${wl.name}`);
-                                } else {
-                                  await addToWatchlist(parts[0], wl.id);
-                                  toast.success(`Added ${parts[0]} to ${wl.name}`);
-                                }
-                                input.value = '';
-                                (queryClient as any).invalidateQueries({ queryKey: ['watchlists'] });
-                              }}
-                              variant="secondary"
-                              className="gap-2"
-                            >
-                              <Star className="h-4 w-4" /> Add
-                            </Button>
-                          </div>
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Symbol</TableHead>
-                                <TableHead>
-                                  <span className="sr-only">Held</span>
-                                </TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {(wl.symbols || []).length === 0 ? (
-                                <TableRow>
-                                  <TableCell colSpan={3} className="text-center text-muted-foreground">No symbols yet</TableCell>
-                                </TableRow>
-                              ) : (
-                                wl.symbols.map((symbol) => (
-                                  <TableRow key={`${wl.id}-${symbol}`}>
-                                    <TableCell>{symbol}</TableCell>
-                                    <TableCell>
-                                      {selectedPortfolio?.stocks?.some(s => s.symbol === symbol) && (
-                                        <Badge variant="secondary" className="text-xs">Held</Badge>
-                                      )}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                      <div className="flex items-center gap-1 justify-end">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={async () => {
-                                            // Quick alert creator: prompt for type and threshold
-                                            const type = prompt('Alert type: price | percent | volume | news | earnings', 'price');
-                                            if (!type) return;
-                                            let stockId: string | undefined;
-                                            try {
-                                              const stocks = (await MarketService.listStocks({ q: symbol, limit: 1 })) as any[];
-                                              stockId = stocks?.[0]?.id ? String(stocks[0].id) : undefined;
-                                            } catch {}
-                                            let condition = 'above';
-                                            let target = 0;
-                                            if (type === 'price' || type === 'percent' || type === 'volume') {
-                                              const cond = prompt('Condition: above | below | equals', 'above');
-                                              if (!cond) return;
-                                              condition = cond as any;
-                                              const tgt = prompt('Target value (number)', '0');
-                                              if (!tgt) return;
-                                              target = Number(tgt);
-                                              if (!Number.isFinite(target)) return;
-                                            }
-                                            try {
-                                              await createAlert({
-                                                stock_id: stockId,
-                                                alert_type: type,
-                                                condition,
-                                                target_value: target,
-                                                notification_method: 'in_app',
-                                              });
-                                              toast.success('Alert created');
-                                            } catch {
-                                              toast.error('Failed to create alert');
-                                            }
-                                          }}
-                                          className="h-8 w-8 p-0"
-                                        >
-                                          <Bell className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={async () => {
-                                            await removeFromWatchlist(wl.id, symbol);
-                                            toast.success(`Removed ${symbol}`);
-                                          }}
-                                          className="h-8 w-8 p-0 text-destructive"
-                                        >
-                                          <Star className="h-3 w-3 fill-current" />
-                                        </Button>
-                                      </div>
-                                    </TableCell>
-                                  </TableRow>
-                                ))
-                              )}
-                            </TableBody>
-                          </Table>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          <Suspense fallback={<div>Loading Watchlist Manager...</div>}>
+            <WatchlistManager
+              onQuickTrade={handleQuickTrade}
+              onChartStock={handleChartStock}
+            />
+          </Suspense>
         );
 
       case "screener":
@@ -938,7 +708,11 @@ export default function App() {
       case "rebalancing":
         return (
           <Suspense fallback={<div>Loading Rebalancing Manager...</div>}>
-            <RebalancingManager onNavigate={handleViewChange} onQuickTrade={handleQuickTrade} />
+            <RebalancingManager 
+              onNavigate={handleViewChange} 
+              onQuickTrade={handleQuickTrade}
+              portfolioId={selectedPortfolio?.id}
+            />
           </Suspense>
         );
 
@@ -1165,9 +939,10 @@ export default function App() {
           }}
           onPlaceOrder={handlePlaceOrder}
           marketData={marketData}
-          buyingPower={accountBalance.buyingPower}
           initialSymbol={quickTradeSymbol}
           initialSide={quickTradeSide}
+          portfolios={portfolios}
+          selectedPortfolioId={selectedPortfolio?.id}
         />
       </Suspense>
 

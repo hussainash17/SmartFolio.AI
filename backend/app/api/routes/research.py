@@ -8,7 +8,8 @@ import math
 
 from app.api.deps import get_current_user, get_session_dep
 from app.model.user import User
-from app.model.stock import StockCompany, StockData, DailyOHLC
+from app.model.stock import StockData, DailyOHLC
+from app.model.company import Company
 from app.model.alert import News, StockNews
 from app.services.research_service import ResearchService
 
@@ -34,19 +35,19 @@ def stock_screener(
     """Advanced stock screener with fundamental and technical filters"""
     
     # Build the query
-    query = select(StockCompany)
+    query = select(Company)
     
     # Apply filters
     conditions = []
     
     if sector:
-        conditions.append(StockCompany.sector == sector)
+        conditions.append(Company.sector == sector)
     
     if min_price is not None:
-        conditions.append(StockCompany.current_price >= min_price)
+        conditions.append(Company.current_price >= min_price)
     
     if max_price is not None:
-        conditions.append(StockCompany.current_price <= max_price)
+        conditions.append(Company.current_price <= max_price)
     
     if conditions:
         query = query.where(and_(*conditions))
@@ -58,10 +59,10 @@ def stock_screener(
     screener_results = []
     for stock in stocks:
         # Mock financial ratios (in real implementation, calculate from financial data)
-        mock_pe_ratio = 15.5 + (hash(stock.symbol) % 20)  # Mock P/E between 15-35
+        mock_pe_ratio = 15.5 + (hash(stock.trading_code) % 20)  # Mock P/E between 15-35
         mock_market_cap = float(stock.current_price or 100) * 1000000  # Mock market cap
-        mock_dividend_yield = 2.0 + (hash(stock.symbol) % 50) / 10  # Mock dividend yield 2-7%
-        mock_volume = 500000 + (hash(stock.symbol) % 2000000)  # Mock volume
+        mock_dividend_yield = 2.0 + (hash(stock.trading_code) % 50) / 10  # Mock dividend yield 2-7%
+        mock_volume = 500000 + (hash(stock.trading_code) % 2000000)  # Mock volume
         
         # Apply additional filters
         if min_market_cap is not None and mock_market_cap < min_market_cap * 1000000:
@@ -90,7 +91,7 @@ def stock_screener(
         
         screener_results.append({
             "stock_id": str(stock.id),
-            "symbol": stock.symbol,
+            "symbol": stock.trading_code,
             "name": stock.company_name,
             "sector": stock.sector,
             "current_price": float(stock.current_price or 0),
@@ -134,7 +135,7 @@ def get_fundamental_analysis(
     
     # Get stock information
     stock = session.exec(
-        select(StockCompany).where(StockCompany.symbol == symbol.upper())
+        select(Company).where(Company.trading_code == symbol.upper())
     ).first()
     
     if not stock:
@@ -149,7 +150,7 @@ def get_fundamental_analysis(
     # Mock financial ratios
     fundamental_data = {
         "basic_info": {
-            "symbol": stock.symbol,
+            "symbol": stock.trading_code,
             "name": stock.company_name,
             "sector": stock.sector,
             "current_price": current_price,
@@ -228,7 +229,7 @@ def get_technical_analysis(
     
     # Get stock information
     stock = session.exec(
-        select(StockCompany).where(StockCompany.symbol == symbol.upper())
+        select(Company).where(Company.trading_code == symbol.upper())
     ).first()
     
     if not stock:
@@ -412,7 +413,7 @@ def get_stock_news(
     
     # Get stock information
     stock = session.exec(
-        select(StockCompany).where(StockCompany.symbol == symbol.upper())
+        select(Company).where(Company.trading_code == symbol.upper())
     ).first()
     
     if not stock:
@@ -493,9 +494,9 @@ def get_sector_analysis(
     
     # Get all sectors
     sectors_query = session.exec(
-        select(StockCompany.sector, func.count(StockCompany.id).label("stock_count"))
-        .where(StockCompany.sector.is_not(None))
-        .group_by(StockCompany.sector)
+        select(Company.sector, func.count(Company.id).label("stock_count"))
+        .where(Company.sector.is_not(None))
+        .group_by(Company.sector)
     ).all()
     
     sector_analysis = []
@@ -565,14 +566,14 @@ def get_analyst_picks(
 ):
     """Return a list of analyst picks with rating and target price."""
     service = ResearchService(session)
-    stocks = session.exec(select(StockCompany).limit(100)).all() or []
+    stocks = session.exec(select(Company).limit(100)).all() or []
     picks = []
     for stock in stocks[:100]:
         fin = service._calculate_financial_metrics(stock)
         tech = service._calculate_technical_indicators(stock)
         rating, target, recommendation = service._generate_analyst_recommendation(stock, fin, tech)
         picks.append({
-            "symbol": stock.symbol,
+            "symbol": stock.trading_code,
             "name": stock.company_name,
             "sector": stock.sector,
             "rating": rating,
@@ -594,8 +595,8 @@ def get_earnings_highlights(
     end = datetime.utcnow()
     start = end - timedelta(days=30)
     rows = session.exec(
-        select(DailyOHLC, StockCompany)
-        .join(StockCompany, StockCompany.id == DailyOHLC.company_id)
+        select(DailyOHLC, Company)
+        .join(Company, Company.id == DailyOHLC.company_id)
         .where(DailyOHLC.date >= start)
         .order_by(DailyOHLC.date.desc())
         .limit(200)
@@ -624,14 +625,14 @@ def get_thematic_ideas(
     session: Session = Depends(get_session_dep)
 ):
     """Return thematic investment ideas with example tickers."""
-    sectors = [row[0] for row in session.exec(select(StockCompany.sector).distinct()).all()]
+    sectors = [row[0] for row in session.exec(select(Company.sector).distinct()).all()]
     themes = [
         {"name": "Export Boosters", "description": "Export-oriented companies benefiting from FX incentives", "tags": ["Export", "FX"], "tickers": []},
         {"name": "Dividend Champions", "description": "High-yield, stable dividend payers", "tags": ["Dividend"], "tickers": []},
         {"name": "Infrastructure Play", "description": "Beneficiaries of public and private infrastructure spend", "tags": ["Infra"], "tickers": []},
     ]
     # Simple mapping of first few symbols per sector to each theme
-    all_symbols = [row.symbol for row in session.exec(select(StockCompany).limit(200)).all()]
+    all_symbols = [row.symbol for row in session.exec(select(Company).limit(200)).all()]
     for i, theme in enumerate(themes):
         theme["tickers"] = all_symbols[i::3][:8]
     return {"themes": themes, "sectors": sectors}

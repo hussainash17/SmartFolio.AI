@@ -8,7 +8,7 @@ from app.model.portfolio import (
     WatchlistItem, WatchlistItemCreate, WatchlistItemPublic
 )
 from app.model.user import User
-from app.model.stock import StockCompany
+from app.model.company import Company
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/watchlist", tags=["watchlist"])
@@ -188,7 +188,7 @@ def add_watchlist_item(
     
     # Verify stock exists
     stock = session.exec(
-        select(StockCompany).where(StockCompany.id == item.stock_id)
+        select(Company).where(Company.id == item.stock_id)
     ).first()
     
     if not stock:
@@ -367,7 +367,7 @@ def add_multiple_stocks(
     for stock_id in stock_ids:
         # Verify stock exists
         stock = session.exec(
-            select(StockCompany).where(StockCompany.id == stock_id)
+            select(Company).where(Company.id == stock_id)
         ).first()
         
         if not stock:
@@ -496,7 +496,7 @@ def add_multiple_by_symbols(
         if not symbol:
             continue
         stock = session.exec(
-            select(StockCompany).where(StockCompany.symbol == symbol)
+            select(Company).where(Company.trading_code == symbol)
         ).first()
         if not stock:
             skipped.append(symbol)
@@ -533,16 +533,16 @@ def search_stocks(
     
     # Search by symbol or company name
     stocks = session.exec(
-        select(StockCompany).where(
-            (StockCompany.symbol.ilike(f"%{query}%")) |
-            (StockCompany.company_name.ilike(f"%{query}%"))
+        select(Company).where(
+            (Company.trading_code.ilike(f"%{query}%")) |
+            (Company.company_name.ilike(f"%{query}%"))
         ).limit(limit)
     ).all()
     
     return [
         {
             "id": stock.id,
-            "symbol": stock.symbol,
+            "symbol": stock.trading_code,
             "company_name": stock.company_name,
             "sector": stock.sector,
             "industry": stock.industry
@@ -575,8 +575,8 @@ def get_watchlist_items_with_details(
     
     # Get items with stock details using join
     items = session.exec(
-        select(WatchlistItem, StockCompany).join(
-            StockCompany, WatchlistItem.stock_id == StockCompany.id
+        select(WatchlistItem, Company).join(
+            Company, WatchlistItem.stock_id == Company.id
         ).where(WatchlistItem.watchlist_id == watchlist_id)
     ).all()
     
@@ -587,7 +587,7 @@ def get_watchlist_items_with_details(
             "notes": item.notes,
             "stock": {
                 "id": stock.id,
-                "symbol": stock.symbol,
+                "symbol": stock.trading_code,
                 "company_name": stock.company_name,
                 "sector": stock.sector,
                 "industry": stock.industry

@@ -7,7 +7,7 @@ from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .user import User
-    from .stock import StockCompany
+    from .company import Company
     from .trade import Trade
     from .order import Order
     from .risk_management import PortfolioRiskMetrics
@@ -37,7 +37,7 @@ class Portfolio(SQLModel, table=True):
 class PortfolioPosition(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     portfolio_id: uuid.UUID = Field(foreign_key="portfolio.id")
-    stock_id: uuid.UUID = Field(foreign_key="stockcompany.id")
+    stock_id: uuid.UUID = Field(foreign_key="company.id")
     quantity: int = Field(default=0)
     average_price: Decimal = Field(max_digits=10, decimal_places=2)
     total_investment: Decimal = Field(max_digits=15, decimal_places=2)
@@ -48,7 +48,7 @@ class PortfolioPosition(SQLModel, table=True):
 
     # Relationships
     portfolio: Portfolio = Relationship(back_populates="positions")
-    stock: "StockCompany" = Relationship(back_populates="positions")
+    stock: "Company" = Relationship(back_populates="positions")
 
 
 # Watchlist Model
@@ -71,13 +71,13 @@ class Watchlist(SQLModel, table=True):
 class WatchlistItem(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     watchlist_id: uuid.UUID = Field(foreign_key="watchlist.id")
-    stock_id: uuid.UUID = Field(foreign_key="stockcompany.id")
+    stock_id: uuid.UUID = Field(foreign_key="company.id")
     added_at: datetime = Field(default_factory=datetime.utcnow)
     notes: Optional[str] = Field(default=None, max_length=500)
 
     # Relationships
     watchlist: Watchlist = Relationship(back_populates="items")
-    stock: "StockCompany" = Relationship(back_populates="watchlist_items")
+    stock: "Company" = Relationship(back_populates="watchlist_items")
 
 
 # Pydantic models for API

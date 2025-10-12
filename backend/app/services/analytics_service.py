@@ -229,7 +229,7 @@ class AnalyticsService:
             allocation_percent = float(position.current_value) / total_value * 100
             stock_allocations.append({
                 "stock_id": str(stock.id),
-                "symbol": stock.symbol,
+                "symbol": stock.trading_code,
                 "name": stock.company_name,
                 "sector": stock.sector,
                 "current_value": float(position.current_value),
@@ -332,7 +332,7 @@ class AnalyticsService:
             if dividend_yield > 0:
                 dividend_stocks.append({
                     "stock_id": str(stock.id),
-                    "symbol": stock.symbol,
+                    "symbol": stock.trading_code,
                     "name": stock.company_name,
                     "sector": stock.sector,
                     "position_value": float(position.current_value),
@@ -523,7 +523,7 @@ class AnalyticsService:
         for position, stock in positions:
             stock_id = str(stock.id)
             stock_analysis[stock_id] = {
-                "symbol": stock.symbol,
+                "symbol": stock.trading_code,
                 "name": stock.company_name,
                 "current_quantity": position.quantity,
                 "average_cost": float(position.average_price),

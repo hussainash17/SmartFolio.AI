@@ -13,11 +13,10 @@ from app.model.stock import (
     DailyOHLC,
     IntradayTick,
     MarketSummary,
-    StockCompany,
-    StockCompanyPublic,
     StockData,
     StockDataPublic,
 )
+from app.model.company import Company, CompanyPublic
 
 router = APIRouter(prefix="/market", tags=["market"]) 
 
@@ -56,12 +55,12 @@ def list_stocks(
     offset: int = Query(0, ge=0),
     session: Session = Depends(get_session_dep),
 ) -> List[Dict[str, Any]]:
-    stmt = select(StockCompany)
+    stmt = select(Company)
     if q:
         like = f"%{q.upper()}%"
-        stmt = stmt.where((StockCompany.symbol.ilike(like)) | (StockCompany.company_name.ilike(like)))
+        stmt = stmt.where((Company.trading_code.ilike(like)) | (Company.company_name.ilike(like)))
     if sector:
-        stmt = stmt.where(StockCompany.sector == sector)
+        stmt = stmt.where(Company.sector == sector)
     stmt = stmt.offset(offset).limit(limit)
 
     companies = session.exec(stmt).all()
@@ -78,7 +77,7 @@ def list_stocks(
         result.append(
             {
                 "id": str(company.id),
-                "symbol": company.symbol,
+                "symbol": company.trading_code,
                 "company_name": company.company_name,
                 "sector": company.sector,
                 "industry": company.industry,
@@ -95,7 +94,7 @@ def list_stocks(
 
 @router.get("/stocks/{symbol}")
 def get_stock(symbol: str, session: Session = Depends(get_session_dep)) -> Dict[str, Any]:
-    company = session.exec(select(StockCompany).where(StockCompany.symbol == symbol.upper())).first()
+    company = session.exec(select(Company).where(Company.trading_code == symbol.upper())).first()
     if not company:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stock not found")
 
@@ -108,7 +107,7 @@ def get_stock(symbol: str, session: Session = Depends(get_session_dep)) -> Dict[
 
     return {
         "id": str(company.id),
-        "symbol": company.symbol,
+        "symbol": company.trading_code,
         "company_name": company.company_name,
         "sector": company.sector,
         "industry": company.industry,
@@ -138,7 +137,7 @@ def get_chart_data(
     ),
     session: Session = Depends(get_session_dep),
 ) -> Dict[str, Any]:
-    company = session.exec(select(StockCompany).where(StockCompany.symbol == symbol.upper())).first()
+    company = session.exec(select(Company).where(Company.trading_code == symbol.upper())).first()
     if not company:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stock not found")
 
@@ -151,7 +150,7 @@ def get_chart_data(
             .order_by(IntradayTick.timestamp)
         ).all()
         return {
-            "symbol": company.symbol,
+            "symbol": company.trading_code,
             "type": "intraday",
             "points": [
                 {
@@ -183,7 +182,7 @@ def get_chart_data(
     ).all()
 
     return {
-        "symbol": company.symbol,
+        "symbol": company.trading_code,
         "type": "daily",
         "candles": [
             {
@@ -213,8 +212,8 @@ def get_top_movers(
 
     # Top gainers
     gainers = session.exec(
-        select(StockData, StockCompany)
-        .join(StockCompany, StockCompany.id == StockData.company_id)
+        select(StockData, Company)
+        .join(Company, Company.id == StockData.company_id)
         .where(StockData.timestamp == latest_time)
         .order_by(desc(StockData.change_percent))
         .limit(limit)
@@ -222,19 +221,19 @@ def get_top_movers(
 
     # Top losers
     losers = session.exec(
-        select(StockData, StockCompany)
-        .join(StockCompany, StockCompany.id == StockData.company_id)
+        select(StockData, Company)
+        .join(Company, Company.id == StockData.company_id)
         .where(StockData.timestamp == latest_time)
         .order_by(StockData.change_percent.asc())
         .limit(limit)
     ).all()
 
-    def serialize(rows: List[tuple[StockData, StockCompany]]) -> List[Dict[str, Any]]:
+    def serialize(rows: List[tuple[StockData, Company]]) -> List[Dict[str, Any]]:
         data: List[Dict[str, Any]] = []
         for sd, sc in rows:
             data.append(
                 {
-                    "symbol": sc.symbol,
+                    "symbol": sc.trading_code,
                     "company_name": sc.company_name,
                     "last": float(sd.last_trade_price),
                     "change": float(sd.change),
@@ -259,8 +258,8 @@ def get_most_active(
     latest_time = latest_ts[0]
 
     rows = session.exec(
-        select(StockData, StockCompany)
-        .join(StockCompany, StockCompany.id == StockData.company_id)
+        select(StockData, Company)
+        .join(Company, Company.id == StockData.company_id)
         .where(StockData.timestamp == latest_time)
         .order_by(desc(StockData.volume))
         .limit(limit)
@@ -270,7 +269,7 @@ def get_most_active(
     for sd, sc in rows:
         data.append(
             {
-                "symbol": sc.symbol,
+                "symbol": sc.trading_code,
                 "company_name": sc.company_name,
                 "last": float(sd.last_trade_price),
                 "change": float(sd.change),

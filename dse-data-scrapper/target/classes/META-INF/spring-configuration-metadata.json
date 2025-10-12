@@ -1,0 +1,157 @@
+{
+  "groups": [
+    {
+      "name": "scraper",
+      "type": "com.dohatec.oms.datascraper.config.ScraperProperties",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties"
+    },
+    {
+      "name": "scraper.batch",
+      "type": "com.dohatec.oms.datascraper.config.ScraperProperties$Batch",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties",
+      "sourceMethod": "getBatch()"
+    },
+    {
+      "name": "scraper.dse",
+      "type": "com.dohatec.oms.datascraper.config.ScraperProperties$Dse",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties",
+      "sourceMethod": "getDse()"
+    },
+    {
+      "name": "scraper.http",
+      "type": "com.dohatec.oms.datascraper.config.ScraperProperties$Http",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties",
+      "sourceMethod": "getHttp()"
+    },
+    {
+      "name": "scraper.retry",
+      "type": "com.dohatec.oms.datascraper.config.ScraperProperties$Retry",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties",
+      "sourceMethod": "getRetry()"
+    },
+    {
+      "name": "scraper.schedule",
+      "type": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties",
+      "sourceMethod": "getSchedule()"
+    }
+  ],
+  "properties": [
+    {
+      "name": "scraper.batch.batch-size",
+      "type": "java.lang.Integer",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Batch"
+    },
+    {
+      "name": "scraper.batch.parallel-processing",
+      "type": "java.lang.Boolean",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Batch"
+    },
+    {
+      "name": "scraper.batch.thread-pool-size",
+      "type": "java.lang.Integer",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Batch"
+    },
+    {
+      "name": "scraper.dse.base-url",
+      "type": "java.lang.String",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Dse"
+    },
+    {
+      "name": "scraper.dse.company-detail-url",
+      "type": "java.lang.String",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Dse"
+    },
+    {
+      "name": "scraper.dse.latest-share-price-url",
+      "type": "java.lang.String",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Dse"
+    },
+    {
+      "name": "scraper.dse.market-summary-url",
+      "type": "java.lang.String",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Dse"
+    },
+    {
+      "name": "scraper.http.connection-timeout",
+      "type": "java.lang.Integer",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Http"
+    },
+    {
+      "name": "scraper.http.max-connections",
+      "type": "java.lang.Integer",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Http"
+    },
+    {
+      "name": "scraper.http.read-timeout",
+      "type": "java.lang.Integer",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Http"
+    },
+    {
+      "name": "scraper.http.user-agent",
+      "type": "java.lang.String",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Http"
+    },
+    {
+      "name": "scraper.retry.enabled",
+      "type": "java.lang.Boolean",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Retry"
+    },
+    {
+      "name": "scraper.retry.initial-delay",
+      "type": "java.lang.Long",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Retry"
+    },
+    {
+      "name": "scraper.retry.max-attempts",
+      "type": "java.lang.Integer",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Retry"
+    },
+    {
+      "name": "scraper.retry.max-delay",
+      "type": "java.lang.Long",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Retry"
+    },
+    {
+      "name": "scraper.retry.multiplier",
+      "type": "java.lang.Double",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Retry"
+    },
+    {
+      "name": "scraper.schedule.cleanup-cron",
+      "type": "java.lang.String",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule"
+    },
+    {
+      "name": "scraper.schedule.company-list-sync-cron",
+      "type": "java.lang.String",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule"
+    },
+    {
+      "name": "scraper.schedule.daily-aggregation-cron",
+      "type": "java.lang.String",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule"
+    },
+    {
+      "name": "scraper.schedule.enabled",
+      "type": "java.lang.Boolean",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule"
+    },
+    {
+      "name": "scraper.schedule.fundamental-cron",
+      "type": "java.lang.String",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule"
+    },
+    {
+      "name": "scraper.schedule.realtime-cron",
+      "type": "java.lang.String",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule"
+    },
+    {
+      "name": "scraper.schedule.timezone",
+      "type": "java.lang.String",
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule"
+    }
+  ],
+  "hints": []
+}

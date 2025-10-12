@@ -195,12 +195,6 @@ export function RiskAnalysis({ onNavigate, onQuickTrade }: RiskAnalysisProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1>Risk Management</h1>
-          <p className="text-muted-foreground">
-            Comprehensive risk monitoring and analysis for your portfolio
-          </p>
-        </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => onNavigate('risk-profile')}>
             <Settings className="h-4 w-4 mr-2" />

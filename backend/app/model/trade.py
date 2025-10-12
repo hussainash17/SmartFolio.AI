@@ -7,14 +7,14 @@ from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .portfolio import Portfolio
-    from .stock import StockCompany
+    from .company import Company
 
 
 # Trade Model (all market trades)
 class Trade(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     portfolio_id: Optional[uuid.UUID] = Field(default=None, foreign_key="portfolio.id")
-    stock_id: uuid.UUID = Field(foreign_key="stockcompany.id")
+    stock_id: uuid.UUID = Field(foreign_key="company.id")
     trade_type: str = Field(max_length=10)  # BUY, SELL
     quantity: int = Field(default=0)
     price: Decimal = Field(max_digits=10, decimal_places=2)
@@ -28,7 +28,7 @@ class Trade(SQLModel, table=True):
 
     # Relationships
     portfolio: Optional["Portfolio"] = Relationship(back_populates="trades")
-    stock: "StockCompany" = Relationship(back_populates="trades")
+    stock: "Company" = Relationship(back_populates="trades")
 
 
 # Pydantic models for API

@@ -107,7 +107,7 @@ export function LoginPage({ onSwitchToSignup }: LoginPageProps) {
               <TrendingUp className="h-7 w-7 text-primary-foreground" />
             </div>
             <div className="text-left">
-              <h1 className="text-2xl font-bold text-foreground">PortfolioMax</h1>
+              <h1 className="text-2xl font-bold text-foreground">SmartFolio.AI</h1>
               <p className="text-sm text-muted-foreground">Investment Platform</p>
             </div>
           </div>

@@ -11,7 +11,8 @@ from app.model.order import (
     OrderSummary, OrderType, OrderSide, OrderStatus, OrderValidity,
     OrderWithDetails)
 from app.model.portfolio import Portfolio
-from app.model.stock import StockCompany, StockData
+from app.model.stock import StockData
+from app.model.company import Company
 from app.model.user import User
 from app.model.funds import AccountTransaction, TransactionType
 
@@ -34,7 +35,7 @@ def create_order(
 	"""Create a new order"""
 	# Validate stock exists
 	stock = session.exec(
-		select(StockCompany).where(StockCompany.id == order.stock_id)
+		select(Company).where(Company.id == order.stock_id)
 	).first()
 	
 	if not stock:
@@ -145,7 +146,7 @@ def get_user_orders_with_details(
     session: Session = Depends(get_session_dep),
 ):
     """Get all orders for the current user including stock symbol and company name"""
-    query = select(Order, StockCompany).join(StockCompany, Order.stock_id == StockCompany.id).where(Order.user_id == current_user.id)
+    query = select(Order, Company).join(Company, Order.stock_id == Company.id).where(Order.user_id == current_user.id)
 
     if portfolio_id:
         query = query.where(Order.portfolio_id == portfolio_id)
@@ -160,7 +161,7 @@ def get_user_orders_with_details(
         results.append(
             OrderWithDetails(
                 **order.dict(),
-                symbol=stock.symbol,
+                symbol=stock.trading_code,
                 company_name=stock.company_name,
             )
         )

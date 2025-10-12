@@ -11,10 +11,14 @@ if TYPE_CHECKING:
     from .alert import Alert, StockNews
     from .trade import Trade
     from .order import Order
+    from .company import Company
 
 
 # Stock Company Information
-class StockCompany(SQLModel, table=True):
+# Note: StockCompany has been consolidated into Company table
+# This is kept as an alias for backwards compatibility
+class StockCompany(SQLModel, table=False):
+    """Deprecated: Use Company instead. Kept for backwards compatibility."""
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     symbol: str = Field(unique=True, index=True, max_length=50)
     company_name: str = Field(max_length=255)
@@ -34,23 +38,12 @@ class StockCompany(SQLModel, table=True):
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    
-    # Relationships
-    stock_data: list["StockData"] = Relationship(back_populates="company")
-    intraday_ticks: list["IntradayTick"] = Relationship(back_populates="company")
-    daily_data: list["DailyOHLC"] = Relationship(back_populates="company")
-    positions: list["PortfolioPosition"] = Relationship(back_populates="stock")
-    watchlist_items: list["WatchlistItem"] = Relationship(back_populates="stock")
-    trades: list["Trade"] = Relationship(back_populates="stock")
-    alerts: list["Alert"] = Relationship(back_populates="stock")
-    news_relations: list["StockNews"] = Relationship(back_populates="stock")
-    orders: list["Order"] = Relationship(back_populates="stock")
 
 
 # Real-time Stock Data
 class StockData(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    company_id: uuid.UUID = Field(foreign_key="stockcompany.id")
+    company_id: uuid.UUID = Field(foreign_key="company.id")
     last_trade_price: Decimal = Field(max_digits=10, decimal_places=2)
     change: Decimal = Field(max_digits=10, decimal_places=2)
     change_percent: Decimal = Field(max_digits=5, decimal_places=2)
@@ -65,25 +58,25 @@ class StockData(SQLModel, table=True):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationships
-    company: StockCompany = Relationship(back_populates="stock_data")
+    company: "Company" = Relationship(back_populates="stock_data")
 
 
 # Intraday Tick Data (for real-time charting)
 class IntradayTick(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    company_id: uuid.UUID = Field(foreign_key="stockcompany.id")
+    company_id: uuid.UUID = Field(foreign_key="company.id")
     price: Decimal = Field(max_digits=10, decimal_places=2)
     volume: int = Field(default=0, sa_column=Column(BigInteger))
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationships
-    company: StockCompany = Relationship(back_populates="intraday_ticks")
+    company: "Company" = Relationship(back_populates="intraday_ticks")
 
 
 # Daily OHLC Data (aggregated from intraday ticks)
 class DailyOHLC(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    company_id: uuid.UUID = Field(foreign_key="stockcompany.id")
+    company_id: uuid.UUID = Field(foreign_key="company.id")
     date: datetime = Field(index=True)
     open_price: Decimal = Field(max_digits=10, decimal_places=2)
     high: Decimal = Field(max_digits=10, decimal_places=2)
@@ -96,7 +89,7 @@ class DailyOHLC(SQLModel, table=True):
     change_percent: Decimal = Field(max_digits=5, decimal_places=2)
     
     # Relationships
-    company: StockCompany = Relationship(back_populates="daily_data")
+    company: "Company" = Relationship(back_populates="daily_data")
 
 
 # Market Summary
