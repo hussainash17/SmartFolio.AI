@@ -6,3 +6,6 @@ node_modules/
 /playwright/.cache/
 .idea
 .copierdist/
+/dse-data-scrapper/logs
+/dse-data-scrapper/.idea
+/dse-data-scrapper/target

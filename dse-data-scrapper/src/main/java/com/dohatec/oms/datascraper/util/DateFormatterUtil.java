@@ -79,6 +79,31 @@ public class DateFormatterUtil {
             return null;
         }
     }
+    
+    /**
+     * Parse date from "yyyyMM" format (year and month only)
+     * Sets day to the last day of the month
+     * @param dateStr the date string in YYYYMM format (e.g., "202409")
+     * @return LocalDate or null if parsing fails
+     */
+    public LocalDate parseYearMonthDate(String dateStr) {
+        if (dateStr == null || dateStr.length() != 6) {
+            return null;
+        }
+        
+        try {
+            int year = Integer.parseInt(dateStr.substring(0, 4));
+            int month = Integer.parseInt(dateStr.substring(4, 6));
+            
+            // Return the last day of the month
+            return LocalDate.of(year, month, 1).withDayOfMonth(
+                LocalDate.of(year, month, 1).lengthOfMonth()
+            );
+        } catch (Exception e) {
+            log.warn("Failed to parse year-month date: {}", dateStr);
+            return null;
+        }
+    }
 
     /**
      * Extract date from text containing date pattern

@@ -40,117 +40,140 @@
     {
       "name": "scraper.batch.batch-size",
       "type": "java.lang.Integer",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Batch"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Batch",
+      "defaultValue": 20
     },
     {
       "name": "scraper.batch.parallel-processing",
       "type": "java.lang.Boolean",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Batch"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Batch",
+      "defaultValue": true
     },
     {
       "name": "scraper.batch.thread-pool-size",
       "type": "java.lang.Integer",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Batch"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Batch",
+      "defaultValue": 10
     },
     {
       "name": "scraper.dse.base-url",
       "type": "java.lang.String",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Dse"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Dse",
+      "defaultValue": "https:\/\/dsebd.org"
     },
     {
       "name": "scraper.dse.company-detail-url",
       "type": "java.lang.String",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Dse"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Dse",
+      "defaultValue": "https:\/\/dsebd.org\/displayCompany.php?name=%s"
     },
     {
       "name": "scraper.dse.latest-share-price-url",
       "type": "java.lang.String",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Dse"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Dse",
+      "defaultValue": "https:\/\/dsebd.org\/latest_share_price_scroll_by_ltp.php"
     },
     {
       "name": "scraper.dse.market-summary-url",
       "type": "java.lang.String",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Dse"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Dse",
+      "defaultValue": "https:\/\/dsebd.org"
     },
     {
       "name": "scraper.http.connection-timeout",
       "type": "java.lang.Integer",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Http"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Http",
+      "defaultValue": 30000
     },
     {
       "name": "scraper.http.max-connections",
       "type": "java.lang.Integer",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Http"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Http",
+      "defaultValue": 50
     },
     {
       "name": "scraper.http.read-timeout",
       "type": "java.lang.Integer",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Http"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Http",
+      "defaultValue": 60000
     },
     {
       "name": "scraper.http.user-agent",
       "type": "java.lang.String",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Http"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Http",
+      "defaultValue": "Mozilla\/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit\/537.36"
     },
     {
       "name": "scraper.retry.enabled",
       "type": "java.lang.Boolean",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Retry"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Retry",
+      "defaultValue": true
     },
     {
       "name": "scraper.retry.initial-delay",
       "type": "java.lang.Long",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Retry"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Retry",
+      "defaultValue": 1000
     },
     {
       "name": "scraper.retry.max-attempts",
       "type": "java.lang.Integer",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Retry"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Retry",
+      "defaultValue": 3
     },
     {
       "name": "scraper.retry.max-delay",
       "type": "java.lang.Long",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Retry"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Retry",
+      "defaultValue": 10000
     },
     {
       "name": "scraper.retry.multiplier",
       "type": "java.lang.Double",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Retry"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Retry",
+      "defaultValue": 2
     },
     {
       "name": "scraper.schedule.cleanup-cron",
       "type": "java.lang.String",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule",
+      "defaultValue": "0 0 2 1 * *"
     },
     {
       "name": "scraper.schedule.company-list-sync-cron",
       "type": "java.lang.String",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule",
+      "defaultValue": "0 0 10 * * SAT"
     },
     {
       "name": "scraper.schedule.daily-aggregation-cron",
       "type": "java.lang.String",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule",
+      "defaultValue": "0 30 15 * * MON-THU"
     },
     {
       "name": "scraper.schedule.enabled",
       "type": "java.lang.Boolean",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule",
+      "defaultValue": true
     },
     {
       "name": "scraper.schedule.fundamental-cron",
       "type": "java.lang.String",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule",
+      "defaultValue": "0 0 16 * * MON-THU"
     },
     {
       "name": "scraper.schedule.realtime-cron",
       "type": "java.lang.String",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule",
+      "defaultValue": "0 *\/1 10-14 * * MON-THU"
     },
     {
       "name": "scraper.schedule.timezone",
       "type": "java.lang.String",
-      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule"
+      "sourceType": "com.dohatec.oms.datascraper.config.ScraperProperties$Schedule",
+      "defaultValue": "Asia\/Dhaka"
     }
   ],
   "hints": []
