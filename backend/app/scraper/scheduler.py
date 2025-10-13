@@ -51,7 +51,7 @@ class SmartStockScheduler:
                 max_instances=1,
                 coalesce=True
             )
-            
+
             # Scrape every 5 minutes outside market hours
             self.scheduler.add_job(
                 run_dse_scraper,
@@ -65,7 +65,7 @@ class SmartStockScheduler:
                 max_instances=1,
                 coalesce=True
             )
-            
+
             # Weekend scraping every 15 minutes
             self.scheduler.add_job(
                 run_dse_scraper,
@@ -78,7 +78,7 @@ class SmartStockScheduler:
                 max_instances=1,
                 coalesce=True
             )
-            
+
             # Daily data aggregation at end of trading day
             self.scheduler.add_job(
                 self.aggregate_daily_data,
@@ -91,7 +91,7 @@ class SmartStockScheduler:
                 name='Daily Data Aggregation',
                 max_instances=1
             )
-            
+
             # Cleanup old data weekly
             self.scheduler.add_job(
                 self.cleanup_old_data,
@@ -104,11 +104,11 @@ class SmartStockScheduler:
                 name='Data Cleanup',
                 max_instances=1
             )
-            
+
             self.scheduler.start()
             self.is_running = True
             logger.info("SmartStock scheduler started")
-    
+
     def stop(self):
         """Stop the scheduler"""
         if self.is_running:

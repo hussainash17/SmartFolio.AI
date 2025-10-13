@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Plus, TrendingUp, TrendingDown, DollarSign, PieChart } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
+import { Plus, TrendingUp, TrendingDown, DollarSign, PieChart, BarChart3, ShoppingCart } from "lucide-react";
 import { Portfolio, PortfolioSummary } from "../types/portfolio";
 
 interface PortfolioDashboardProps {
@@ -145,6 +146,103 @@ export function PortfolioDashboard({ onCreatePortfolio, onSelectPortfolio, onQui
           );
         })}
       </div>
+
+      {/* Default Portfolio Holdings */}
+      {portfolios.length > 0 && portfolios[0].stocks.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle>Default Portfolio Holdings</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Showing stocks from: {portfolios[0].name}
+                </p>
+              </div>
+              <Button variant="outline" onClick={() => onSelectPortfolio(portfolios[0])}>
+                View Full Details
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Symbol</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead className="text-right">Quantity</TableHead>
+                  <TableHead className="text-right">Avg Cost</TableHead>
+                  <TableHead className="text-right">Current Price</TableHead>
+                  <TableHead className="text-right">Market Value</TableHead>
+                  <TableHead className="text-right">Gain/Loss</TableHead>
+                  <TableHead className="text-right">%</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {portfolios[0].stocks.map((stock) => {
+                  const marketValue = stock.quantity * stock.currentPrice;
+                  const costBasis = stock.quantity * stock.purchasePrice;
+                  const gainLoss = marketValue - costBasis;
+                  const gainLossPercent = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
+
+                  return (
+                    <TableRow key={stock.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{stock.symbol}</span>
+                          {stock.sector && stock.sector !== 'Unknown' && (
+                            <Badge variant="outline" className="text-xs">{stock.sector}</Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">{stock.companyName}</TableCell>
+                      <TableCell className="text-right">{stock.quantity}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(stock.purchasePrice)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(stock.currentPrice)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(marketValue)}</TableCell>
+                      <TableCell className={`text-right ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <div className="flex items-center justify-end gap-1">
+                          {gainLoss >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                          {formatCurrency(gainLoss)}
+                        </div>
+                      </TableCell>
+                      <TableCell className={`text-right ${gainLossPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatPercent(gainLossPercent)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onChartStock(stock.symbol);
+                            }}
+                            className="h-8 w-8 p-0"
+                          >
+                            <BarChart3 className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onQuickTrade(stock.symbol);
+                            }}
+                            className="h-8 w-8 p-0"
+                          >
+                            <ShoppingCart className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

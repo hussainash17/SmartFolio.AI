@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routes import items, login, private, users, utils, portfolio, watchlist, orders, risk_management, kyc, analytics, research, market, alerts, news, subscription, dashboard, funds
+from app.api.routes import items, login, private, users, utils, portfolio, watchlist, orders, risk_management, kyc, analytics, research, market, alerts, news, subscription, dashboard, funds, fundamentals
 from app.core.config import settings
 
 api_router = APIRouter()
@@ -21,6 +21,7 @@ api_router.include_router(news.router)
 api_router.include_router(subscription.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(funds.router)
+api_router.include_router(fundamentals.router)
 
 
 if settings.ENVIRONMENT == "local":

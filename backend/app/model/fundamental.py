@@ -11,6 +11,8 @@ from sqlmodel import Field, SQLModel, Relationship
 # Dividend Information
 class DividendInformation(SQLModel, table=True):
     """Dividend information for companies"""
+    __tablename__ = "dividend_information"
+    
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     company_id: uuid.UUID = Field(foreign_key="company.id", index=True)
     year: int = Field(index=True)
@@ -61,6 +63,8 @@ class DividendInformationPublic(DividendInformationBase):
 # Financial Performance
 class FinancialPerformance(SQLModel, table=True):
     """Annual financial performance metrics"""
+    __tablename__ = "financial_performance"
+    
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     company_id: uuid.UUID = Field(foreign_key="company.id", index=True)
     year: int = Field(index=True)
@@ -117,6 +121,8 @@ class FinancialPerformancePublic(FinancialPerformanceBase):
 # Quarterly Performance
 class QuarterlyPerformance(SQLModel, table=True):
     """Quarterly performance metrics"""
+    __tablename__ = "quarterly_performance"
+    
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     company_id: uuid.UUID = Field(foreign_key="company.id", index=True)
     quarter: str = Field(max_length=20)  # 'Q1', 'Q2', 'Q3', 'Half Yearly', '9 Months', 'Annual'
@@ -164,6 +170,8 @@ class QuarterlyPerformancePublic(QuarterlyPerformanceBase):
 # Shareholding Pattern
 class ShareholdingPattern(SQLModel, table=True):
     """Shareholding pattern information"""
+    __tablename__ = "shareholding_pattern"
+    
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     company_id: uuid.UUID = Field(foreign_key="company.id", index=True)
     date: dt.date = Field(index=True)
@@ -214,6 +222,8 @@ class ShareholdingPatternPublic(ShareholdingPatternBase):
 # Loan Status
 class LoanStatus(SQLModel, table=True):
     """Company loan status information"""
+    __tablename__ = "loan_status"
+    
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     company_id: uuid.UUID = Field(foreign_key="company.id", index=True, unique=True)
     
@@ -255,6 +265,8 @@ class LoanStatusPublic(LoanStatusBase):
 # Scraper Log
 class ScraperLog(SQLModel, table=True):
     """Log for scraper operations"""
+    __tablename__ = "scraper_log"
+    
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     scraper_type: str = Field(max_length=50, index=True)  # 'REALTIME', 'FUNDAMENTAL', 'COMPANY_LIST'
     status: str = Field(max_length=20)  # 'SUCCESS', 'FAILED', 'PARTIAL'

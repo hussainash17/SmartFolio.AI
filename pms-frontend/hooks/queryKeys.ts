@@ -37,4 +37,17 @@ export const queryKeys = {
   watchlists: ['watchlists'] as const,
   watchlistItems: (watchlistId: string) => ['watchlists', watchlistId, 'items'] as const,
   alerts: ['alerts'] as const,
+
+  // Fundamental Analysis
+  fundamentalCompanyInfo: (tradingCode: string) => ['fundamentals', 'company', tradingCode] as const,
+  fundamentalMarketSummary: (tradingCode: string) => ['fundamentals', 'market-summary', tradingCode] as const,
+  fundamentalShareholding: (tradingCode: string) => ['fundamentals', 'shareholding', tradingCode] as const,
+  fundamentalEarnings: (tradingCode: string) => ['fundamentals', 'earnings', tradingCode] as const,
+  fundamentalFinancialHealth: (tradingCode: string) => ['fundamentals', 'financial-health', tradingCode] as const,
+  fundamentalDividends: (tradingCode: string, limit?: number) => ['fundamentals', 'dividends', tradingCode, limit ?? 10] as const,
+  fundamentalRatios: (tradingCode: string, years?: number) => ['fundamentals', 'ratios', tradingCode, years ?? 5] as const,
+  fundamentalComparison: (codes: string) => ['fundamentals', 'compare', codes] as const,
+  fundamentalSearch: (params: { sector?: string; category?: string; minPe?: number; maxPe?: number; minDividendYield?: number }) => 
+    ['fundamentals', 'search', params] as const,
+  fundamentalDataAvailability: (tradingCode: string) => ['fundamentals', 'data-availability', tradingCode] as const,
 };

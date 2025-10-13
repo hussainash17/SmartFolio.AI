@@ -6,6 +6,7 @@ import { Input } from './ui/input'
 import { Badge } from './ui/badge'
 import { Progress } from './ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { 
   PieChart as PieIcon, 
   Target, 
@@ -21,6 +22,7 @@ import {
 import { OpenAPI, AnalyticsService } from '../src/client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../hooks/queryKeys'
+import { usePortfolios } from '../hooks/usePortfolios'
 import { toast } from 'sonner'
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 
@@ -98,9 +100,25 @@ function normalizeSector(value: any): string {
 	return v
 }
 
-export function AssetAllocation({ portfolioId, onNavigate }: AssetAllocationProps) {
+export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: AssetAllocationProps) {
 	const queryClient = useQueryClient()
 	const [activeTab, setActiveTab] = useState('overview')
+	
+	// Get portfolios list
+	const { portfolios, loading: portfoliosLoading } = usePortfolios()
+	
+	// Manage selected portfolio internally, default to first portfolio or prop
+	const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(null)
+	
+	// Initialize with prop or first portfolio
+	useEffect(() => {
+		if (!selectedPortfolioId && portfolios.length > 0) {
+			setSelectedPortfolioId(propPortfolioId || portfolios[0].id)
+		}
+	}, [propPortfolioId, portfolios, selectedPortfolioId])
+	
+	// Use selected portfolio for queries
+	const portfolioId = selectedPortfolioId
 
 	const { data: allocation = { total_value: 0, sector_wise_allocation: [], stock_wise_allocation: [], concentration_risk: { top_5_holdings: 0, top_10_holdings: 0, largest_holding: 0 } }, isLoading: allocationLoading } = useQuery({
 		queryKey: queryKeys.portfolioAllocation(portfolioId || 'none'),
@@ -141,7 +159,7 @@ export function AssetAllocation({ portfolioId, onNavigate }: AssetAllocationProp
 		if ((targets || []).length > 0) {
 			setEditableTargets(targets.map(t => ({ ...t, category: normalizeSector(t.category) })))
 		} else if (sectors.length > 0) {
-			setEditableTargets(sectors.map(s => ({ category: s.sector, category_type: 'SECTOR', target_percent: Number(s.allocation_percent.toFixed(2)) })))
+			setEditableTargets(sectors.map(s => ({ category: s.sector, category_type: 'SECTOR', target_percent: Number((s.allocation_percent ?? 0).toFixed(2)) })))
 		}
 	}, [JSON.stringify(targets), JSON.stringify((allocation as any)?.sector_wise_allocation)])
 
@@ -310,6 +328,18 @@ export function AssetAllocation({ portfolioId, onNavigate }: AssetAllocationProp
 					<p className="text-muted-foreground">Interactive allocation visualization and rebalancing recommendations</p>
 				</div>
 				<div className="flex items-center gap-2">
+					<Select value={selectedPortfolioId || ''} onValueChange={setSelectedPortfolioId}>
+						<SelectTrigger className="w-[280px]">
+							<SelectValue placeholder={portfoliosLoading ? "Loading portfolios..." : "Select portfolio"} />
+						</SelectTrigger>
+						<SelectContent>
+							{portfolios.map((p) => (
+								<SelectItem key={p.id} value={p.id}>
+									{p.name} {p.description && `- ${p.description}`}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
 					<Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.portfolioAllocation(portfolioId) })} className="gap-2">
 						<RefreshCw className="h-4 w-4" /> Refresh
 					</Button>
@@ -535,7 +565,7 @@ export function AssetAllocation({ portfolioId, onNavigate }: AssetAllocationProp
 													<div className="w-4 h-4 rounded" style={{ backgroundColor: PALETTE[idx % PALETTE.length] }} />
 													<span className="font-medium">{s.sector}</span>
 												</div>
-												<Badge>{s.allocation_percent.toFixed(2)}%</Badge>
+												<Badge>{(s.allocation_percent ?? 0).toFixed(2)}%</Badge>
 											</div>
 											<div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
 												<div>Value: {formatCurrency(s.value)}</div>
@@ -583,7 +613,7 @@ export function AssetAllocation({ portfolioId, onNavigate }: AssetAllocationProp
 											<TableCell className="text-right">
 												<div className="flex items-center justify-end gap-2">
 													<Progress value={stock.allocation_percent} className="h-2 w-16" />
-													<span className="font-medium">{stock.allocation_percent.toFixed(2)}%</span>
+													<span className="font-medium">{(stock.allocation_percent ?? 0).toFixed(2)}%</span>
 												</div>
 											</TableCell>
 											<TableCell className={`text-right ${stock.unrealized_pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -592,7 +622,7 @@ export function AssetAllocation({ portfolioId, onNavigate }: AssetAllocationProp
 											<TableCell className={`text-right ${stock.unrealized_pnl_percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
 												<div className="flex items-center justify-end gap-1">
 													{stock.unrealized_pnl_percent >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-													{stock.unrealized_pnl_percent.toFixed(2)}%
+													{(stock.unrealized_pnl_percent ?? 0).toFixed(2)}%
 												</div>
 											</TableCell>
 										</TableRow>
@@ -616,7 +646,7 @@ export function AssetAllocation({ portfolioId, onNavigate }: AssetAllocationProp
 										setEditableTargets(sectors.map(s => ({ 
 											category: s.sector, 
 											category_type: 'SECTOR', 
-											target_percent: Number(s.allocation_percent.toFixed(2)) 
+											target_percent: Number((s.allocation_percent ?? 0).toFixed(2)) 
 										})))
 									}}>
 										Reset to Current
@@ -678,7 +708,7 @@ export function AssetAllocation({ portfolioId, onNavigate }: AssetAllocationProp
 														step="0.1"
 														min="0"
 														max="100"
-														value={Number((target?.target_percent ?? 0).toFixed(2))}
+														value={Number(target?.target_percent ?? 0).toFixed(2)}
 														onChange={(e) => {
 															const v = Number(e.target.value || 0)
 															setEditableTargets(prev => prev.map(t => normalizeSector(t.category) === row.sector ? { ...t, target_percent: v } : t))
@@ -692,7 +722,7 @@ export function AssetAllocation({ portfolioId, onNavigate }: AssetAllocationProp
 														step="0.1"
 														min="0"
 														max="100"
-														value={Number((target?.min_percent ?? 0).toFixed(2))}
+														value={Number(target?.min_percent ?? 0).toFixed(2)}
 														onChange={(e) => {
 															const v = Number(e.target.value || 0)
 															setEditableTargets(prev => prev.map(t => normalizeSector(t.category) === row.sector ? { ...t, min_percent: v } : t))
@@ -707,7 +737,7 @@ export function AssetAllocation({ portfolioId, onNavigate }: AssetAllocationProp
 														step="0.1"
 														min="0"
 														max="100"
-														value={Number((target?.max_percent ?? 0).toFixed(2))}
+														value={Number(target?.max_percent ?? 0).toFixed(2)}
 														onChange={(e) => {
 															const v = Number(e.target.value || 0)
 															setEditableTargets(prev => prev.map(t => normalizeSector(t.category) === row.sector ? { ...t, max_percent: v } : t))
