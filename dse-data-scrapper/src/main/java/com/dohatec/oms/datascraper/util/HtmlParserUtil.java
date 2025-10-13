@@ -202,5 +202,65 @@ public class HtmlParserUtil {
     public String getAttributeSafely(Element element, String attribute) {
         return element != null ? element.attr(attribute) : "";
     }
-}
 
+    /**
+     * Parse financial performance table with multi-row structure
+     * Expected table structure:
+     * - First 3 rows are headers
+     * - Subsequent rows contain: Year, ..., EPS, ..., NAV, ..., Profit, ..., TCI
+     * 
+     * @param table the table element
+     * @return map with keys in format "FieldName_Year" (e.g., "EPS_2024")
+     */
+    public Map<String, String> parseFinancialPerformanceTable(Element table) {
+        Map<String, String> data = new HashMap<>();
+        
+        if (table == null) {
+            return data;
+        }
+        
+        Elements rows = table.select("tbody tr");
+        
+        // Skip first 3 header rows, process data rows
+        for (int i = 3; i < rows.size(); i++) {
+            Element row = rows.get(i);
+            Elements cells = row.select("td");
+            
+            // Table typically has 12+ columns
+            if (cells.size() >= 12) {
+                String year = cleanText(cells.get(0).text());
+                
+                // Skip invalid rows
+                if (isEmpty(year) || year.equals("Year")) {
+                    continue;
+                }
+                
+                // Extract financial metrics
+                String epsBasic = cleanText(cells.size() > 4 ? cells.get(4).text() : "-");
+                String epsDiluted = cleanText(cells.size() > 5 ? cells.get(5).text() : "-");
+                String navPerShare = cleanText(cells.size() > 7 ? cells.get(7).text() : "-");
+                String profit = cleanText(cells.size() > 10 ? cells.get(10).text() : "-");
+                String totalComprehensiveIncome = cleanText(cells.size() > 12 ? cells.get(12).text() : "-");
+                
+                // Store with year suffix
+                if (!isEmpty(epsBasic)) {
+                    data.put("EPS_Basic_" + year, epsBasic);
+                }
+                if (!isEmpty(epsDiluted)) {
+                    data.put("EPS_Diluted_" + year, epsDiluted);
+                }
+                if (!isEmpty(navPerShare)) {
+                    data.put("NAV_Per_Share_" + year, navPerShare);
+                }
+                if (!isEmpty(profit)) {
+                    data.put("Profit_" + year, profit);
+                }
+                if (!isEmpty(totalComprehensiveIncome)) {
+                    data.put("Total_Comprehensive_Income_" + year, totalComprehensiveIncome);
+                }
+            }
+        }
+        
+        return data;
+    }
+}
