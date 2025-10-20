@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { ArrowLeft, Plus, Trash2, Edit, TrendingUp, TrendingDown, BarChart3, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, TrendingUp, TrendingDown, BarChart3, ShoppingCart, Upload } from "lucide-react";
 import { Portfolio, Stock } from "../types/portfolio";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import { UploadPortfolioDialog } from "./UploadPortfolioDialog";
 
 interface PortfolioDetailProps {
   portfolio: Portfolio;
@@ -24,6 +27,8 @@ export function PortfolioDetail({
   onQuickTrade,
   onChartStock
 }: PortfolioDetailProps) {
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -49,6 +54,16 @@ export function PortfolioDetail({
 
   const totalStockValue = portfolio.stocks.reduce((sum, stock) => sum + (stock.quantity * stock.currentPrice), 0);
 
+  // Color palette for pie chart
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+
+  // Prepare data for pie chart
+  const sectorChartData = Object.entries(sectorAllocation).map(([sector, value]) => ({
+    name: sector,
+    value: value,
+    percentage: totalStockValue > 0 ? (value / totalStockValue) * 100 : 0,
+  }));
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -62,11 +77,29 @@ export function PortfolioDetail({
             <p className="text-muted-foreground">{portfolio.description}</p>
           )}
         </div>
-        <Button onClick={onAddStock} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Add Stock
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={() => setIsUploadDialogOpen(true)} 
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <Upload className="h-4 w-4" />
+            Upload Portfolio
+          </Button>
+          <Button onClick={onAddStock} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Add Stock
+          </Button>
+        </div>
       </div>
+
+      {/* Upload Portfolio Dialog */}
+      <UploadPortfolioDialog
+        open={isUploadDialogOpen}
+        onOpenChange={setIsUploadDialogOpen}
+        portfolioId={portfolio.id}
+        portfolioName={portfolio.name}
+      />
 
       {/* Performance Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -221,19 +254,57 @@ export function PortfolioDetail({
             <CardTitle>Sector Allocation</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {Object.entries(sectorAllocation).map(([sector, value]) => {
-                const percentage = totalStockValue > 0 ? (value / totalStockValue) * 100 : 0;
-                return (
-                  <div key={sector} className="flex items-center justify-between">
-                    <span className="text-sm">{sector}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">{formatCurrency(value)}</span>
-                      <Badge variant="secondary">{percentage.toFixed(1)}%</Badge>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Pie Chart */}
+              <div className="flex items-center justify-center">
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={sectorChartData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percentage }) => `${name}: ${percentage.toFixed(1)}%`}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {sectorChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '6px',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Legend with Details */}
+              <div className="space-y-3">
+                {sectorChartData.map((sector, index) => (
+                  <div key={sector.name} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-4 h-4 rounded-sm"
+                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                      />
+                      <span className="font-medium text-sm">{sector.name}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold">{formatCurrency(sector.value)}</span>
+                      <Badge variant="secondary" className="min-w-[60px] justify-center">
+                        {sector.percentage.toFixed(1)}%
+                      </Badge>
                     </div>
                   </div>
-                );
-              })}
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>

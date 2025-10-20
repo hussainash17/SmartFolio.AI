@@ -229,13 +229,13 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Page Header */}
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Portfolio Rebalancing</h1>
-          <p className="text-muted-foreground">Automated rebalancing recommendations and execution</p>
+          <h1 className="text-3xl font-semibold text-foreground mb-2">Portfolio Rebalancing</h1>
+          <p className="text-muted-foreground text-lg">Maintain your target allocation with intelligent rebalancing recommendations</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => onNavigate('allocation')}>
             <BarChart3 className="h-4 w-4 mr-2" />
             Asset Allocation

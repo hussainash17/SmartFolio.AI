@@ -2,7 +2,7 @@ from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlmodel import select, Session
 
 from app.api.deps import get_current_user, get_session_dep
@@ -16,6 +16,12 @@ from app.model.portfolio import (
 from app.model.company import Company
 from app.model.trade import Trade, TradeCreate, TradeUpdate, TradePublic, TradeWithDetails
 from app.model.user import User
+from app.model.portfolio_statement import (
+    PortfolioStatementResponse,
+    BulkHoldingsSaveRequest,
+    BulkHoldingsSaveResponse,
+)
+from app.services.holdings_service import HoldingsService
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
@@ -821,3 +827,127 @@ def get_orders_trades_summary(
         "total_order_value_all_time": float(all_time_total_value),
         "recent_trades_count": int(recent_trades_count),
     }
+
+
+# Portfolio Statement PDF Upload & Parsing APIs
+@router.post("/{portfolio_id}/upload-statement", response_model=PortfolioStatementResponse)
+async def upload_portfolio_statement(
+        portfolio_id: UUID,
+        file: UploadFile = File(...),
+        broker_house: Optional[str] = None,
+        current_user: User = Depends(get_current_user),
+        session: Session = Depends(get_session_dep),
+):
+    """
+    Upload and parse a portfolio statement PDF file.
+    
+    Extracts holdings data from the PDF and returns structured information
+    for review before saving to the database.
+    
+    Args:
+        portfolio_id: UUID of the portfolio to associate holdings with
+        file: PDF file of the portfolio statement
+        broker_house: (Optional) Broker house name to use specific parser.
+                     Supported values: 'lankabangla', 'doha', 'generic'
+                     If not provided, will attempt to auto-detect from PDF content.
+        current_user: Current authenticated user
+        session: Database session
+        
+    Returns:
+        PortfolioStatementResponse with parsed client info and holdings
+        
+    Raises:
+        400: Invalid file format, corrupted PDF, or unsupported broker
+        404: Portfolio not found
+        413: File size exceeds limit
+        422: PDF parsing failed
+    
+    Example:
+        POST /api/v1/portfolio/{portfolio_id}/upload-statement?broker_house=lankabangla
+    """
+    # Verify portfolio belongs to user
+    portfolio = session.exec(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        )
+    ).first()
+    
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portfolio not found"
+        )
+    
+    # Validate broker_house parameter if provided
+    if broker_house:
+        broker_house = broker_house.lower().strip()
+        supported_brokers = ['lankabangla', 'doha', 'generic']
+        if broker_house not in supported_brokers:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported broker house: '{broker_house}'. Supported values: {', '.join(supported_brokers)}"
+            )
+    
+    # Parse the PDF with specified broker and database session for stock matching
+    try:
+        # Initialize parser with database session for stock lookup
+        from app.services.pdf_parser import PortfolioStatementParser
+        parser = PortfolioStatementParser(session=session)
+        statement = await parser.parse_pdf_statement(file, broker_house=broker_house)
+        return statement
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error while processing PDF: {str(e)}"
+        )
+
+
+@router.post("/{portfolio_id}/holdings/bulk", response_model=BulkHoldingsSaveResponse)
+def save_bulk_holdings(
+        portfolio_id: UUID,
+        request: BulkHoldingsSaveRequest,
+        current_user: User = Depends(get_current_user),
+        session: Session = Depends(get_session_dep),
+):
+    """
+    Save parsed holdings from portfolio statement to the database.
+    
+    This endpoint should be called after reviewing the parsed data from
+    the upload-statement endpoint. It will create or update portfolio
+    positions based on the provided holdings.
+    
+    Args:
+        portfolio_id: UUID of the portfolio
+        request: Bulk holdings save request with client info and holdings
+        current_user: Current authenticated user
+        session: Database session
+        
+    Returns:
+        BulkHoldingsSaveResponse with operation results
+        
+    Raises:
+        400: Invalid data format
+        404: Portfolio not found
+        409: Conflict with existing data (if configured)
+        500: Internal server error
+    """
+    try:
+        holdings_service = HoldingsService(session)
+        result = holdings_service.save_bulk_holdings(
+            portfolio_id=portfolio_id,
+            user_id=current_user.id,
+            request=request,
+        )
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save holdings: {str(e)}"
+        )

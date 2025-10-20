@@ -110,15 +110,28 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 	// Manage selected portfolio internally, default to first portfolio or prop
 	const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(null)
 	
-	// Initialize with prop or first portfolio
+	// Initialize with prop when it changes
 	useEffect(() => {
-		if (!selectedPortfolioId && portfolios.length > 0) {
-			setSelectedPortfolioId(propPortfolioId || portfolios[0].id)
+		if (propPortfolioId) {
+			setSelectedPortfolioId(propPortfolioId)
 		}
-	}, [propPortfolioId, portfolios, selectedPortfolioId])
+	}, [propPortfolioId])
+	
+	// Auto-select first portfolio when portfolios load (if no portfolio selected)
+	useEffect(() => {
+		if (!selectedPortfolioId && !propPortfolioId && portfolios.length > 0) {
+			console.log('[AssetAllocation] Auto-selecting first portfolio:', portfolios[0].id)
+			setSelectedPortfolioId(portfolios[0].id)
+		}
+	}, [portfolios, propPortfolioId, selectedPortfolioId])
 	
 	// Use selected portfolio for queries
 	const portfolioId = selectedPortfolioId
+
+	// Debug log the portfolio ID being used
+	useEffect(() => {
+		console.log('[AssetAllocation] Current portfolioId:', portfolioId, 'selectedPortfolioId:', selectedPortfolioId, 'propPortfolioId:', propPortfolioId)
+	}, [portfolioId, selectedPortfolioId, propPortfolioId])
 
 	const { data: allocation = { total_value: 0, sector_wise_allocation: [], stock_wise_allocation: [], concentration_risk: { top_5_holdings: 0, top_10_holdings: 0, largest_holding: 0 } }, isLoading: allocationLoading } = useQuery({
 		queryKey: queryKeys.portfolioAllocation(portfolioId || 'none'),
@@ -321,11 +334,11 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 
 	return (
 		<div className="space-y-6">
-			{/* Header */}
-			<div className="flex items-center justify-between">
+			{/* Page Header */}
+			<div className="flex items-center justify-between mb-8">
 				<div>
-					<h1 className="text-3xl font-bold">Asset Allocation</h1>
-					<p className="text-muted-foreground">Interactive allocation visualization and rebalancing recommendations</p>
+					<h1 className="text-3xl font-semibold text-foreground mb-2">Asset Allocation Analysis</h1>
+					<p className="text-muted-foreground text-lg">Interactive asset allocation breakdown with rebalancing recommendations</p>
 				</div>
 				<div className="flex items-center gap-2">
 					<Select value={selectedPortfolioId || ''} onValueChange={setSelectedPortfolioId}>

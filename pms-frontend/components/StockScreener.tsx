@@ -322,7 +322,7 @@ export function StockScreener({ onQuickTrade, onChartStock, onAddToWatchlist }: 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-end gap-2">
         <div className="flex gap-2">
           <Button variant="outline">
             <Bookmark className="h-4 w-4 mr-2" />

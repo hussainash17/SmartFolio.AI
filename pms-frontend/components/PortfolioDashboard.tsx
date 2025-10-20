@@ -28,6 +28,18 @@ export function PortfolioDashboard({ onCreatePortfolio, onSelectPortfolio, onQui
 
   return (
     <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-semibold text-foreground mb-2">My Portfolios</h1>
+          <p className="text-muted-foreground text-lg">Manage and monitor your investment portfolios</p>
+        </div>
+        <Button onClick={onCreatePortfolio} size="lg">
+          <Plus className="h-5 w-5 mr-2" />
+          Create Portfolio
+        </Button>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -95,11 +107,7 @@ export function PortfolioDashboard({ onCreatePortfolio, onSelectPortfolio, onQui
 
       {/* Portfolios Grid */}
       <div className="flex justify-between items-center">
-        <h2>Your Portfolios</h2>
-        <Button onClick={onCreatePortfolio} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Create Portfolio
-        </Button>
+        <h2 className="text-xl font-semibold">Your Portfolios</h2>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

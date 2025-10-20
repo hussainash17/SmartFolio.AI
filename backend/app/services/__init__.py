@@ -10,6 +10,8 @@ from .kyc_service import KYCService
 from .portfolio_service import PortfolioService
 from .analytics_service import AnalyticsService
 from .research_service import ResearchService
+from .goal_service import EnhancedInvestmentGoalService
+from .financial_calculations import FinancialCalculator, calculate_step_up_sip
 
 __all__ = [
     "BaseService",
@@ -17,4 +19,7 @@ __all__ = [
     "PortfolioService",
     "AnalyticsService",
     "ResearchService",
+    "EnhancedInvestmentGoalService",
+    "FinancialCalculator",
+    "calculate_step_up_sip",
 ]

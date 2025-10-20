@@ -315,7 +315,7 @@ export class FundamentalsService {
     public static getCompanyInfo(data: FundamentalsGetCompanyInfoData): CancelablePromise<FundamentalsGetCompanyInfoResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/v1/fundamentals/company/{trading_code}',
+            url: '/api/v1/api/v1/fundamentals/company/{trading_code}',
             path: {
                 trading_code: data.tradingCode
             },
@@ -336,7 +336,7 @@ export class FundamentalsService {
     public static getMarketSummary(data: FundamentalsGetMarketSummaryData): CancelablePromise<FundamentalsGetMarketSummaryResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/v1/fundamentals/market-summary/{trading_code}',
+            url: '/api/v1/api/v1/fundamentals/market-summary/{trading_code}',
             path: {
                 trading_code: data.tradingCode
             },
@@ -357,7 +357,7 @@ export class FundamentalsService {
     public static getShareholdingPattern(data: FundamentalsGetShareholdingPatternData): CancelablePromise<FundamentalsGetShareholdingPatternResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/v1/fundamentals/shareholding/{trading_code}',
+            url: '/api/v1/api/v1/fundamentals/shareholding/{trading_code}',
             path: {
                 trading_code: data.tradingCode
             },
@@ -378,7 +378,7 @@ export class FundamentalsService {
     public static getEarningsProfit(data: FundamentalsGetEarningsProfitData): CancelablePromise<FundamentalsGetEarningsProfitResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/v1/fundamentals/earnings/{trading_code}',
+            url: '/api/v1/api/v1/fundamentals/earnings/{trading_code}',
             path: {
                 trading_code: data.tradingCode
             },
@@ -399,7 +399,7 @@ export class FundamentalsService {
     public static getFinancialHealth(data: FundamentalsGetFinancialHealthData): CancelablePromise<FundamentalsGetFinancialHealthResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/v1/fundamentals/financial-health/{trading_code}',
+            url: '/api/v1/api/v1/fundamentals/financial-health/{trading_code}',
             path: {
                 trading_code: data.tradingCode
             },
@@ -421,7 +421,7 @@ export class FundamentalsService {
     public static getDividendHistory(data: FundamentalsGetDividendHistoryData): CancelablePromise<FundamentalsGetDividendHistoryResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/v1/fundamentals/dividends/{trading_code}',
+            url: '/api/v1/api/v1/fundamentals/dividends/{trading_code}',
             path: {
                 trading_code: data.tradingCode
             },
@@ -446,7 +446,7 @@ export class FundamentalsService {
     public static getHistoricalRatios(data: FundamentalsGetHistoricalRatiosData): CancelablePromise<FundamentalsGetHistoricalRatiosResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/v1/fundamentals/ratios/{trading_code}',
+            url: '/api/v1/api/v1/fundamentals/ratios/{trading_code}',
             path: {
                 trading_code: data.tradingCode
             },
@@ -470,7 +470,7 @@ export class FundamentalsService {
     public static compareCompanies(data: FundamentalsCompareCompaniesData): CancelablePromise<FundamentalsCompareCompaniesResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/v1/fundamentals/compare',
+            url: '/api/v1/api/v1/fundamentals/compare',
             query: {
                 codes: data.codes
             },
@@ -496,7 +496,7 @@ export class FundamentalsService {
     public static searchCompanies(data: FundamentalsSearchCompaniesData = {}): CancelablePromise<FundamentalsSearchCompaniesResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/v1/fundamentals/search',
+            url: '/api/v1/api/v1/fundamentals/search',
             query: {
                 sector: data.sector,
                 category: data.category,
@@ -522,7 +522,7 @@ export class FundamentalsService {
     public static checkDataAvailability(data: FundamentalsCheckDataAvailabilityData): CancelablePromise<FundamentalsCheckDataAvailabilityResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/v1/fundamentals/data-availability/{trading_code}',
+            url: '/api/v1/api/v1/fundamentals/data-availability/{trading_code}',
             path: {
                 trading_code: data.tradingCode
             },

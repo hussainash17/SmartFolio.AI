@@ -7,7 +7,7 @@ import {usePortfolios} from "./hooks/usePortfolios";
 import {useTrading} from "./hooks/useTrading";
 import {useAuth} from "./hooks/useAuth";
 import {Portfolio, Stock} from "./types/portfolio";
-import {Activity, FileText, HelpCircle, Receipt, Settings, ShieldCheck, TrendingUp, User,} from "lucide-react";
+import {Activity, BarChart3, FileText, HelpCircle, LineChart as LineChartIcon, Receipt, Settings, ShieldCheck, TrendingUp, User,} from "lucide-react";
 import {MarketService, PortfolioService} from "./src/client";
 import {useQueryClient} from "@tanstack/react-query";
 import {queryKeys} from "./hooks/queryKeys";
@@ -23,7 +23,7 @@ const PortfolioDetail = lazy(() => import("./components/PortfolioDetail").then(m
 const PortfolioForm = lazy(() => import("./components/PortfolioForm").then(m => ({default: m.PortfolioForm})));
 const StockForm = lazy(() => import("./components/StockForm").then(m => ({default: m.StockForm})));
 const QuickTradeDialog = lazy(() => import("./components/QuickTradeDialog").then(m => ({default: m.QuickTradeDialog})));
-const TradingViewChart = lazy(() => import("./components/TradingViewChart").then(m => ({default: m.TradingViewChart})));
+const PortfolioPerformance = lazy(() => import("./components/PortfolioPerformance").then(m => ({default: m.PortfolioPerformance})));
 const StockScreener = lazy(() => import("./components/StockScreener").then(m => ({default: m.StockScreener})));
 const RiskAnalysis = lazy(() => import("./components/RiskAnalysis").then(m => ({default: m.RiskAnalysis})));
 const RebalancingManager = lazy(() => import("./components/RebalancingManager").then(m => ({default: m.RebalancingManager})));
@@ -31,7 +31,7 @@ const RiskManagement = lazy(() => import("./components/RiskManagement").then(m =
 const SignupPage = lazy(() => import("./components/SignupPage").then(m => ({default: m.SignupPage})));
 const LoginPage = lazy(() => import("./components/LoginPage").then(m => ({default: m.LoginPage})));
 const MarketNewsInsights = lazy(() => import("./components/MarketNewsInsights").then(m => ({default: m.default})));
-const InvestmentGoals = lazy(() => import("./components/InvestmentGoals").then(m => ({default: m.InvestmentGoals})));
+const InvestmentGoalsEnhanced = lazy(() => import("./components/InvestmentGoalsEnhanced").then(m => ({default: m.InvestmentGoalsEnhanced})));
 const AssetAllocation = lazy(() => import("./components/AssetAllocation").then(m => ({default: m.AssetAllocation})));
 const WatchlistManager = lazy(() => import("./components/WatchlistManager").then(m => ({default: m.WatchlistManager})));
 const AddToWatchlistDialog = lazy(() => import("./components/AddToWatchlistDialog").then(m => ({default: m.AddToWatchlistDialog})));
@@ -431,7 +431,7 @@ export default function App() {
             case "portfolios":
                 return "Manage and monitor your investment portfolios";
             case "performance":
-                return "Detailed performance analysis with benchmarking, attribution, and risk-adjusted returns";
+                return "";
             case "allocation":
                 return "Interactive asset allocation breakdown with rebalancing recommendations";
             case "goals":
@@ -534,18 +534,7 @@ export default function App() {
             case "performance":
                 return (
                     <Suspense fallback={<div>Loading Performance Analytics...</div>}>
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                                {marketData.slice(0, 3).map((stock) => (
-                                    <TradingViewChart
-                                        key={stock.symbol}
-                                        stock={stock}
-                                        onQuickTrade={handleQuickTrade}
-                                        className="h-80"
-                                    />
-                                ))}
-                            </div>
-                        </div>
+                        <PortfolioPerformance />
                     </Suspense>
                 );
 
@@ -562,7 +551,7 @@ export default function App() {
             case "goals":
                 return (
                     <Suspense fallback={<div>Loading Investment Goals...</div>}>
-                        <InvestmentGoals/>
+                        <InvestmentGoalsEnhanced/>
                     </Suspense>
                 );
 
@@ -628,19 +617,20 @@ export default function App() {
 
             case "research":
                 return (
-                    <Suspense fallback={<div>Loading Research Tools...</div>}>
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {marketData.slice(0, 4).map((stock) => (
-                                    <TradingViewChart
-                                        key={stock.symbol}
-                                        stock={stock}
-                                        onQuickTrade={handleQuickTrade}
-                                    />
-                                ))}
-                            </div>
+                    <div className="space-y-6">
+                        <div className="mb-8">
+                            <h1 className="text-3xl font-semibold text-foreground mb-2">Research & Analysis</h1>
+                            <p className="text-muted-foreground text-lg">Advanced charting and technical analysis tools</p>
                         </div>
-                    </Suspense>
+                        <div className="text-center py-12">
+                            <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <BarChart3 className="h-8 w-8 text-primary" />
+                            </div>
+                            <p className="text-muted-foreground max-w-md mx-auto">
+                                Advanced charting and technical analysis tools coming soon.
+                            </p>
+                        </div>
+                    </div>
                 );
 
             case "fundamentals":
@@ -689,6 +679,10 @@ export default function App() {
             case "risk-profile":
                 return (
                     <div className="space-y-6">
+                        <div className="mb-8">
+                            <h1 className="text-3xl font-semibold text-foreground mb-2">Risk Profile Assessment</h1>
+                            <p className="text-muted-foreground text-lg">Update your risk tolerance and investment objectives</p>
+                        </div>
                         <div className="text-center py-12">
                             <div
                                 className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -704,6 +698,10 @@ export default function App() {
             case "reports":
                 return (
                     <div className="space-y-6">
+                        <div className="mb-8">
+                            <h1 className="text-3xl font-semibold text-foreground mb-2">Portfolio Reports</h1>
+                            <p className="text-muted-foreground text-lg">Generate comprehensive portfolio reports and performance summaries</p>
+                        </div>
                         <div className="text-center py-12">
                             <div
                                 className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -719,6 +717,10 @@ export default function App() {
             case "tax-center":
                 return (
                     <div className="space-y-6">
+                        <div className="mb-8">
+                            <h1 className="text-3xl font-semibold text-foreground mb-2">Tax Center</h1>
+                            <p className="text-muted-foreground text-lg">Tax-loss harvesting, capital gains analysis, and tax-efficient strategies</p>
+                        </div>
                         <div className="text-center py-12">
                             <div
                                 className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -735,6 +737,10 @@ export default function App() {
             case "statements":
                 return (
                     <div className="space-y-6">
+                        <div className="mb-8">
+                            <h1 className="text-3xl font-semibold text-foreground mb-2">Account Statements</h1>
+                            <p className="text-muted-foreground text-lg">Download monthly and annual account statements</p>
+                        </div>
                         <div className="text-center py-12">
                             <div
                                 className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -750,6 +756,10 @@ export default function App() {
             case "transactions":
                 return (
                     <div className="space-y-6">
+                        <div className="mb-8">
+                            <h1 className="text-3xl font-semibold text-foreground mb-2">Transaction History</h1>
+                            <p className="text-muted-foreground text-lg">Complete history of all account transactions and transfers</p>
+                        </div>
                         <div className="text-center py-12">
                             <div
                                 className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -774,6 +784,10 @@ export default function App() {
             case "profile":
                 return (
                     <div className="space-y-6">
+                        <div className="mb-8">
+                            <h1 className="text-3xl font-semibold text-foreground mb-2">User Profile & KYC</h1>
+                            <p className="text-muted-foreground text-lg">Manage your personal information, documents, and KYC compliance</p>
+                        </div>
                         <div className="text-center py-12">
                             <div
                                 className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -790,6 +804,10 @@ export default function App() {
             case "settings":
                 return (
                     <div className="space-y-6">
+                        <div className="mb-8">
+                            <h1 className="text-3xl font-semibold text-foreground mb-2">Platform Settings</h1>
+                            <p className="text-muted-foreground text-lg">Customize your platform experience, notifications, and preferences</p>
+                        </div>
                         <div className="text-center py-12">
                             <div
                                 className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -806,6 +824,10 @@ export default function App() {
             case "help":
                 return (
                     <div className="space-y-6">
+                        <div className="mb-8">
+                            <h1 className="text-3xl font-semibold text-foreground mb-2">Help & Support</h1>
+                            <p className="text-muted-foreground text-lg">Documentation, tutorials, and customer support resources</p>
+                        </div>
                         <div className="text-center py-12">
                             <div
                                 className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -820,27 +842,22 @@ export default function App() {
                 );
 
             case "chart":
-                const chartStock = getMarketData(selectedChartStock);
-                return chartStock ? (
-                    <Suspense fallback={<div>Loading Chart...</div>}>
-                        <div className="space-y-6">
-                            <TradingViewChart stock={chartStock} onQuickTrade={handleQuickTrade}/>
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                {marketData
-                                    .filter((s) => s.symbol !== selectedChartStock)
-                                    .slice(0, 3)
-                                    .map((stock) => (
-                                        <TradingViewChart
-                                            key={stock.symbol}
-                                            stock={stock}
-                                            onQuickTrade={handleQuickTrade}
-                                            className="h-64"
-                                        />
-                                    ))}
-                            </div>
+                return (
+                    <div className="space-y-6">
+                        <div className="mb-8">
+                            <h1 className="text-3xl font-semibold text-foreground mb-2">Chart Analysis</h1>
+                            <p className="text-muted-foreground text-lg">Advanced charting with technical indicators and drawing tools</p>
                         </div>
-                    </Suspense>
-                ) : null;
+                        <div className="text-center py-12">
+                            <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <LineChartIcon className="h-8 w-8 text-primary" />
+                            </div>
+                            <p className="text-muted-foreground max-w-md mx-auto">
+                                Interactive charting with technical indicators coming soon.
+                            </p>
+                        </div>
+                    </div>
+                );
 
             default:
                 return (
@@ -875,13 +892,7 @@ export default function App() {
 
                 <div className="flex-1 overflow-y-auto">
                     <div className="p-8">
-                        {/* Page Header */}
-                        <div className="mb-8">
-                            <h1 className="text-3xl font-semibold text-foreground mb-2">{getPageTitle()}</h1>
-                            <p className="text-muted-foreground text-lg">{getPageDescription()}</p>
-                        </div>
-
-                        {/* Page Content */}
+                        {/* Page Content - Each component manages its own header */}
                         {renderContent()}
                     </div>
                 </div>

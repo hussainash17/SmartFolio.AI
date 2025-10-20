@@ -135,15 +135,27 @@ export function ComprehensiveDashboard({
     enabled: !!selectedPortfolioId,
     queryFn: async () => {
       if (!selectedPortfolioId) return [] as Array<{ type: string; value: number; percentage: number; color: string }>;
-      const alloc = await AnalyticsService.getPortfolioAllocation({ portfolioId: selectedPortfolioId });
-      const sectors = ((alloc as any).sector_wise_allocation || []) as Array<any>;
-      const palette = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#6b7280", "#8b5cf6", "#14b8a6", "#f97316"];
-      return sectors.map((s, idx) => ({
-        type: String(s.sector || 'Unknown'),
-        value: Number(s.value || 0),
-        percentage: Number(s.allocation_percent || 0),
-        color: palette[idx % palette.length],
-      }));
+      try {
+        const alloc = await AnalyticsService.getPortfolioAllocation({ portfolioId: selectedPortfolioId });
+        const sectors = ((alloc as any).sector_wise_allocation || []) as Array<any>;
+        
+        // Ensure sectors is an array
+        if (!Array.isArray(sectors)) {
+          console.warn('[ComprehensiveDashboard] sector_wise_allocation is not an array:', sectors);
+          return [] as Array<{ type: string; value: number; percentage: number; color: string }>;
+        }
+        
+        const palette = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#6b7280", "#8b5cf6", "#14b8a6", "#f97316"];
+        return sectors.map((s, idx) => ({
+          type: String(s.sector || 'Unknown'),
+          value: Number(s.value || 0),
+          percentage: Number(s.allocation_percent || 0),
+          color: palette[idx % palette.length],
+        }));
+      } catch (error) {
+        console.error('[ComprehensiveDashboard] Failed to fetch asset allocation:', error);
+        return [] as Array<{ type: string; value: number; percentage: number; color: string }>;
+      }
     },
   });
 
@@ -198,8 +210,12 @@ export function ComprehensiveDashboard({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Page Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-semibold text-foreground mb-2">Dashboard</h1>
+          <p className="text-muted-foreground text-lg">Comprehensive view of your investment portfolio and financial goals</p>
+        </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => onNavigate('reports')}>
             <BarChart3 className="h-4 w-4 mr-2" />
@@ -318,24 +334,30 @@ export function ComprehensiveDashboard({
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {assetAllocation.map((asset) => (
-                    <div key={asset.type} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className="w-3 h-3 rounded-full" 
-                            style={{ backgroundColor: asset.color }}
-                          />
-                          <span className="text-sm">{asset.type}</span>
+                  {Array.isArray(assetAllocation) && assetAllocation.length > 0 ? (
+                    assetAllocation.map((asset) => (
+                      <div key={asset.type} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded-full" 
+                              style={{ backgroundColor: asset.color }}
+                            />
+                            <span className="text-sm">{asset.type}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{formatCurrency(asset.value)}</span>
+                            <span className="text-sm text-muted-foreground">{asset.percentage}%</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">{formatCurrency(asset.value)}</span>
-                          <span className="text-sm text-muted-foreground">{asset.percentage}%</span>
-                        </div>
+                        <Progress value={asset.percentage} className="h-2" />
                       </div>
-                      <Progress value={asset.percentage} className="h-2" />
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No allocation data available
+                    </p>
+                  )}
                 </div>
                 <Button 
                   variant="outline" 

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from pydantic import EmailStr
 from sqlalchemy import JSON, Column
@@ -46,6 +46,27 @@ class InvestmentGoal(str, Enum):
     INCOME_GENERATION = "INCOME_GENERATION"
     CAPITAL_PRESERVATION = "CAPITAL_PRESERVATION"
     SHORT_TERM_GAINS = "SHORT_TERM_GAINS"
+    HOME_PURCHASE = "HOME_PURCHASE"
+    VACATION = "VACATION"
+    EMERGENCY_FUND = "EMERGENCY_FUND"
+    WEDDING = "WEDDING"
+    VEHICLE_PURCHASE = "VEHICLE_PURCHASE"
+    BUSINESS_STARTUP = "BUSINESS_STARTUP"
+
+
+class RiskAppetite(str, Enum):
+    """Risk tolerance levels"""
+    CONSERVATIVE = "CONSERVATIVE"
+    MODERATE = "MODERATE"
+    AGGRESSIVE = "AGGRESSIVE"
+
+
+class GoalTrackingStatus(str, Enum):
+    """Goal progress tracking status"""
+    ON_TRACK = "ON_TRACK"
+    BEHIND = "BEHIND"
+    AHEAD = "AHEAD"
+    AT_RISK = "AT_RISK"
 
 
 # KYC Information Model
@@ -94,22 +115,88 @@ class KYCInformation(SQLModel, table=True):
     user: "User" = Relationship(back_populates="kyc_information")
 
 
-# Investment Goals Model
+# Investment Goals Model - Enhanced for comprehensive goal tracking
 class UserInvestmentGoal(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    user_id: uuid.UUID = Field(foreign_key="user.id")
+    user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
+    
+    # Basic Goal Information
     goal_type: InvestmentGoal
-    target_amount: int | None = Field(default=None)
-    target_date: datetime | None = Field(default=None)
-    priority: int = Field(default=1)  # 1 = highest priority
+    target_amount: float | None = Field(default=None, description="Target amount to achieve")
+    target_date: datetime | None = Field(default=None, index=True, description="Target completion date")
+    priority: int = Field(default=1, description="Priority level (1=highest)")
     description: str | None = Field(default=None, max_length=500)
     is_active: bool = Field(default=True)
+    
+    # Financial Planning Fields
+    current_savings: float | None = Field(default=None, description="Current amount saved towards goal")
+    risk_appetite: RiskAppetite | None = Field(default=None, index=True, description="Risk tolerance level")
+    monthly_sip_required: float | None = Field(default=None, description="Calculated monthly SIP required")
+    current_monthly_sip: float | None = Field(default=None, description="Actual current monthly SIP")
+    
+    # Asset Allocation (percentages)
+    equity_allocation: float | None = Field(default=None, description="Recommended equity %")
+    debt_allocation: float | None = Field(default=None, description="Recommended debt %")
+    gold_allocation: float | None = Field(default=None, description="Recommended gold %")
+    cash_allocation: float | None = Field(default=None, description="Recommended cash %")
+    
+    # Return Expectations (annual percentages)
+    expected_return_min: float | None = Field(default=None, description="Expected minimum return % p.a.")
+    expected_return_max: float | None = Field(default=None, description="Expected maximum return % p.a.")
+    expected_return_avg: float | None = Field(default=None, description="Expected average return % p.a.")
+    
+    # Goal Achievement Metrics
+    probability_achievement: float | None = Field(default=None, description="Probability of achieving goal (0-100%)")
+    projected_final_value: float | None = Field(default=None, description="Projected value at target date")
+    
+    # Portfolio Linking
+    linked_portfolio_id: uuid.UUID | None = Field(default=None, foreign_key="portfolio.id", index=True, description="Linked portfolio")
+    
+    # Auto-Rebalancing
+    auto_rebalance_enabled: bool = Field(default=False, index=True, description="Enable auto-rebalancing")
+    rebalance_threshold: float | None = Field(default=5.0, description="Rebalance threshold %")
+    last_rebalance_date: datetime | None = Field(default=None)
+    next_rebalance_date: datetime | None = Field(default=None)
+    
+    # Tracking Fields
+    current_value: float | None = Field(default=None, description="Current total value")
+    total_contributions: float | None = Field(default=None, description="Sum of all contributions")
+    total_returns: float | None = Field(default=None, description="Total returns generated")
+    last_reviewed_date: datetime | None = Field(default=None)
+    
+    # Progress Metrics
+    progress_percentage: float | None = Field(default=None, description="Progress (0-100%)")
+    on_track_status: GoalTrackingStatus | None = Field(default=None, index=True, description="Tracking status")
+    shortfall_amount: float | None = Field(default=None, description="Amount short of target")
+    
+    # Milestone Tracking (JSON field)
+    milestones: dict = Field(default_factory=dict, sa_column=Column(JSON), description="Achievement milestones")
+    
+    # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Relationships
     user: "User" = Relationship(back_populates="investment_goals")
-    # contributions: list["UserInvestmentGoalContribution"] = Relationship(back_populates="goal")
+    linked_portfolio: Optional["Portfolio"] = Relationship(sa_relationship_kwargs={"foreign_keys": "[UserInvestmentGoal.linked_portfolio_id]"})
+    contributions: list["UserInvestmentGoalContribution"] = Relationship(back_populates="goal", sa_relationship_kwargs={"cascade": "all, delete"})
+
+
+# Investment Goal Contributions Model
+class UserInvestmentGoalContribution(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
+    goal_id: uuid.UUID = Field(foreign_key="userinvestmentgoal.id", index=True)
+    
+    amount: float = Field(description="Contribution amount")
+    contributed_at: datetime = Field(default_factory=datetime.utcnow, description="Contribution date")
+    notes: str | None = Field(default=None, max_length=500, description="Optional notes")
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Relationships
+    user: "User" = Relationship(back_populates="goal_contributions")
+    goal: "UserInvestmentGoal" = Relationship(back_populates="contributions")
 
 
 # User Account Model for multiple account types
@@ -205,6 +292,8 @@ class User(UserBase, table=True):
                                                      sa_relationship_kwargs={"cascade": "all, delete"})
     investment_goals: list["UserInvestmentGoal"] = Relationship(back_populates="user",
                                                                 sa_relationship_kwargs={"cascade": "all, delete"})
+    goal_contributions: list["UserInvestmentGoalContribution"] = Relationship(back_populates="user",
+                                                                               sa_relationship_kwargs={"cascade": "all, delete"})
     accounts: list["UserAccount"] = Relationship(back_populates="user",
                                                  sa_relationship_kwargs={"cascade": "all, delete"})
 
@@ -261,48 +350,100 @@ class KYCInformationPublic(KYCInformationBase):
     updated_at: datetime
 
 
-# Investment Goals Pydantic models
+# Investment Goals Pydantic models - Enhanced
 class UserInvestmentGoalBase(SQLModel):
     goal_type: InvestmentGoal
-    target_amount: int | None = None
+    target_amount: float | None = None
     target_date: datetime | None = None
     priority: int = 1
     description: str | None = None
     is_active: bool = True
+    
+    # Financial planning fields
+    current_savings: float | None = None
+    risk_appetite: RiskAppetite | None = None
+    current_monthly_sip: float | None = None
+    
+    # Portfolio linking
+    linked_portfolio_id: uuid.UUID | None = None
+    
+    # Auto-rebalancing
+    auto_rebalance_enabled: bool = False
+    rebalance_threshold: float | None = 5.0
 
 
 class UserInvestmentGoalCreate(UserInvestmentGoalBase):
+    """Create a new investment goal"""
     pass
 
 
 class UserInvestmentGoalUpdate(SQLModel):
+    """Update an existing investment goal"""
     goal_type: InvestmentGoal | None = None
-    target_amount: int | None = None
+    target_amount: float | None = None
     target_date: datetime | None = None
     priority: int | None = None
     description: str | None = None
     is_active: bool | None = None
+    current_savings: float | None = None
+    risk_appetite: RiskAppetite | None = None
+    current_monthly_sip: float | None = None
+    linked_portfolio_id: uuid.UUID | None = None
+    auto_rebalance_enabled: bool | None = None
+    rebalance_threshold: float | None = None
 
 
 class UserInvestmentGoalPublic(UserInvestmentGoalBase):
+    """Public-facing investment goal data"""
     id: uuid.UUID
     user_id: uuid.UUID
+    
+    # Calculated fields
+    monthly_sip_required: float | None = None
+    equity_allocation: float | None = None
+    debt_allocation: float | None = None
+    gold_allocation: float | None = None
+    cash_allocation: float | None = None
+    expected_return_min: float | None = None
+    expected_return_max: float | None = None
+    expected_return_avg: float | None = None
+    probability_achievement: float | None = None
+    projected_final_value: float | None = None
+    
+    # Tracking fields
+    current_value: float | None = None
+    total_contributions: float | None = None
+    total_returns: float | None = None
+    progress_percentage: float | None = None
+    on_track_status: GoalTrackingStatus | None = None
+    shortfall_amount: float | None = None
+    
+    # Rebalancing
+    last_rebalance_date: datetime | None = None
+    next_rebalance_date: datetime | None = None
+    last_reviewed_date: datetime | None = None
+    
+    # Milestones
+    milestones: dict = {}
+    
     created_at: datetime
     updated_at: datetime
 
 
 # Contribution Pydantic models
 class UserInvestmentGoalContributionBase(SQLModel):
-    amount: int
+    amount: float
     contributed_at: datetime | None = None
     notes: str | None = None
 
 
 class UserInvestmentGoalContributionCreate(UserInvestmentGoalContributionBase):
+    """Create a new goal contribution"""
     pass
 
 
 class UserInvestmentGoalContributionPublic(UserInvestmentGoalContributionBase):
+    """Public-facing contribution data"""
     id: uuid.UUID
     goal_id: uuid.UUID
     user_id: uuid.UUID
@@ -334,6 +475,96 @@ class UserAccountPublic(UserAccountBase):
     user_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+
+
+# Advanced Investment Goal Response Models
+
+class AssetAllocationRecommendation(SQLModel):
+    """Asset allocation recommendation for a goal"""
+    equity_percent: float
+    debt_percent: float
+    gold_percent: float
+    cash_percent: float
+    rationale: str
+    risk_level: RiskAppetite
+
+
+class SIPCalculationResult(SQLModel):
+    """SIP calculation response"""
+    monthly_sip_required: float
+    total_investment: float
+    expected_final_value: float
+    expected_returns: float
+    time_period_months: int
+    probability_of_success: float
+    
+
+class GoalProgressResponse(SQLModel):
+    """Detailed goal progress information"""
+    goal_id: uuid.UUID
+    goal_name: str
+    current_value: float
+    target_amount: float
+    progress_percentage: float
+    on_track_status: GoalTrackingStatus
+    shortfall_amount: float
+    total_contributions: float
+    total_returns: float
+    months_remaining: int
+    projected_final_value: float
+    recommended_action: str | None = None
+
+
+class WhatIfScenarioRequest(SQLModel):
+    """What-if scenario input parameters"""
+    additional_monthly_investment: float | None = None
+    delay_months: int | None = None
+    return_adjustment: float | None = None  # e.g., -1.0 for 1% lower returns
+
+
+class WhatIfScenarioResponse(SQLModel):
+    """What-if scenario calculation results"""
+    scenario_description: str
+    new_monthly_sip: float
+    new_projected_value: float
+    new_probability: float
+    impact_on_goal: str
+    recommendation: str
+
+
+class ProductRecommendation(SQLModel):
+    """Investment product recommendation"""
+    product_type: str  # MUTUAL_FUND, ETF, STOCK, BOND, FD
+    product_name: str
+    ticker: str | None = None
+    allocation_percent: float
+    expected_return: float
+    risk_level: str
+    rationale: str
+    
+
+class ProductRecommendationResponse(SQLModel):
+    """List of product recommendations for a goal"""
+    goal_id: uuid.UUID
+    recommendations: list[ProductRecommendation]
+    total_allocation: float
+    diversification_score: float
+
+
+class GoalAlert(SQLModel):
+    """Goal-related alert"""
+    alert_type: str  # DRIFT, MILESTONE, REVIEW_DUE, REBALANCE_NEEDED
+    severity: str  # INFO, WARNING, CRITICAL
+    message: str
+    action_required: str | None = None
+    created_at: datetime
+
+
+class GoalAlertResponse(SQLModel):
+    """List of alerts for a goal"""
+    goal_id: uuid.UUID
+    alerts: list[GoalAlert]
+    total_alerts: int
 
 
 # Properties to return via API, id is always required

@@ -28,7 +28,7 @@ from .user import (
     UserInvestmentGoalCreate,
     UserInvestmentGoalUpdate,
     UserInvestmentGoalPublic,
-    # UserInvestmentGoalContribution,
+    UserInvestmentGoalContribution,
     UserInvestmentGoalContributionBase,
     UserInvestmentGoalContributionCreate,
     UserInvestmentGoalContributionPublic,
@@ -40,6 +40,17 @@ from .user import (
     AccountType,
     KYCStatus,
     InvestmentGoal,
+    RiskAppetite,
+    GoalTrackingStatus,
+    AssetAllocationRecommendation,
+    SIPCalculationResult,
+    GoalProgressResponse,
+    WhatIfScenarioRequest,
+    WhatIfScenarioResponse,
+    ProductRecommendation,
+    ProductRecommendationResponse,
+    GoalAlert,
+    GoalAlertResponse,
 )
 
 from .item import Item, ItemBase, ItemCreate, ItemPublic, ItemUpdate, ItemsPublic
@@ -190,6 +201,16 @@ from .risk_management import (
     RiskProfile,
 )
 from .funds import AccountTransaction, AccountTransactionPublic, TransactionType
+
+# Portfolio statement parsing models
+from .portfolio_statement import (
+    ClientInfo,
+    HoldingItem,
+    PortfolioStatementResponse,
+    BulkHoldingsSaveRequest,
+    BulkHoldingsSaveResponse,
+    ParsedStatementData,
+)
 
 # Fundamental data models
 from .fundamental import (
@@ -386,12 +407,19 @@ __all__ = [
     "AccountTransaction",
     "AccountTransactionPublic",
     "TransactionType",
+    # Portfolio statement parsing models
+    "ClientInfo",
+    "HoldingItem",
+    "PortfolioStatementResponse",
+    "BulkHoldingsSaveRequest",
+    "BulkHoldingsSaveResponse",
+    "ParsedStatementData",
     "UserInvestmentGoal",
     "UserInvestmentGoalBase",
     "UserInvestmentGoalCreate",
     "UserInvestmentGoalUpdate",
     "UserInvestmentGoalPublic",
-    # "UserInvestmentGoalContribution",
+    "UserInvestmentGoalContribution",
     "UserInvestmentGoalContributionBase",
     "UserInvestmentGoalContributionCreate",
     "UserInvestmentGoalContributionPublic",
@@ -403,6 +431,17 @@ __all__ = [
     "AccountType",
     "KYCStatus",
     "InvestmentGoal",
+    "RiskAppetite",
+    "GoalTrackingStatus",
+    "AssetAllocationRecommendation",
+    "SIPCalculationResult",
+    "GoalProgressResponse",
+    "WhatIfScenarioRequest",
+    "WhatIfScenarioResponse",
+    "ProductRecommendation",
+    "ProductRecommendationResponse",
+    "GoalAlert",
+    "GoalAlertResponse",
     "KYCInformation",
     "KYCInformationBase",
     "KYCInformationCreate",
