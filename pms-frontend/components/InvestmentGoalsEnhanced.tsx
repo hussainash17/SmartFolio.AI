@@ -527,22 +527,22 @@ function GoalSIPCalculator({ goalId }: { goalId: string }) {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Current Amount</span>
                   <span className="font-semibold">
-                    ₹{sipCalc.current_amount.toLocaleString()}
+                    ₹{(sipCalc.current_amount ?? 0).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Target Amount</span>
                   <span className="font-semibold">
-                    ₹{sipCalc.target_amount.toLocaleString()}
+                    ₹{(sipCalc.target_amount ?? 0).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Time Remaining</span>
-                  <span className="font-semibold">{sipCalc.time_remaining_months} months</span>
+                  <span className="font-semibold">{sipCalc.time_remaining_months ?? 0} months</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Expected Return (p.a.)</span>
-                  <span className="font-semibold">{sipCalc.expected_annual_return}%</span>
+                  <span className="font-semibold">{sipCalc.expected_annual_return ?? 0}%</span>
                 </div>
               </div>
             </div>
@@ -552,15 +552,15 @@ function GoalSIPCalculator({ goalId }: { goalId: string }) {
               <div className="space-y-2">
                     <div className="flex justify-between items-center p-4 bg-primary/10 rounded-lg">
                   <span className="font-semibold">Monthly SIP Required</span>
-                  <span className="text-2xl font-bold">{sipCalc.required_monthly_sip.toLocaleString()}</span>
+                  <span className="text-2xl font-bold">₹{(sipCalc.required_monthly_sip ?? 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Total Investment</span>
-                  <span className="font-semibold">{sipCalc.total_investment_required.toLocaleString()}</span>
+                  <span className="font-semibold">₹{(sipCalc.total_investment_required ?? 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Expected Returns</span>
-                  <span className="font-semibold text-green-600">{sipCalc.expected_returns.toLocaleString()}</span>
+                  <span className="font-semibold text-green-600">₹{(sipCalc.expected_returns ?? 0).toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -579,7 +579,7 @@ function GoalSIPCalculator({ goalId }: { goalId: string }) {
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Goal May Be Challenging</AlertTitle>
               <AlertDescription>
-                Shortfall: ₹{sipCalc.shortfall_amount?.toLocaleString()}. Consider extending
+                Shortfall: ₹{(sipCalc.shortfall_amount ?? 0).toLocaleString()}. Consider extending
                 the timeline or increasing your monthly investment.
               </AlertDescription>
             </Alert>
@@ -696,25 +696,25 @@ function GoalWhatIfScenarios({ goalId }: { goalId: string }) {
                     <div className="flex justify-between">
                       <span>Monthly SIP</span>
                       <span className="font-semibold">
-                        {whatIfMutation.data.original_scenario.monthly_sip.toLocaleString()}
+                        ₹{(whatIfMutation.data.original_scenario?.monthly_sip ?? 0).toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Target Date</span>
                       <span className="font-semibold">
-                        {new Date(whatIfMutation.data.original_scenario.target_date).toLocaleDateString()}
+                        {whatIfMutation.data.original_scenario?.target_date ? new Date(whatIfMutation.data.original_scenario.target_date).toLocaleDateString() : 'N/A'}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Projected Amount</span>
                       <span className="font-semibold">
-                        {whatIfMutation.data.original_scenario.projected_amount.toLocaleString()}
+                        ₹{(whatIfMutation.data.original_scenario?.projected_amount ?? 0).toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Shortfall</span>
                       <span className="font-semibold text-red-600">
-                        {whatIfMutation.data.original_scenario.shortfall.toLocaleString()}
+                        ₹{(whatIfMutation.data.original_scenario?.shortfall ?? 0).toLocaleString()}
                       </span>
                     </div>
                   </CardContent>
@@ -728,25 +728,25 @@ function GoalWhatIfScenarios({ goalId }: { goalId: string }) {
                     <div className="flex justify-between">
                       <span>Monthly SIP</span>
                       <span className="font-semibold">
-                        {whatIfMutation.data.new_scenario.monthly_sip.toLocaleString()}
+                        ₹{(whatIfMutation.data.new_scenario?.monthly_sip ?? 0).toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Target Date</span>
                       <span className="font-semibold">
-                        {new Date(whatIfMutation.data.new_scenario.target_date).toLocaleDateString()}
+                        {whatIfMutation.data.new_scenario?.target_date ? new Date(whatIfMutation.data.new_scenario.target_date).toLocaleDateString() : 'N/A'}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Projected Amount</span>
                       <span className="font-semibold">
-                        {whatIfMutation.data.new_scenario.projected_amount.toLocaleString()}
+                        ₹{(whatIfMutation.data.new_scenario?.projected_amount ?? 0).toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Shortfall</span>
                       <span className="font-semibold text-green-600">
-                        {whatIfMutation.data.new_scenario.shortfall.toLocaleString()}
+                        ₹{(whatIfMutation.data.new_scenario?.shortfall ?? 0).toLocaleString()}
                       </span>
                     </div>
                   </CardContent>
@@ -758,9 +758,9 @@ function GoalWhatIfScenarios({ goalId }: { goalId: string }) {
                 <AlertTitle>Impact Analysis</AlertTitle>
                 <AlertDescription className="space-y-1">
                   <p>
-                    Amount Difference: {Math.abs(whatIfMutation.data.impact.amount_difference).toLocaleString()}
+                    Amount Difference: ₹{Math.abs(whatIfMutation.data.impact?.amount_difference ?? 0).toLocaleString()}
                   </p>
-                  <p className="font-semibold mt-2">{whatIfMutation.data.recommendation}</p>
+                  <p className="font-semibold mt-2">{whatIfMutation.data.recommendation ?? 'No recommendation available'}</p>
                 </AlertDescription>
               </Alert>
             </div>

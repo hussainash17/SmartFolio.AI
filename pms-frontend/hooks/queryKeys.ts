@@ -54,4 +54,22 @@ export const queryKeys = {
   fundamentalSearch: (params: { sector?: string; category?: string; minPe?: number; maxPe?: number; minDividendYield?: number }) => 
     ['fundamentals', 'search', params] as const,
   fundamentalDataAvailability: (tradingCode: string) => ['fundamentals', 'data-availability', tradingCode] as const,
+
+  // Performance Analytics
+  performanceSummary: (portfolioId: string, period: string) => ['performance', 'summary', portfolioId, period] as const,
+  valueHistory: (portfolioId: string, period: string, benchmarkId?: string, frequency?: string) => 
+    ['performance', 'value-history', portfolioId, period, benchmarkId ?? 'none', frequency ?? 'daily'] as const,
+  benchmarkComparison: (portfolioId: string, benchmarkId: string) => ['performance', 'benchmark-comparison', portfolioId, benchmarkId] as const,
+  benchmarks: ['performance', 'benchmarks'] as const,
+  monthlyReturns: (portfolioId: string, year?: number) => ['performance', 'monthly-returns', portfolioId, year ?? 'current'] as const,
+  securityAttribution: (portfolioId: string, period: string, limit: number) => ['performance', 'security-attribution', portfolioId, period, limit] as const,
+  sectorAttribution: (portfolioId: string, period: string, benchmarkId?: string) => ['performance', 'sector-attribution', portfolioId, period, benchmarkId ?? 'none'] as const,
+  riskMetrics: (portfolioId: string, period: string, benchmarkId?: string) => ['performance', 'risk-metrics', portfolioId, period, benchmarkId ?? 'none'] as const,
+  
+  // New Optimized Split APIs
+  currentValue: (portfolioId: string) => ['performance', 'current-value', portfolioId] as const,
+  performanceReturns: (portfolioId: string, period: string) => ['performance', 'returns', portfolioId, period] as const,
+  performanceRisk: (portfolioId: string, period: string) => ['performance', 'risk', portfolioId, period] as const,
+  bestWorst: (portfolioId: string, period: string) => ['performance', 'best-worst', portfolioId, period] as const,
+  cashFlows: (portfolioId: string, period: string) => ['performance', 'cash-flows', portfolioId, period] as const,
 };

@@ -262,52 +262,5 @@ class LoanStatusPublic(LoanStatusBase):
     updated_at: dt.datetime
 
 
-# Scraper Log
-class ScraperLog(SQLModel, table=True):
-    """Log for scraper operations"""
-    __tablename__ = "scraper_log"
-    
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    scraper_type: str = Field(max_length=50, index=True)  # 'REALTIME', 'FUNDAMENTAL', 'COMPANY_LIST'
-    status: str = Field(max_length=20)  # 'SUCCESS', 'FAILED', 'PARTIAL'
-    companies_processed: Optional[int] = None
-    companies_failed: Optional[int] = None
-    error_message: Optional[str] = None
-    host_ip: Optional[str] = Field(default=None, max_length=50)
-    started_at: dt.datetime = Field(index=True)
-    completed_at: Optional[dt.datetime] = None
-    duration_seconds: Optional[int] = None
-
-
-class ScraperLogBase(SQLModel):
-    """Base model for scraper log"""
-    scraper_type: str
-    status: str
-    companies_processed: Optional[int] = None
-    companies_failed: Optional[int] = None
-    error_message: Optional[str] = None
-    host_ip: Optional[str] = None
-    started_at: dt.datetime
-    completed_at: Optional[dt.datetime] = None
-    duration_seconds: Optional[int] = None
-
-
-class ScraperLogCreate(ScraperLogBase):
-    """Create model for scraper log"""
-    pass
-
-
-class ScraperLogUpdate(SQLModel):
-    """Update model for scraper log"""
-    status: Optional[str] = None
-    companies_processed: Optional[int] = None
-    companies_failed: Optional[int] = None
-    error_message: Optional[str] = None
-    completed_at: Optional[dt.datetime] = None
-    duration_seconds: Optional[int] = None
-
-
-class ScraperLogPublic(ScraperLogBase):
-    """Public model for scraper log"""
-    id: uuid.UUID
+# Scraper models removed - no longer needed
 

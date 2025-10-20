@@ -29,7 +29,7 @@ dependencies = [
     "redis>=5.0.0",
     "websockets>=12.0",
     "python-binance>=1.0.19",
-    "ta>=0.10.2",  # Technical analysis library
+    "ta>=0.10.2", # Technical analysis library
     "pandas>=2.0.0",
     "numpy>=1.24.0",
     "matplotlib>=3.7.0",
@@ -42,6 +42,8 @@ dependencies = [
     "pdfplumber>=0.11.0",
     "PyPDF2>=3.0.0",
     "pillow>=10.0.0",
+    "scipy>=1.15.3",
+    "yfinance>=0.2.66",
 ]
 
 [tool.uv]

@@ -20,10 +20,19 @@ import {
   Activity
 } from "lucide-react";
 import { AccountBalance, Order, Transaction, NewsItem, MarketData as MarketDataType } from "../types/trading";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { AnalyticsService, RiskManagementService, KycService, OpenAPI } from "../src/client";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "../hooks/queryKeys";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { usePortfolios } from "../hooks/usePortfolios";
+import {
+  useCurrentValue,
+  usePerformanceReturns,
+  usePerformanceRiskMetrics,
+  useBestWorstPeriods,
+  useCashFlows,
+} from "../hooks/usePerformance";
 
 interface ComprehensiveDashboardProps {
   accountBalance: AccountBalance;
@@ -46,8 +55,19 @@ export function ComprehensiveDashboard({
   onQuickTrade,
   onChartStock,
   onNavigate,
-  selectedPortfolioId,
+  selectedPortfolioId: initialPortfolioId,
 }: ComprehensiveDashboardProps) {
+  // Portfolio selection state
+  const { portfolios } = usePortfolios();
+  const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | undefined>(initialPortfolioId);
+  
+  // Set default portfolio when portfolios load
+  useMemo(() => {
+    if (!selectedPortfolioId && portfolios.length > 0) {
+      setSelectedPortfolioId(portfolios[0].id);
+    }
+  }, [portfolios, selectedPortfolioId]);
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -91,44 +111,28 @@ export function ComprehensiveDashboard({
     staleTime: 60 * 1000,
   });
 
-  const { data: portfolioPerformance = {
-    totalReturn: 0,
-    yearToDate: 0,
-    oneYear: 0,
-    threeYear: 0,
-    sharpeRatio: 0,
-    volatility: 0,
-    maxDrawdown: 0,
-    alpha: 0,
-    beta: 0,
-  } } = useQuery({
-    queryKey: queryKeys.portfolioAnalytics(selectedPortfolioId || 'none'),
-    enabled: !!selectedPortfolioId,
-    queryFn: async () => {
-      if (!selectedPortfolioId) return {
-        totalReturn: 0, yearToDate: 0, oneYear: 0, threeYear: 0, sharpeRatio: 0, volatility: 0, maxDrawdown: 0, alpha: 0, beta: 0,
-      };
-      const perfAll = await AnalyticsService.getPortfolioPerformance({ portfolioId: selectedPortfolioId, period: 'ALL' });
-      const perf1Y = await AnalyticsService.getPortfolioPerformance({ portfolioId: selectedPortfolioId, period: '1Y' });
-      let alpha = 0, beta = 0;
-      try {
-        const bench = await AnalyticsService.getBenchmarkComparison({ portfolioId: selectedPortfolioId, benchmark: 'SPY', period: '1Y' });
-        alpha = Number((bench as any).alpha || 0);
-        beta = Number((bench as any).beta || 0);
-      } catch {}
-      return {
-        totalReturn: Number((perfAll as any).absolute_return_percent || 0),
-        yearToDate: Number((perf1Y as any).absolute_return_percent || 0),
-        oneYear: Number((perf1Y as any).annualized_return || 0),
-        threeYear: Number((perfAll as any).cagr || 0),
-        sharpeRatio: Number((perf1Y as any).sharpe_ratio || 0),
-        volatility: Number((perf1Y as any).volatility || 0),
-        maxDrawdown: Number((perf1Y as any).max_drawdown || 0),
-        alpha,
-        beta,
-      };
-    },
-  });
+  // Use new optimized split APIs for performance data
+  const { data: currentValue } = useCurrentValue(selectedPortfolioId);
+  const { data: returnsYTD } = usePerformanceReturns(selectedPortfolioId, 'YTD');
+  const { data: returns1Y } = usePerformanceReturns(selectedPortfolioId, '1Y');
+  const { data: returns3Y } = usePerformanceReturns(selectedPortfolioId, '3Y');
+  const { data: returnsAll } = usePerformanceReturns(selectedPortfolioId, 'ALL');
+  const { data: riskMetrics1Y } = usePerformanceRiskMetrics(selectedPortfolioId, '1Y');
+  const { data: bestWorstYTD } = useBestWorstPeriods(selectedPortfolioId, 'YTD');
+  const { data: cashFlowsYTD } = useCashFlows(selectedPortfolioId, 'YTD');
+
+  // Aggregate performance data from split APIs
+  const portfolioPerformance = useMemo(() => ({
+    totalReturn: returnsAll?.time_weighted_return || 0,
+    yearToDate: returnsYTD?.time_weighted_return || 0,
+    oneYear: returns1Y?.annualized_return || 0,
+    threeYear: returns3Y?.annualized_return || 0,
+    sharpeRatio: riskMetrics1Y?.sharpe_ratio || 0,
+    volatility: riskMetrics1Y?.volatility || 0,
+    maxDrawdown: riskMetrics1Y?.max_drawdown || 0,
+    alpha: 0, // TODO: Add benchmark comparison API
+    beta: 0,  // TODO: Add benchmark comparison API
+  }), [returnsAll, returnsYTD, returns1Y, returns3Y, riskMetrics1Y]);
 
   const { data: assetAllocation = [] } = useQuery({
     queryKey: queryKeys.portfolioAllocation(selectedPortfolioId || 'none'),
@@ -159,37 +163,57 @@ export function ComprehensiveDashboard({
     },
   });
 
-  const { data: investmentGoals = [] } = useQuery({
+  const { data: investmentGoals = [] } = useQuery<Array<{
+    id: string;
+    name: string;
+    target: number;
+    current: number;
+    progress: number;
+    timeframe: string;
+    priority: string;
+    status: string;
+  }>>({
     queryKey: queryKeys.investmentGoals,
     queryFn: async () => {
-      const goals = await KycService.getInvestmentGoals();
-      return (goals as any[]).map((g) => ({
-        id: String(g.id),
-        name: String(g.goal_type || 'Goal'),
-        target: Number(g.target_amount || 0),
-        current: 0,
-        progress: 0,
-        timeframe: g.target_date ? new Date(g.target_date).toLocaleDateString() : '—',
-        priority: (Number(g.priority || 1) <= 1 ? 'High' : Number(g.priority || 1) <= 2 ? 'Medium' : 'Low'),
-      }));
+      try {
+        const goals = await KycService.getInvestmentGoals();
+        return (goals as any[]).map((g) => ({
+          id: String(g.id),
+          name: String(g.goal_type || 'Goal'),
+          target: Number(g.target_amount || 0),
+          current: 0,
+          progress: 0,
+          timeframe: g.target_date ? new Date(g.target_date).toLocaleDateString() : '—',
+          priority: (Number(g.priority || 1) <= 1 ? 'High' : Number(g.priority || 1) <= 2 ? 'Medium' : 'Low'),
+          status: String(g.status || 'ACTIVE'),
+        }));
+      } catch (error) {
+        console.error('[Dashboard] Failed to fetch investment goals:', error);
+        return [];
+      }
     },
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const { data: goalProgressMap = {} } = useQuery({
-    queryKey: ['kyc', 'goals', 'progress'],
+    queryKey: ['kyc', 'goals', 'progress', investmentGoals.map(g => g.id).join(',')],
     queryFn: async () => {
       const result: Record<string, number> = {};
-      for (const g of (investmentGoals as any[])) {
+      for (const g of investmentGoals) {
         try {
           const contribs = await KycService.listGoalContributions({ goalId: g.id });
-          const sum = (contribs as any[]).reduce((acc, c) => acc + Number(c.amount || 0), 0);
-          const target = Number(g.target_amount || 0);
+          const sum = (contribs as any[]).reduce((acc: number, c: any) => acc + Number(c.amount || 0), 0);
+          const target = Number(g.target || 0);
           result[g.id] = target > 0 ? Math.min(100, (sum / target) * 100) : 0;
-        } catch {}
+        } catch (error) {
+          console.error(`[Dashboard] Failed to fetch contributions for goal ${g.id}:`, error);
+          result[g.id] = 0;
+        }
       }
       return result;
     },
-    enabled: (investmentGoals as any[]).length > 0,
+    enabled: investmentGoals.length > 0,
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 
   const { data: riskAlerts = [] } = useQuery({
@@ -206,24 +230,59 @@ export function ComprehensiveDashboard({
     },
   });
 
+  // Fetch user risk profile
+  const { data: riskProfile } = useQuery({
+    queryKey: ['risk', 'profile'],
+    queryFn: async () => {
+      try {
+        const profile = await RiskManagementService.getUserRiskProfile();
+        return profile as any;
+      } catch (error) {
+        // 404 means user hasn't created a risk profile yet - this is normal
+        if ((error as any)?.status === 404) {
+          return null;
+        }
+        console.error('[Dashboard] Failed to fetch risk profile:', error);
+        return null;
+      }
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    retry: false, // Don't retry on 404
+  });
+
   const dashboardSummaryMemo = useMemo(() => dashboardSummary, [dashboardSummary]);
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
+      {/* Page Header with Portfolio Selector */}
       <div className="flex items-center justify-between mb-8">
-        <div>
+        <div className="flex-1">
           <h1 className="text-3xl font-semibold text-foreground mb-2">Dashboard</h1>
           <p className="text-muted-foreground text-lg">Comprehensive view of your investment portfolio and financial goals</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-3 items-center">
+          {/* Portfolio Selector */}
+          <div className="min-w-[250px]">
+            <Select value={selectedPortfolioId} onValueChange={setSelectedPortfolioId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select Portfolio" />
+              </SelectTrigger>
+              <SelectContent>
+                {portfolios.map((portfolio) => (
+                  <SelectItem key={portfolio.id} value={portfolio.id}>
+                    {portfolio.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Button variant="outline" onClick={() => onNavigate('reports')}>
             <BarChart3 className="h-4 w-4 mr-2" />
-            Generate Report
+            Report
           </Button>
           <Button onClick={() => onQuickTrade()}>
             <DollarSign className="h-4 w-4 mr-2" />
-            Quick Trade
+            Trade
           </Button>
         </div>
       </div>
@@ -305,7 +364,9 @@ export function ComprehensiveDashboard({
             <div className="flex items-center gap-1 mt-1">
               <span className="text-sm text-muted-foreground">Avg progress:</span>
               <span className="text-sm font-medium">
-                {(investmentGoals.length > 0 ? (investmentGoals.reduce((acc, goal) => acc + goal.progress, 0) / investmentGoals.length) : 0).toFixed(1)}%
+                {investmentGoals.length > 0 && Object.keys(goalProgressMap).length > 0
+                  ? (Object.values(goalProgressMap).reduce((acc: number, val: any) => acc + (Number(val) || 0), 0) / investmentGoals.length).toFixed(1)
+                  : '0.0'}%
               </span>
             </div>
           </CardContent>
@@ -497,75 +558,404 @@ export function ComprehensiveDashboard({
 
             <Card>
               <CardHeader>
-                <CardTitle>Milestones</CardTitle>
+                <CardTitle>Best & Worst Periods</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Award className="h-4 w-4 text-yellow-600" />
-                      <span>First $10,000 investment</span>
-                    </div>
-                    <span className="text-sm text-muted-foreground">Completed</span>
+                {!bestWorstYTD ? (
+                  <div className="space-y-2">
+                    <div className="h-4 bg-muted rounded animate-pulse"></div>
+                    <div className="h-4 bg-muted rounded animate-pulse"></div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-blue-600" />
-                      <span>Reach $50,000 goal</span>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-green-600" />
+                        <span className="text-sm">Best Month</span>
+                      </div>
+                      <span className="text-sm font-semibold text-green-600">
+                        {formatPercent(bestWorstYTD.best_month.return)}
+                      </span>
                     </div>
-                    <span className="text-sm text-muted-foreground">Est. 6 months</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <TrendingDown className="h-4 w-4 text-red-600" />
+                        <span className="text-sm">Worst Month</span>
+                      </div>
+                      <span className="text-sm font-semibold text-red-600">
+                        {formatPercent(bestWorstYTD.worst_month.return)}
+                      </span>
+                    </div>
+                    {cashFlowsYTD && (
+                      <>
+                        <div className="border-t pt-3 mt-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Net Contributions</span>
+                            <span className="text-sm font-medium text-green-600">
+                              {formatCurrency(cashFlowsYTD.net_contributions)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Net Withdrawals</span>
+                          <span className="text-sm font-medium text-red-600">
+                            {formatCurrency(cashFlowsYTD.net_withdrawals)}
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
         <TabsContent value="goals" className="space-y-6">
+          {/* Goals Overview Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Total Goals</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{investmentGoals.length}</div>
+                <div className="text-sm text-muted-foreground mt-1">
+                  {investmentGoals.filter(g => g.status === 'ACTIVE').length} active
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Total Target</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {formatCurrency(investmentGoals.reduce((sum, g) => sum + (Number(g.target) || 0), 0))}
+                </div>
+                <div className="text-sm text-muted-foreground mt-1">
+                  Across all goals
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Average Progress</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {investmentGoals.length > 0 && Object.keys(goalProgressMap).length > 0
+                    ? (Object.values(goalProgressMap).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0) / investmentGoals.length).toFixed(1)
+                    : '0.0'}%
+                </div>
+                <div className="text-sm text-muted-foreground mt-1">
+                  Overall completion
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Individual Goals */}
           <Card>
             <CardHeader>
-              <CardTitle>Investment Goals</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Investment Goals</CardTitle>
+                <Button variant="outline" size="sm" onClick={() => onNavigate('goals')}>
+                  <Target className="h-4 w-4 mr-2" />
+                  Manage Goals
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {investmentGoals.map((goal) => (
-                  <div key={goal.id} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">{goal.name}</div>
-                        <div className="text-sm text-muted-foreground">Target: {formatCurrency(goal.target)} • Due: {goal.timeframe}</div>
+              {investmentGoals.length === 0 ? (
+                <div className="text-center py-8">
+                  <Target className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-muted-foreground mb-4">No investment goals yet</p>
+                  <Button onClick={() => onNavigate('goals')}>
+                    Create Your First Goal
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {investmentGoals.map((goal) => {
+                    const progress = Number(goalProgressMap[goal.id]) || 0;
+                    const target = Number(goal.target) || 0;
+                    const currentAmount = (target * progress) / 100;
+                    const remaining = Math.max(0, target - currentAmount);
+                    
+                    return (
+                      <div key={goal.id} className="p-4 border rounded-lg space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-lg">{goal.name}</h3>
+                              <Badge 
+                                variant="outline" 
+                                className={
+                                  goal.priority === 'High' 
+                                    ? 'border-red-200 text-red-600' 
+                                    : goal.priority === 'Medium' 
+                                    ? 'border-yellow-200 text-yellow-600' 
+                                    : 'border-blue-200 text-blue-600'
+                                }
+                              >
+                                {goal.priority}
+                              </Badge>
+                              <Badge variant="outline">
+                                {goal.status || 'ACTIVE'}
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-muted-foreground mt-1">
+                              Target: {formatCurrency(target)} • Due: {goal.timeframe}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-2xl font-bold">{progress.toFixed(1)}%</div>
+                            <div className="text-sm text-muted-foreground">Complete</div>
+                          </div>
+                        </div>
+
+                        <Progress value={progress} className="h-3" />
+
+                        <div className="grid grid-cols-3 gap-4 text-sm">
+                          <div>
+                            <div className="text-muted-foreground">Current</div>
+                            <div className="font-semibold text-green-600">
+                              {formatCurrency(currentAmount)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-muted-foreground">Remaining</div>
+                            <div className="font-semibold text-orange-600">
+                              {formatCurrency(remaining)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-muted-foreground">Target</div>
+                            <div className="font-semibold">
+                              {formatCurrency(target)}
+                            </div>
+                          </div>
+                        </div>
+
+                        {progress >= 100 && (
+                          <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded text-green-700 text-sm">
+                            <Award className="h-4 w-4" />
+                            <span className="font-medium">Goal Achieved! 🎉</span>
+                          </div>
+                        )}
                       </div>
-                      <div className="text-right">
-                        <div className="font-medium">{Number((goalProgressMap as any)[goal.id] || 0).toFixed(1)}%</div>
-                      </div>
-                    </div>
-                    <Progress value={Number((goalProgressMap as any)[goal.id] || 0)} className="h-2" />
-                  </div>
-                ))}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="risk" className="space-y-6">
+          {/* Risk Overview Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Risk Score</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{(Number(dashboardSummaryMemo?.risk_score) || 0).toFixed(1)}</div>
+                <Badge 
+                  variant="outline" 
+                  className={
+                    dashboardSummaryMemo?.risk_level === 'HIGH' 
+                      ? 'border-red-200 text-red-600 mt-2' 
+                      : dashboardSummaryMemo?.risk_level === 'MODERATE' 
+                      ? 'border-yellow-200 text-yellow-600 mt-2' 
+                      : 'border-green-200 text-green-600 mt-2'
+                  }
+                >
+                  {dashboardSummaryMemo?.risk_level || 'LOW'}
+                </Badge>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Volatility</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatPercent(portfolioPerformance?.volatility || 0)}</div>
+                <div className="text-sm text-muted-foreground mt-1">
+                  Annualized
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Max Drawdown</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">{formatPercent(portfolioPerformance?.maxDrawdown || 0)}</div>
+                <div className="text-sm text-muted-foreground mt-1">
+                  Worst decline
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Active Alerts</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{riskAlerts?.length || 0}</div>
+                <div className="text-sm text-muted-foreground mt-1">
+                  {(riskAlerts?.filter(a => a.severity === 'high') || []).length} high priority
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Risk Profile */}
+          {riskProfile && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Your Risk Profile
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-sm text-muted-foreground">Risk Tolerance</div>
+                        <div className="font-semibold text-lg capitalize">{riskProfile.risk_tolerance || 'Moderate'}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-muted-foreground">Investment Horizon</div>
+                        <div className="font-semibold">{riskProfile.investment_horizon || 'Medium-term'}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-muted-foreground">Risk Capacity</div>
+                        <div className="font-semibold capitalize">{riskProfile.risk_capacity || 'Moderate'}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-sm text-muted-foreground">Max Loss Tolerance</div>
+                        <div className="font-semibold">{riskProfile.max_loss_tolerance ? `${riskProfile.max_loss_tolerance}%` : 'Not set'}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-muted-foreground">Liquidity Needs</div>
+                        <div className="font-semibold capitalize">{riskProfile.liquidity_needs || 'Moderate'}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-muted-foreground">Profile Updated</div>
+                        <div className="font-semibold">
+                          {riskProfile.updated_at ? new Date(riskProfile.updated_at).toLocaleDateString() : 'N/A'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Risk Metrics */}
           <Card>
             <CardHeader>
-              <CardTitle>Risk Management</CardTitle>
+              <CardTitle>Risk-Adjusted Performance</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {riskAlerts.map((alert, index) => (
-                  <div key={index} className={`p-3 rounded-lg border ${
-                    alert.severity === 'high' ? 'bg-red-50 border-red-200' : alert.severity === 'medium' ? 'bg-yellow-50 border-yellow-200' : 'bg-emerald-50 border-emerald-200'
-                  }`}>
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className={`h-4 w-4 ${alert.severity === 'high' ? 'text-red-600' : alert.severity === 'medium' ? 'text-yellow-600' : 'text-emerald-600'}`} />
-                      <span className="text-sm font-medium">{alert.type.toUpperCase()}</span>
-                    </div>
-                    <p className="text-sm mt-1">{alert.message}</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-4 border rounded-lg">
+                  <div className="text-sm text-muted-foreground mb-1">Sharpe Ratio</div>
+                  <div className="text-2xl font-bold">{(portfolioPerformance?.sharpeRatio || 0).toFixed(2)}</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {(portfolioPerformance?.sharpeRatio || 0) > 1 ? 'Good' : (portfolioPerformance?.sharpeRatio || 0) > 0.5 ? 'Fair' : 'Poor'}
                   </div>
-                ))}
+                </div>
+                <div className="p-4 border rounded-lg">
+                  <div className="text-sm text-muted-foreground mb-1">Volatility</div>
+                  <div className="text-2xl font-bold">{formatPercent(portfolioPerformance?.volatility || 0)}</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {Math.abs(portfolioPerformance?.volatility || 0) < 15 ? 'Low' : Math.abs(portfolioPerformance?.volatility || 0) < 25 ? 'Moderate' : 'High'}
+                  </div>
+                </div>
+                <div className="p-4 border rounded-lg">
+                  <div className="text-sm text-muted-foreground mb-1">Max Drawdown</div>
+                  <div className="text-2xl font-bold text-red-600">{formatPercent(portfolioPerformance?.maxDrawdown || 0)}</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Worst decline
+                  </div>
+                </div>
+                <div className="p-4 border rounded-lg">
+                  <div className="text-sm text-muted-foreground mb-1">Beta</div>
+                  <div className="text-2xl font-bold">{(portfolioPerformance?.beta || 0).toFixed(2)}</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    vs Market
+                  </div>
+                </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Risk Alerts */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5" />
+                  Risk Alerts
+                </CardTitle>
+                <Button variant="outline" size="sm" onClick={() => onNavigate('risk-analysis')}>
+                  View All
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {riskAlerts.length === 0 ? (
+                <div className="text-center py-8">
+                  <Shield className="h-12 w-12 mx-auto text-green-600 mb-3" />
+                  <p className="text-muted-foreground">No active risk alerts</p>
+                  <p className="text-sm text-muted-foreground mt-1">Your portfolio is within acceptable risk parameters</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {riskAlerts.map((alert, index) => (
+                    <div key={index} className={`p-4 rounded-lg border ${
+                      alert.severity === 'high' ? 'bg-red-50 border-red-200' : alert.severity === 'medium' ? 'bg-yellow-50 border-yellow-200' : 'bg-emerald-50 border-emerald-200'
+                    }`}>
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className={`h-5 w-5 mt-0.5 ${alert.severity === 'high' ? 'text-red-600' : alert.severity === 'medium' ? 'text-yellow-600' : 'text-emerald-600'}`} />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold">{alert.type.toUpperCase()}</span>
+                            <Badge 
+                              variant="outline" 
+                              className={
+                                alert.severity === 'high' 
+                                  ? 'border-red-300 text-red-700' 
+                                  : alert.severity === 'medium' 
+                                  ? 'border-yellow-300 text-yellow-700' 
+                                  : 'border-emerald-300 text-emerald-700'
+                              }
+                            >
+                              {alert.severity.toUpperCase()}
+                            </Badge>
+                          </div>
+                          <p className="text-sm">{alert.message}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -5,17 +5,18 @@ from starlette.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.core.config import settings
-# Import models to ensure they are initialized before any routers/scheduler
+# Import models to ensure they are initialized before any routers
 from app.model import Company, Item, User, MarketInformation
 from app.api.main import api_router
 import app.model as _models  # noqa: F401 - ensure all models are imported and mappers registered
 from sqlalchemy.orm import configure_mappers
 configure_mappers()
-from app.scraper.scheduler import start_scheduler
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
-    return f"{route.tags[0]}-{route.name}"
+    if route.tags:
+        return f"{route.tags[0]}-{route.name}"
+    return route.name
 
 
 if settings.SENTRY_DSN and settings.ENVIRONMENT != "local":
@@ -24,9 +25,9 @@ if settings.SENTRY_DSN and settings.ENVIRONMENT != "local":
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup code
-    start_scheduler()
+    # Application initialization can go here
     yield
-    # (Optional) Shutdown code
+    # Shutdown code can go here
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

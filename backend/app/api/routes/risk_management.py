@@ -57,10 +57,11 @@ def get_user_risk_profile(
     ).first()
     
     if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Risk profile not found"
-        )
+        # Auto-create a default risk profile if none exists for the user
+        profile = UserRiskProfile(user_id=current_user.id)
+        session.add(profile)
+        session.commit()
+        session.refresh(profile)
     
     return profile
 
