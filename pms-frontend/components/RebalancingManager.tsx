@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -31,6 +31,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../hooks/queryKeys';
 import { AnalyticsService, OpenAPI } from '../src/client';
 import { toast } from 'sonner';
+import { usePortfolios } from '../hooks/usePortfolios';
 
 interface RebalancingManagerProps {
   onNavigate: (view: string) => void;
@@ -59,26 +60,46 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
   const [rebalanceFrequency, setRebalanceFrequency] = useState('quarterly');
   const [selectedStrategy, setSelectedStrategy] = useState('strategic');
   const [minTradeValue, setMinTradeValue] = useState(100);
+  const { portfolios, selectedPortfolio, setSelectedPortfolioId } = usePortfolios();
+
+  // Local current portfolio selection used by this view
+  const [currentPortfolioId, setCurrentPortfolioId] = useState<string | null>(
+    portfolioId ?? (selectedPortfolio ? selectedPortfolio.id : null)
+  );
+
+  // Initialize current portfolio once portfolios load, if not set yet
+  useEffect(() => {
+    if (!currentPortfolioId) {
+      const initial = portfolioId ?? (selectedPortfolio ? selectedPortfolio.id : portfolios[0]?.id);
+      if (initial) setCurrentPortfolioId(String(initial));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [portfolioId, selectedPortfolio, portfolios]);
+
+  // Keep global selection in sync (optional)
+  useEffect(() => {
+    if (currentPortfolioId) setSelectedPortfolioId(currentPortfolioId);
+  }, [currentPortfolioId, setSelectedPortfolioId]);
 
   // Fetch allocation data
   const { data: allocation, isLoading } = useQuery({
-    queryKey: queryKeys.portfolioAllocation(portfolioId || 'none'),
-    enabled: !!portfolioId,
+    queryKey: queryKeys.portfolioAllocation(currentPortfolioId || 'none'),
+    enabled: !!currentPortfolioId,
     queryFn: async () => {
-      if (!portfolioId) return null;
-      return AnalyticsService.getPortfolioAllocation({ portfolioId }) as any;
+      if (!currentPortfolioId) return null;
+      return AnalyticsService.getPortfolioAllocation({ portfolioId: currentPortfolioId }) as any;
     },
     staleTime: 30 * 1000,
   });
 
   // Fetch targets
   const { data: targets = [] } = useQuery({
-    queryKey: queryKeys.allocationTargets(portfolioId || 'none'),
-    enabled: !!portfolioId,
+    queryKey: queryKeys.allocationTargets(currentPortfolioId || 'none'),
+    enabled: !!currentPortfolioId,
     queryFn: async () => {
-      if (!portfolioId) return [];
+      if (!currentPortfolioId) return [];
       const base = (OpenAPI as any).BASE || '';
-      const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/analytics/portfolio/${portfolioId}/allocation/targets`, {
+      const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/analytics/portfolio/${currentPortfolioId}/allocation/targets`, {
         headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
         credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
       });
@@ -203,7 +224,7 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
     toast.info('Rebalancing execution will be implemented in the next phase');
   };
 
-  if (!portfolioId) {
+  if (!currentPortfolioId) {
     return (
       <Card>
         <CardContent className="pt-6">
@@ -236,11 +257,21 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
           <p className="text-muted-foreground text-lg">Maintain your target allocation with intelligent rebalancing recommendations</p>
         </div>
         <div className="flex items-center gap-2">
+          <Select value={currentPortfolioId || ''} onValueChange={(v) => setCurrentPortfolioId(v)}>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="Select portfolio" />
+            </SelectTrigger>
+            <SelectContent>
+              {portfolios.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button variant="outline" onClick={() => onNavigate('allocation')}>
             <BarChart3 className="h-4 w-4 mr-2" />
             Asset Allocation
           </Button>
-          <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.portfolioAllocation(portfolioId) })}>
+          <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.portfolioAllocation(currentPortfolioId || 'none') })}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>

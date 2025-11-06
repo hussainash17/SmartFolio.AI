@@ -6,11 +6,11 @@ import { Progress } from "./ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
-import { 
-  Shield, 
-  AlertTriangle, 
-  TrendingDown, 
-  BarChart3, 
+import {
+  Shield,
+  AlertTriangle,
+  TrendingDown,
+  BarChart3,
   Activity,
   Target,
   RefreshCw,
@@ -177,7 +177,7 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
   };
 
   // Find sectors with high concentration risk
-  const highConcentrationSectors = sectorConcentration.filter(sector => 
+  const highConcentrationSectors = sectorConcentration.filter(sector =>
     sector.weight > sector.benchmark + 5
   );
 
@@ -217,14 +217,14 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-8">
         <div>
           <h1>{tabInfo.title}</h1>
           <p className="text-muted-foreground">
             {tabInfo.description}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center justify-between mb-8">
           <Button variant="outline" onClick={() => onNavigate('risk-profile')}>
             <Settings className="h-4 w-4 mr-2" />
             Update Risk Profile
@@ -329,8 +329,8 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between text-sm">
-                      <span>Current: {metric.name.includes('$') ? formatCurrency(metric.value) : 
-                             metric.name.includes('%') || metric.name.includes('Ratio') ? 
+                      <span>Current: {metric.name.includes('$') ? formatCurrency(metric.value) :
+                             metric.name.includes('%') || metric.name.includes('Ratio') ?
                              formatPercent(metric.value) : metric.value}</span>
                       <span className="text-muted-foreground">
                         Target: {metric.name.includes('$') ? formatCurrency(metric.target) :
@@ -338,9 +338,9 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
                                formatPercent(metric.target) : metric.target}
                       </span>
                     </div>
-                    <Progress 
-                      value={Math.min(100, (metric.value / metric.target) * 100)} 
-                      className="h-2" 
+                    <Progress
+                      value={Math.min(100, (metric.value / metric.target) * 100)}
+                      className="h-2"
                     />
                     <p className="text-xs text-muted-foreground">{metric.description}</p>
                   </div>
@@ -366,7 +366,7 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
                       </Button>
                     ))}
                   </div>
-                  
+
                   {/* Mock risk chart visualization */}
                   <div className="h-64 bg-muted rounded-lg flex items-center justify-center">
                     <div className="text-center">
@@ -427,7 +427,7 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>High Concentration Warning</AlertTitle>
               <AlertDescription>
-                Your {sector.sector} allocation ({sector.weight.toFixed(1)}%) is significantly above 
+                Your {sector.sector} allocation ({sector.weight.toFixed(1)}%) is significantly above
                 the benchmark ({sector.benchmark}%). Consider diversifying to reduce concentration risk.
               </AlertDescription>
             </Alert>
@@ -498,7 +498,7 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
                         <div>
                           <h4 className="font-medium">{suggestion.asset}</h4>
                           <p className="text-sm text-muted-foreground">
-                            Current: {suggestion.currentWeight.toFixed(1)}% → 
+                            Current: {suggestion.currentWeight.toFixed(1)}% →
                             Target: {suggestion.targetWeight.toFixed(1)}%
                           </p>
                         </div>
@@ -507,12 +507,12 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
                         </Badge>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Progress 
-                          value={(suggestion.currentWeight / suggestion.targetWeight) * 100} 
-                          className="flex-1 h-2" 
+                        <Progress
+                          value={(suggestion.currentWeight / suggestion.targetWeight) * 100}
+                          className="flex-1 h-2"
                         />
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           onClick={() => onQuickTrade()}
                           className={suggestion.action === 'buy' ? '' : 'bg-red-600 hover:bg-red-700'}
                         >
@@ -523,7 +523,7 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
                   </Card>
                 ))}
               </div>
-              
+
               <div className="flex gap-2 mt-6">
                 <Button className="flex-1">
                   <Target className="h-4 w-4 mr-2" />
@@ -554,21 +554,21 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
                   <p className="text-2xl font-bold text-red-800 mt-2">-28.4%</p>
                   <p className="text-xs text-red-600">Estimated portfolio impact</p>
                 </div>
-                
+
                 <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
                   <h4 className="font-medium text-orange-800">COVID-19 Crash</h4>
                   <p className="text-sm text-orange-600 mt-1">Market down 34%</p>
                   <p className="text-2xl font-bold text-orange-800 mt-2">-24.1%</p>
                   <p className="text-xs text-orange-600">Estimated portfolio impact</p>
                 </div>
-                
+
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <h4 className="font-medium text-blue-800">Rising Interest Rates</h4>
                   <p className="text-sm text-blue-600 mt-1">+200 basis points</p>
                   <p className="text-2xl font-bold text-blue-800 mt-2">-12.7%</p>
                   <p className="text-xs text-blue-600">Estimated portfolio impact</p>
                 </div>
-                
+
                 <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
                   <h4 className="font-medium text-purple-800">Tech Sector Correction</h4>
                   <p className="text-sm text-purple-600 mt-1">Tech down 50%</p>

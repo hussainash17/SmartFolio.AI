@@ -9,3 +9,4 @@ node_modules/
 /dse-data-scrapper/logs
 /dse-data-scrapper/.idea
 /dse-data-scrapper/target
+.cursor

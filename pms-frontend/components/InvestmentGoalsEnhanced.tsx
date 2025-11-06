@@ -466,7 +466,7 @@ function GoalOverview({ goal, onUpdate }: any) {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-semibold">
-                        ₹{contrib.amount.toLocaleString()}
+                        {contrib.amount.toLocaleString()}
                       </p>
                       {contrib.description && (
                         <p className="text-sm text-muted-foreground">
@@ -527,13 +527,13 @@ function GoalSIPCalculator({ goalId }: { goalId: string }) {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Current Amount</span>
                   <span className="font-semibold">
-                    ₹{(sipCalc.current_amount ?? 0).toLocaleString()}
+                    {(sipCalc.current_amount ?? 0).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Target Amount</span>
                   <span className="font-semibold">
-                    ₹{(sipCalc.target_amount ?? 0).toLocaleString()}
+                    {(sipCalc.target_amount ?? 0).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -552,15 +552,15 @@ function GoalSIPCalculator({ goalId }: { goalId: string }) {
               <div className="space-y-2">
                     <div className="flex justify-between items-center p-4 bg-primary/10 rounded-lg">
                   <span className="font-semibold">Monthly SIP Required</span>
-                  <span className="text-2xl font-bold">₹{(sipCalc.required_monthly_sip ?? 0).toLocaleString()}</span>
+                  <span className="text-2xl font-bold">{(sipCalc.required_monthly_sip ?? 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Total Investment</span>
-                  <span className="font-semibold">₹{(sipCalc.total_investment_required ?? 0).toLocaleString()}</span>
+                  <span className="font-semibold">{(sipCalc.total_investment_required ?? 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Expected Returns</span>
-                  <span className="font-semibold text-green-600">₹{(sipCalc.expected_returns ?? 0).toLocaleString()}</span>
+                  <span className="font-semibold text-green-600">{(sipCalc.expected_returns ?? 0).toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -579,7 +579,7 @@ function GoalSIPCalculator({ goalId }: { goalId: string }) {
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Goal May Be Challenging</AlertTitle>
               <AlertDescription>
-                Shortfall: ₹{(sipCalc.shortfall_amount ?? 0).toLocaleString()}. Consider extending
+                Shortfall: {(sipCalc.shortfall_amount ?? 0).toLocaleString()}. Consider extending
                 the timeline or increasing your monthly investment.
               </AlertDescription>
             </Alert>
@@ -696,7 +696,7 @@ function GoalWhatIfScenarios({ goalId }: { goalId: string }) {
                     <div className="flex justify-between">
                       <span>Monthly SIP</span>
                       <span className="font-semibold">
-                        ₹{(whatIfMutation.data.original_scenario?.monthly_sip ?? 0).toLocaleString()}
+                    {(whatIfMutation.data.original_scenario?.monthly_sip ?? 0).toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -708,13 +708,13 @@ function GoalWhatIfScenarios({ goalId }: { goalId: string }) {
                     <div className="flex justify-between">
                       <span>Projected Amount</span>
                       <span className="font-semibold">
-                        ₹{(whatIfMutation.data.original_scenario?.projected_amount ?? 0).toLocaleString()}
+                        {(whatIfMutation.data.original_scenario?.projected_amount ?? 0).toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Shortfall</span>
                       <span className="font-semibold text-red-600">
-                        ₹{(whatIfMutation.data.original_scenario?.shortfall ?? 0).toLocaleString()}
+                        {(whatIfMutation.data.original_scenario?.shortfall ?? 0).toLocaleString()}
                       </span>
                     </div>
                   </CardContent>
@@ -728,7 +728,7 @@ function GoalWhatIfScenarios({ goalId }: { goalId: string }) {
                     <div className="flex justify-between">
                       <span>Monthly SIP</span>
                       <span className="font-semibold">
-                        ₹{(whatIfMutation.data.new_scenario?.monthly_sip ?? 0).toLocaleString()}
+                        {(whatIfMutation.data.new_scenario?.monthly_sip ?? 0).toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -740,13 +740,13 @@ function GoalWhatIfScenarios({ goalId }: { goalId: string }) {
                     <div className="flex justify-between">
                       <span>Projected Amount</span>
                       <span className="font-semibold">
-                        ₹{(whatIfMutation.data.new_scenario?.projected_amount ?? 0).toLocaleString()}
+                        {(whatIfMutation.data.new_scenario?.projected_amount ?? 0).toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Shortfall</span>
                       <span className="font-semibold text-green-600">
-                        ₹{(whatIfMutation.data.new_scenario?.shortfall ?? 0).toLocaleString()}
+                        {(whatIfMutation.data.new_scenario?.shortfall ?? 0).toLocaleString()}
                       </span>
                     </div>
                   </CardContent>
@@ -758,7 +758,7 @@ function GoalWhatIfScenarios({ goalId }: { goalId: string }) {
                 <AlertTitle>Impact Analysis</AlertTitle>
                 <AlertDescription className="space-y-1">
                   <p>
-                    Amount Difference: ₹{Math.abs(whatIfMutation.data.impact?.amount_difference ?? 0).toLocaleString()}
+                    Amount Difference: {Math.abs(whatIfMutation.data.impact?.amount_difference ?? 0).toLocaleString()}
                   </p>
                   <p className="font-semibold mt-2">{whatIfMutation.data.recommendation ?? 'No recommendation available'}</p>
                 </AlertDescription>
@@ -783,11 +783,18 @@ function GoalAssetAllocation({ goalId }: { goalId: string }) {
     return <div className="text-center py-8 text-muted-foreground">No allocation data available</div>;
   }
 
+  const recommended = allocation.recommended_allocation || {
+    equity: 0,
+    debt: 0,
+    gold: 0,
+    cash: 0,
+  };
+
   const allocationData = [
-    { name: "Equity", value: allocation.recommended_allocation.equity, color: "#3b82f6" },
-    { name: "Debt", value: allocation.recommended_allocation.debt, color: "#10b981" },
-    { name: "Gold", value: allocation.recommended_allocation.gold, color: "#f59e0b" },
-    { name: "Cash", value: allocation.recommended_allocation.cash, color: "#6b7280" },
+    { name: "Equity", value: Number(recommended.equity ?? 0), color: "#3b82f6" },
+    { name: "Debt", value: Number(recommended.debt ?? 0), color: "#10b981" },
+    { name: "Gold", value: Number(recommended.gold ?? 0), color: "#f59e0b" },
+    { name: "Cash", value: Number(recommended.cash ?? 0), color: "#6b7280" },
   ];
 
   return (
@@ -806,15 +813,15 @@ function GoalAssetAllocation({ goalId }: { goalId: string }) {
           <div className="grid md:grid-cols-3 gap-4 mb-6">
             <div>
               <p className="text-sm text-muted-foreground">Risk Tolerance</p>
-              <p className="text-lg font-semibold capitalize">{allocation.risk_tolerance}</p>
+              <p className="text-lg font-semibold capitalize">{allocation.risk_tolerance ?? "unknown"}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Time Horizon</p>
-              <p className="text-lg font-semibold">{allocation.time_horizon_years} years</p>
+              <p className="text-lg font-semibold">{Number(allocation.time_horizon_years ?? 0)} years</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Rebalancing</p>
-              <p className="text-lg font-semibold">{allocation.rebalancing_frequency}</p>
+              <p className="text-lg font-semibold">{allocation.rebalancing_frequency ?? "N/A"}</p>
             </div>
           </div>
 
@@ -842,14 +849,14 @@ function GoalAssetAllocation({ goalId }: { goalId: string }) {
           <Alert>
             <Info className="h-4 w-4" />
             <AlertTitle>Strategy Rationale</AlertTitle>
-            <AlertDescription>{allocation.rationale}</AlertDescription>
+            <AlertDescription>{allocation.rationale ?? "Allocation derived from your goal's risk and horizon."}</AlertDescription>
           </Alert>
 
           <div className="border-t pt-4">
             <h4 className="font-semibold mb-2">Rebalancing Guidelines</h4>
             <p className="text-sm text-muted-foreground">
-              We recommend rebalancing {allocation.rebalancing_frequency.toLowerCase()} or when any
-              asset class drifts by more than {allocation.suggested_drift_threshold}% from the
+              We recommend rebalancing {(allocation.rebalancing_frequency ?? "periodically").toLowerCase()} or when any
+              asset class drifts by more than {Number(allocation.suggested_drift_threshold ?? 0)}% from the
               target allocation.
             </p>
           </div>
@@ -892,7 +899,7 @@ function GoalRecommendations({ goalId }: { goalId: string }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {recommendations.recommendations.map((rec, idx) => (
+          {(recommendations.recommendations ?? []).map((rec, idx) => (
             <Card key={idx} className="border-l-4" style={{ borderLeftColor: getRiskColor(rec.risk_level) }}>
               <CardContent className="pt-4">
                 <div className="flex items-start justify-between mb-3">
@@ -904,14 +911,14 @@ function GoalRecommendations({ goalId }: { goalId: string }) {
                     </div>
                   </div>
                   <Badge variant="secondary">
-                    Score: {rec.suitability_score}/100
+                    Score: {Number(rec.suitability_score ?? 0)}/100
                   </Badge>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
                   <div>
                     <p className="text-xs text-muted-foreground">Expected Return</p>
-                    <p className="font-semibold">{rec.expected_return}% p.a.</p>
+                    <p className="font-semibold">{Number(rec.expected_return ?? 0)}% p.a.</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Risk Level</p>
@@ -919,7 +926,7 @@ function GoalRecommendations({ goalId }: { goalId: string }) {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Min Investment</p>
-                    <p className="font-semibold">{rec.min_investment.toLocaleString()}</p>
+                    <p className="font-semibold">{Number(rec.min_investment ?? 0).toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Liquidity</p>
@@ -928,7 +935,7 @@ function GoalRecommendations({ goalId }: { goalId: string }) {
                 </div>
 
                 <div className="text-sm text-muted-foreground border-t pt-3">
-                  {rec.rationale}
+                  {rec.rationale ?? "No specific rationale provided."}
                 </div>
               </CardContent>
             </Card>
