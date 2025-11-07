@@ -260,86 +260,20 @@ export default function App() {
 
     const handlePlaceOrder = async (orderData: any) => {
         try {
-            // For real-time trading, get LIVE market price
-            let executionPrice = 0;
+            // Place order - backend will auto-fill simulated orders immediately
+            await placeOrder(orderData);
+            
+            // Invalidate queries to refresh data
+            queryClient.invalidateQueries({queryKey: queryKeys.ordersList});
+            queryClient.invalidateQueries({queryKey: queryKeys.portfolios});
+            queryClient.invalidateQueries({queryKey: queryKeys.dashboardSummary});
+            queryClient.invalidateQueries({queryKey: queryKeys.fundsSummary});
+            queryClient.invalidateQueries({queryKey: queryKeys.transactions});
 
-            if (orderData.orderType === 'market') {
-                // Fetch real-time price from API for market orders
-                try {
-                    const stockData = await MarketService.getStock({symbol: orderData.symbol});
-                    executionPrice = Number((stockData as any).last || (stockData as any).close || 0);
-
-                    if (!executionPrice || executionPrice <= 0) {
-                        throw new Error('Invalid market price received');
-                    }
-                } catch (error) {
-                    console.error('Error fetching real-time price:', error);
-                    toast.error(`Failed to get real-time price for ${orderData.symbol}`);
-                    return;
-                }
-            } else {
-                // For limit orders, use the limit price
-                executionPrice = orderData.limitPrice || 0;
-            }
-
-            if (!executionPrice || executionPrice <= 0) {
-                toast.error('Invalid execution price');
-                return;
-            }
-
-            // Place order with filled status immediately
-            const orderId = await placeOrder(orderData);
-
-            // Add trade to the portfolio immediately
-            if (orderData.portfolioId && orderData.symbol) {
-                try {
-                    // Get stock ID from the stocks list
-                    const stocks = (await MarketService.listStocks({q: orderData.symbol, limit: 1})) as any[];
-                    const stockId = stocks?.[0]?.id;
-
-                    if (!stockId) {
-                        toast.error(`Stock ${orderData.symbol} not found in system`);
-                        return;
-                    }
-
-                    // Calculate trade amounts for real-time trading
-                    const totalAmount = executionPrice * orderData.quantity;
-                    const commission = orderData.fees || 0;
-                    const netAmount = totalAmount + commission;
-
-                    // Add trade to portfolio with real-time execution price
-                    await PortfolioService.addTrade({
-                        portfolioId: orderData.portfolioId,
-                        requestBody: {
-                            stock_id: stockId,
-                            trade_type: orderData.side.toUpperCase() as 'BUY' | 'SELL',
-                            quantity: orderData.quantity,
-                            price: executionPrice,
-                            total_amount: totalAmount,
-                            commission: commission,
-                            net_amount: netAmount,
-                            trade_date: new Date().toISOString(),
-                            notes: `Auto-filled ${orderData.orderType} order at ${executionPrice.toFixed(2)}`,
-                            is_simulated: true  // Set to true for demo/testing, change to false for real trading
-                        }
-                    });
-
-                    // Invalidate queries to refresh portfolio data in real-time
-                    queryClient.invalidateQueries({queryKey: queryKeys.portfolios});
-                    queryClient.invalidateQueries({queryKey: queryKeys.dashboardSummary});
-                    queryClient.invalidateQueries({queryKey: queryKeys.fundsSummary});
-
-                    // Success notification with execution details
-                    toast.success(
-                        `Order filled! ${orderData.side === 'buy' ? 'Bought' : 'Sold'} ${orderData.quantity} shares of ${orderData.symbol} @ ${formatCurrency(executionPrice)} (Total: ${formatCurrency(totalAmount)})`
-                    );
-                } catch (error: any) {
-                    console.error('Error adding trade to portfolio:', error);
-                    toast.error(`Failed to add trade to portfolio: ${error?.message || 'Unknown error'}`);
-                }
-            } else {
-                toast.error('Portfolio ID is required to place order');
-            }
+            // Success notification
+            toast.success(
+                `Order placed and filled! ${orderData.side === 'buy' ? 'Bought' : 'Sold'} ${orderData.quantity} shares of ${orderData.symbol}`
+            );
         } catch (error: any) {
             console.error('Error placing order:', error);
             toast.error(`Failed to place order: ${error?.message || 'Unknown error'}`);
