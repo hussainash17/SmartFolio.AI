@@ -301,6 +301,59 @@ def get_portfolio_positions(
     return positions
 
 
+@router.get("/positions/by-symbol/{symbol}")
+def get_positions_by_symbol(
+        symbol: str,
+        current_user: User = Depends(get_current_user),
+        session: Session = Depends(get_session_dep)
+):
+    """Get all positions for a specific symbol across all user portfolios"""
+    # Find the stock by symbol
+    stock = session.exec(
+        select(Company).where(Company.trading_code == symbol.upper())
+    ).first()
+    
+    if not stock:
+        return []
+    
+    # Get all portfolios for the user
+    portfolios = session.exec(
+        select(Portfolio).where(Portfolio.user_id == current_user.id)
+    ).all()
+    
+    portfolio_ids = [p.id for p in portfolios]
+    
+    # Get positions for this stock across all user portfolios
+    positions = session.exec(
+        select(PortfolioPosition, Portfolio, Company)
+        .join(Portfolio, PortfolioPosition.portfolio_id == Portfolio.id)
+        .join(Company, PortfolioPosition.stock_id == Company.id)
+        .where(
+            PortfolioPosition.stock_id == stock.id,
+            PortfolioPosition.portfolio_id.in_(portfolio_ids)
+        )
+    ).all()
+    
+    result = []
+    for position, portfolio, company in positions:
+        result.append({
+            "id": position.id,
+            "portfolio_id": portfolio.id,
+            "portfolio_name": portfolio.name,
+            "stock_id": company.id,
+            "symbol": company.trading_code,
+            "company_name": company.company_name,
+            "quantity": position.quantity,
+            "average_price": float(position.average_price),
+            "total_investment": float(position.total_investment),
+            "current_value": float(position.current_value) if position.current_value else None,
+            "unrealized_pnl": float(position.unrealized_pnl) if position.unrealized_pnl else None,
+            "last_updated": position.last_updated,
+        })
+    
+    return result
+
+
 @router.get("/{portfolio_id}/positions/with-details")
 def get_portfolio_positions_with_details(
         portfolio_id: UUID,
