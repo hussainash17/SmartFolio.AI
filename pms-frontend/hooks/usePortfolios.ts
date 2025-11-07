@@ -265,6 +265,58 @@ export function usePortfolios() {
       }));
   };
 
+  // Get positions for a specific symbol across all portfolios
+  const getPositionsBySymbol = async (symbol: string) => {
+    try {
+      const response = await fetch(
+        `${(OpenAPI.BASE || '').replace(/\/$/, '')}/api/v1/portfolio/positions/by-symbol/${symbol}`,
+        {
+          headers: OpenAPI.TOKEN ? { Authorization: `Bearer ${OpenAPI.TOKEN as unknown as string}` } : undefined,
+          credentials: OpenAPI.WITH_CREDENTIALS ? 'include' : 'omit',
+        }
+      );
+      if (!response.ok) return [];
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching positions by symbol:', error);
+      return [];
+    }
+  };
+
+  // Close/remove a position from a portfolio
+  const closePosition = async (portfolioId: string, positionId: string) => {
+    try {
+      const response = await fetch(
+        `${(OpenAPI.BASE || '').replace(/\/$/, '')}/api/v1/portfolio/${portfolioId}/positions/${positionId}`,
+        {
+          method: 'DELETE',
+          headers: OpenAPI.TOKEN ? { Authorization: `Bearer ${OpenAPI.TOKEN as unknown as string}` } : undefined,
+          credentials: OpenAPI.WITH_CREDENTIALS ? 'include' : 'omit',
+        }
+      );
+      if (!response.ok) throw new Error('Failed to close position');
+      // Refresh portfolios after closing position
+      await queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
+      return await response.json();
+    } catch (error) {
+      console.error('Error closing position:', error);
+      throw error;
+    }
+  };
+
+  // Get position for a specific symbol and portfolio
+  const getPositionForSymbol = (symbol: string, portfolioId?: string) => {
+    const targetPortfolio = portfolioId 
+      ? portfolios.find(p => p.id === portfolioId)
+      : selectedPortfolio;
+    
+    if (!targetPortfolio) return null;
+    
+    return targetPortfolio.stocks.find(s => 
+      s.symbol.toUpperCase() === symbol.toUpperCase()
+    ) || null;
+  };
+
   return {
     portfolios,
     selectedPortfolio,
@@ -278,5 +330,8 @@ export function usePortfolios() {
     removeStock,
     getAvailableStocks,
     setSelectedPortfolioId,
+    getPositionsBySymbol,
+    closePosition,
+    getPositionForSymbol,
   };
 }

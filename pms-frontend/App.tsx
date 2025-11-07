@@ -7,7 +7,7 @@ import {usePortfolios} from "./hooks/usePortfolios";
 import {useTrading} from "./hooks/useTrading";
 import {useAuth} from "./hooks/useAuth";
 import {Portfolio, Stock} from "./types/portfolio";
-import {Activity, BarChart3, FileText, HelpCircle, LineChart as LineChartIcon, Receipt, Settings, ShieldCheck, TrendingUp, User,} from "lucide-react";
+import {Activity, FileText, HelpCircle, Receipt, Settings, ShieldCheck, TrendingUp, User,} from "lucide-react";
 import {MarketService, PortfolioService} from "./src/client";
 import {useQueryClient} from "@tanstack/react-query";
 import {queryKeys} from "./hooks/queryKeys";
@@ -36,6 +36,7 @@ const AssetAllocation = lazy(() => import("./components/AssetAllocation").then(m
 const WatchlistManager = lazy(() => import("./components/WatchlistManager").then(m => ({default: m.WatchlistManager})));
 const AddToWatchlistDialog = lazy(() => import("./components/AddToWatchlistDialog").then(m => ({default: m.AddToWatchlistDialog})));
 const Fundamentals = lazy(() => import("./components/Fundamentals").then(m => ({default: m.Fundamentals})));
+const TradingViewChart = lazy(() => import("./components/TradingViewChart").then(m => ({default: m.TradingViewChart})));
 type View =
     | "dashboard"
     | "portfolios"
@@ -101,6 +102,7 @@ export default function App() {
     const [quickTradeSymbol, setQuickTradeSymbol] = useState<string | undefined>();
     const [quickTradeSide, setQuickTradeSide] = useState<"buy" | "sell" | undefined>();
     const [selectedChartStock, setSelectedChartStock] = useState<string>("AAPL");
+    const [researchChartSymbol, setResearchChartSymbol] = useState<string>("");
 
     // Portfolio hooks
     const {
@@ -360,127 +362,7 @@ export default function App() {
 
     const handleChartStock = (symbol: string) => {
         setSelectedChartStock(symbol);
-        setCurrentView("chart");
-    };
-
-    const getPageTitle = () => {
-        switch (currentView) {
-            case "dashboard":
-                return "Dashboard";
-            case "portfolios":
-                return "My Portfolios";
-            case "portfolio-detail":
-                return "Portfolio Details";
-            case "performance":
-                return "Portfolio Performance Analytics";
-            case "allocation":
-                return "Asset Allocation Analysis";
-            case "goals":
-                return "Investment Goals Tracker";
-            case "trading":
-                return "Trading Interface";
-            case "orders":
-                return "Orders & Trades";
-            case "market":
-                return "Market Data";
-            case "watchlist":
-                return "Watchlists";
-            case "screener":
-                return "Stock Screener";
-            case "research":
-                return "Research & Analysis";
-            case "fundamentals":
-                return "Fundamental Analysis";
-            case "news":
-                return "Market News & Insights";
-            case "risk-analysis":
-                return "Risk Management";
-            case "correlation":
-                return "Correlation Analysis";
-            case "rebalancing":
-                return "Portfolio Rebalancing";
-            case "risk-profile":
-                return "Risk Profile Assessment";
-            case "reports":
-                return "Portfolio Reports";
-            case "tax-center":
-                return "Tax Center";
-            case "statements":
-                return "Account Statements";
-            case "transactions":
-                return "Transaction History";
-            case "account":
-                return "Account Management";
-            case "profile":
-                return "User Profile & KYC";
-            case "settings":
-                return "Platform Settings";
-            case "help":
-                return "Help & Support";
-            case "chart":
-                return "Chart Analysis";
-            default:
-                return "Dashboard";
-        }
-    };
-
-    const getPageDescription = () => {
-        switch (currentView) {
-            case "dashboard":
-                return "Comprehensive view of your investment portfolio and financial goals";
-            case "portfolios":
-                return "Manage and monitor your investment portfolios";
-            case "performance":
-                return "";
-            case "allocation":
-                return "Interactive asset allocation breakdown with rebalancing recommendations";
-            case "goals":
-                return "Track progress towards your financial goals with automated recommendations";
-            case "trading":
-                return "Execute trades with market, limit, and stop orders";
-            case "orders":
-                return "View and manage your order history and active trades";
-            case "market":
-                return "Real-time market data, news, and watchlists";
-            case "watchlist":
-                return "Organize and monitor stocks you're interested in with custom watchlists";
-            case "screener":
-                return "Find stocks that match your investment criteria using fundamental and technical filters";
-            case "research":
-                return "Advanced charting and technical analysis tools";
-            case "fundamentals":
-                return "Deep dive into company financials, ratios, and valuation metrics";
-            case "news":
-                return "Stay updated with market news, analyst reports, and investment insights";
-            case "risk-analysis":
-                return "Comprehensive risk monitoring and analysis for your portfolio";
-            case "correlation":
-                return "Analyze correlations between portfolio holdings to identify concentration risks";
-            case "rebalancing":
-                return "Maintain your target allocation with intelligent rebalancing recommendations";
-            case "risk-profile":
-                return "Update your risk tolerance and investment objectives";
-            case "reports":
-                return "Generate comprehensive portfolio reports and performance summaries";
-            case "tax-center":
-                return "Tax-loss harvesting, capital gains analysis, and tax-efficient strategies";
-            case "statements":
-                return "Download monthly and annual account statements";
-            case "transactions":
-                return "Complete history of all account transactions and transfers";
-            case "account":
-                return "Manage your account details, balances, and settings";
-            case "profile":
-                return "Manage your personal information, documents, and KYC compliance";
-            case "settings":
-                return "Customize your platform experience, notifications, and preferences";
-            case "help":
-                return "Documentation, tutorials, and customer support resources";
-            case "chart":
-                return "Advanced charting with technical indicators and drawing tools";
-            default:
-                return "Comprehensive view of your investment portfolio and financial goals";
-        }
+        setCurrentView("research");
     };
 
     const renderContent = () => {
@@ -534,7 +416,7 @@ export default function App() {
             case "performance":
                 return (
                     <Suspense fallback={<div>Loading Performance Analytics...</div>}>
-                        <PortfolioPerformance />
+                        <PortfolioPerformance/>
                     </Suspense>
                 );
 
@@ -617,20 +499,99 @@ export default function App() {
 
             case "research":
                 return (
-                    <div className="space-y-6">
-                        <div className="mb-8">
-                            <h1 className="text-3xl font-semibold text-foreground mb-2">Research & Analysis</h1>
-                            <p className="text-muted-foreground text-lg">Advanced charting and technical analysis tools</p>
-                        </div>
-                        <div className="text-center py-12">
-                            <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <BarChart3 className="h-8 w-8 text-primary" />
+                    <Suspense
+                        fallback={<div className="flex items-center justify-center h-screen">Loading Chart...</div>}>
+                        <div style={{
+                            height: 'calc(100vh - 64px)',
+                            width: '100%',
+                            overflow: 'hidden',
+                            position: 'relative'
+                        }}>
+                            {/* Quick Trade Button */}
+                            <button
+                                onClick={() => handleQuickTrade(researchChartSymbol || undefined, undefined)}
+                                style={{
+                                    position: 'absolute',
+                                    top: '16px',
+                                    right: '16px',
+                                    zIndex: 1000,
+                                    backgroundColor: '#10b981',
+                                    color: 'white',
+                                    padding: '12px 24px',
+                                    borderRadius: '8px',
+                                    fontSize: '14px',
+                                    fontWeight: '600',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#059669';
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.5)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#10b981';
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)';
+                                }}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     strokeWidth="2">
+                                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                                </svg>
+                                Quick Trade
+                            </button>
+
+                            {/* Right-click hint */}
+                            <div style={{
+                                position: 'absolute',
+                                bottom: '16px',
+                                right: '16px',
+                                zIndex: 1000,
+                                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                                color: 'white',
+                                padding: '8px 12px',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                backdropFilter: 'blur(4px)',
+                                pointerEvents: 'none'
+                            }}>
+                                💡 Right-click chart for more options
                             </div>
-                            <p className="text-muted-foreground max-w-md mx-auto">
-                                Advanced charting and technical analysis tools coming soon.
-                            </p>
+
+                            <TradingViewChart
+                                symbol={researchChartSymbol}
+                                interval="1D"
+                                theme="light"
+                                autosize={true}
+                                onPlaceOrder={(symbol, side) => handleQuickTrade(symbol, side)}
+                                onClosePosition={async (portfolioId, positionId) => {
+                                    try {
+                                        // Use the API to close position
+                                        await fetch(`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:8000'}/api/v1/portfolio/${portfolioId}/positions/${positionId}`, {
+                                            method: 'DELETE',
+                                            credentials: 'include',
+                                        });
+                                        // Refresh portfolios
+                                        await queryClient.invalidateQueries({queryKey: ['portfolios']});
+                                        toast.success('Position closed successfully');
+                                    } catch (error) {
+                                        console.error('Error closing position:', error);
+                                        toast.error('Failed to close position');
+                                    }
+                                }}
+                                onPositionUpdate={() => {
+                                    // Refresh portfolios after position updates
+                                    queryClient.invalidateQueries({queryKey: ['portfolios']});
+                                }}
+                            />
                         </div>
-                    </div>
+                    </Suspense>
                 );
 
             case "fundamentals":
@@ -681,7 +642,8 @@ export default function App() {
                     <div className="space-y-6">
                         <div className="mb-8">
                             <h1 className="text-3xl font-semibold text-foreground mb-2">Risk Profile Assessment</h1>
-                            <p className="text-muted-foreground text-lg">Update your risk tolerance and investment objectives</p>
+                            <p className="text-muted-foreground text-lg">Update your risk tolerance and investment
+                                objectives</p>
                         </div>
                         <div className="text-center py-12">
                             <div
@@ -700,7 +662,8 @@ export default function App() {
                     <div className="space-y-6">
                         <div className="mb-8">
                             <h1 className="text-3xl font-semibold text-foreground mb-2">Portfolio Reports</h1>
-                            <p className="text-muted-foreground text-lg">Generate comprehensive portfolio reports and performance summaries</p>
+                            <p className="text-muted-foreground text-lg">Generate comprehensive portfolio reports and
+                                performance summaries</p>
                         </div>
                         <div className="text-center py-12">
                             <div
@@ -719,7 +682,8 @@ export default function App() {
                     <div className="space-y-6">
                         <div className="mb-8">
                             <h1 className="text-3xl font-semibold text-foreground mb-2">Tax Center</h1>
-                            <p className="text-muted-foreground text-lg">Tax-loss harvesting, capital gains analysis, and tax-efficient strategies</p>
+                            <p className="text-muted-foreground text-lg">Tax-loss harvesting, capital gains analysis,
+                                and tax-efficient strategies</p>
                         </div>
                         <div className="text-center py-12">
                             <div
@@ -739,7 +703,8 @@ export default function App() {
                     <div className="space-y-6">
                         <div className="mb-8">
                             <h1 className="text-3xl font-semibold text-foreground mb-2">Account Statements</h1>
-                            <p className="text-muted-foreground text-lg">Download monthly and annual account statements</p>
+                            <p className="text-muted-foreground text-lg">Download monthly and annual account
+                                statements</p>
                         </div>
                         <div className="text-center py-12">
                             <div
@@ -758,7 +723,8 @@ export default function App() {
                     <div className="space-y-6">
                         <div className="mb-8">
                             <h1 className="text-3xl font-semibold text-foreground mb-2">Transaction History</h1>
-                            <p className="text-muted-foreground text-lg">Complete history of all account transactions and transfers</p>
+                            <p className="text-muted-foreground text-lg">Complete history of all account transactions
+                                and transfers</p>
                         </div>
                         <div className="text-center py-12">
                             <div
@@ -786,7 +752,8 @@ export default function App() {
                     <div className="space-y-6">
                         <div className="mb-8">
                             <h1 className="text-3xl font-semibold text-foreground mb-2">User Profile & KYC</h1>
-                            <p className="text-muted-foreground text-lg">Manage your personal information, documents, and KYC compliance</p>
+                            <p className="text-muted-foreground text-lg">Manage your personal information, documents,
+                                and KYC compliance</p>
                         </div>
                         <div className="text-center py-12">
                             <div
@@ -806,7 +773,8 @@ export default function App() {
                     <div className="space-y-6">
                         <div className="mb-8">
                             <h1 className="text-3xl font-semibold text-foreground mb-2">Platform Settings</h1>
-                            <p className="text-muted-foreground text-lg">Customize your platform experience, notifications, and preferences</p>
+                            <p className="text-muted-foreground text-lg">Customize your platform experience,
+                                notifications, and preferences</p>
                         </div>
                         <div className="text-center py-12">
                             <div
@@ -826,7 +794,8 @@ export default function App() {
                     <div className="space-y-6">
                         <div className="mb-8">
                             <h1 className="text-3xl font-semibold text-foreground mb-2">Help & Support</h1>
-                            <p className="text-muted-foreground text-lg">Documentation, tutorials, and customer support resources</p>
+                            <p className="text-muted-foreground text-lg">Documentation, tutorials, and customer support
+                                resources</p>
                         </div>
                         <div className="text-center py-12">
                             <div
@@ -836,24 +805,6 @@ export default function App() {
                             <p className="text-muted-foreground max-w-md mx-auto">
                                 Interactive help center with live chat support and comprehensive documentation coming
                                 soon.
-                            </p>
-                        </div>
-                    </div>
-                );
-
-            case "chart":
-                return (
-                    <div className="space-y-6">
-                        <div className="mb-8">
-                            <h1 className="text-3xl font-semibold text-foreground mb-2">Chart Analysis</h1>
-                            <p className="text-muted-foreground text-lg">Advanced charting with technical indicators and drawing tools</p>
-                        </div>
-                        <div className="text-center py-12">
-                            <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <LineChartIcon className="h-8 w-8 text-primary" />
-                            </div>
-                            <p className="text-muted-foreground max-w-md mx-auto">
-                                Interactive charting with technical indicators coming soon.
                             </p>
                         </div>
                     </div>
@@ -891,7 +842,7 @@ export default function App() {
                 <GlobalTopBar accountBalance={accountBalance} onQuickTrade={handleQuickTrade}/>
 
                 <div className="flex-1 overflow-y-auto">
-                    <div className="p-8">
+                    <div className={currentView === "research" ? "" : "p-8"}>
                         {/* Page Content - Each component manages its own header */}
                         {renderContent()}
                     </div>
