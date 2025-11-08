@@ -1,4 +1,5 @@
 import { useEffect, useRef, memo, useState, useCallback } from 'react';
+import { MarketService } from '../src/client';
 
 interface Position {
   id: string;
@@ -41,6 +42,8 @@ export const TradingViewChart = memo(({
   onClosePosition,
   onPositionUpdate,
 }: TradingViewChartProps) => {
+  void onClosePosition;
+  void onPositionUpdate;
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetRef = useRef<any>(null);
   const chartRef = useRef<any>(null);
@@ -48,16 +51,159 @@ export const TradingViewChart = memo(({
   const [actualSymbol, setActualSymbol] = useState<string>(symbol);
   const [isLoadingDefault, setIsLoadingDefault] = useState(false);
   const [positions, setPositions] = useState<Position[]>([]);
-  const [showContextMenu, setShowContextMenu] = useState(false);
-  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const [lastPrice, setLastPrice] = useState<number | null>(null);
+  const [priceChange, setPriceChange] = useState<number | null>(null);
+  const [priceChangePercent, setPriceChangePercent] = useState<number | null>(null);
+  const [priceDirection, setPriceDirection] = useState<'up' | 'down' | null>(null);
+  const datafeedRef = useRef<any>(null);
+  const quoteListenerIdRef = useRef<string | null>(null);
+  const lastPriceRef = useRef<number | null>(null);
+  const tickHandlerRef = useRef<((bar: any) => void) | null>(null);
+  const symbolChangedHandlerRef = useRef<((info: any) => void) | null>(null);
+
+  const resetQuoteState = useCallback(() => {
+    lastPriceRef.current = null;
+    setLastPrice(null);
+    setPriceChange(null);
+    setPriceChangePercent(null);
+    setPriceDirection(null);
+  }, []);
+
+  const applyQuoteUpdate = useCallback(
+    (price?: number | null, change?: number | null, changePercentValue?: number | null) => {
+      if (price !== undefined && price !== null && !Number.isNaN(price)) {
+        if (lastPriceRef.current !== null) {
+          if (price > lastPriceRef.current) {
+            setPriceDirection('up');
+          } else if (price < lastPriceRef.current) {
+            setPriceDirection('down');
+          }
+        }
+        lastPriceRef.current = price;
+        setLastPrice(price);
+      }
+
+      if (change !== undefined && change !== null && !Number.isNaN(change)) {
+        setPriceChange(change);
+      }
+
+      if (
+        changePercentValue !== undefined &&
+        changePercentValue !== null &&
+        !Number.isNaN(changePercentValue)
+      ) {
+        setPriceChangePercent(changePercentValue);
+      }
+    },
+    []
+  );
+
+  const fetchLatestQuote = useCallback(
+    async (sym: string) => {
+      if (!sym) return;
+      try {
+        const stockResponse = await MarketService.getStock({ symbol: sym });
+        const last =
+          (stockResponse as any)?.data?.last_trade_price ??
+          (stockResponse as any)?.last ??
+          (stockResponse as any)?.close ??
+          (stockResponse as any)?.price ??
+          null;
+        const change =
+          (stockResponse as any)?.data?.change ??
+          (stockResponse as any)?.change ??
+          null;
+        const changePercentVal =
+          (stockResponse as any)?.data?.change_percent ??
+          (stockResponse as any)?.change_percent ??
+          null;
+
+        const parsedLast = last !== null ? Number(last) : null;
+        const parsedChange = change !== null ? Number(change) : null;
+        const parsedChangePercent = changePercentVal !== null ? Number(changePercentVal) : null;
+
+        applyQuoteUpdate(
+          parsedLast !== null && !Number.isNaN(parsedLast) ? parsedLast : null,
+          parsedChange !== null && !Number.isNaN(parsedChange) ? parsedChange : null,
+          parsedChangePercent !== null && !Number.isNaN(parsedChangePercent)
+            ? parsedChangePercent
+            : null
+        );
+      } catch (error) {
+        console.error('Error fetching latest price:', error);
+      }
+    },
+    [applyQuoteUpdate]
+  );
+
+  const unsubscribeQuotes = useCallback(() => {
+    if (datafeedRef.current && quoteListenerIdRef.current) {
+      try {
+        datafeedRef.current.unsubscribeQuotes(quoteListenerIdRef.current);
+      } catch (error) {
+        console.warn('Failed to unsubscribe quotes', error);
+      }
+      quoteListenerIdRef.current = null;
+    }
+  }, []);
+
+  const subscribeToQuotes = useCallback(
+    (sym: string) => {
+      if (!sym || !datafeedRef.current) {
+        return;
+      }
+
+      unsubscribeQuotes();
+      const listenerId = `tv_quotes_${sym}_${Date.now()}`;
+
+      try {
+        datafeedRef.current.subscribeQuotes(
+          [sym],
+          [],
+          (quotes: any[]) => {
+            if (!Array.isArray(quotes)) return;
+            quotes.forEach((quote) => {
+              if (!quote) return;
+              const values = quote.v ?? {};
+              const last =
+                values.lp ??
+                values.price ??
+                values.close ??
+                null;
+              const change = values.ch ?? null;
+              const changePercentVal = values.chp ?? null;
+
+              const parsedLast = last !== null ? Number(last) : null;
+              const parsedChange = change !== null ? Number(change) : null;
+              const parsedChangePercent = changePercentVal !== null ? Number(changePercentVal) : null;
+
+              applyQuoteUpdate(
+                parsedLast !== null && !Number.isNaN(parsedLast) ? parsedLast : null,
+                parsedChange !== null && !Number.isNaN(parsedChange) ? parsedChange : null,
+                parsedChangePercent !== null && !Number.isNaN(parsedChangePercent)
+                  ? parsedChangePercent
+                  : null
+              );
+            });
+          },
+          listenerId
+        );
+        quoteListenerIdRef.current = listenerId;
+      } catch (error) {
+        console.warn('Failed to subscribe to quotes', error);
+      }
+    },
+    [applyQuoteUpdate, unsubscribeQuotes]
+  );
 
   // Fetch positions for the current symbol
   const fetchPositions = useCallback(async (sym: string) => {
     if (!sym || sym.trim() === '') return;
+    const normalizedSymbol = sym.trim().toUpperCase();
     
     try {
       const apiUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${apiUrl}/api/v1/tradingview/positions/${sym}`);
+      const response = await fetch(`${apiUrl}/api/v1/tradingview/positions/${normalizedSymbol}`);
       if (response.ok) {
         const data = await response.json();
         setPositions(data || []);
@@ -74,7 +220,7 @@ export const TradingViewChart = memo(({
   useEffect(() => {
     const fetchDefaultSymbol = async () => {
       if (symbol && symbol.trim() !== '') {
-        setActualSymbol(symbol.trim());
+        setActualSymbol(symbol.trim().toUpperCase());
         return;
       }
 
@@ -86,14 +232,14 @@ export const TradingViewChart = memo(({
         if (response.ok) {
           const data = await response.json();
           if (data && data.length > 0 && data[0].symbol) {
-            setActualSymbol(data[0].symbol);
+            setActualSymbol(String(data[0].symbol).toUpperCase());
           } else {
             // Try tradingview symbols endpoint as fallback
             const tvResponse = await fetch(`${apiUrl}/api/v1/tradingview/symbols?limit=1`);
             if (tvResponse.ok) {
               const tvData = await tvResponse.json();
               if (tvData && tvData.length > 0 && tvData[0].symbol) {
-                setActualSymbol(tvData[0].symbol);
+                setActualSymbol(String(tvData[0].symbol).toUpperCase());
               } else {
                 setActualSymbol('GP'); // Fallback to common DSE symbol
               }
@@ -123,6 +269,28 @@ export const TradingViewChart = memo(({
       fetchPositions(actualSymbol);
     }
   }, [actualSymbol, isLoadingDefault, fetchPositions]);
+
+  useEffect(() => {
+    if (!actualSymbol || isLoadingDefault) {
+      return;
+    }
+
+    const normalized = actualSymbol.toUpperCase();
+    resetQuoteState();
+    fetchLatestQuote(normalized);
+    subscribeToQuotes(normalized);
+
+    return () => {
+      unsubscribeQuotes();
+    };
+  }, [
+    actualSymbol,
+    isLoadingDefault,
+    resetQuoteState,
+    fetchLatestQuote,
+    subscribeToQuotes,
+    unsubscribeQuotes,
+  ]);
 
   useEffect(() => {
     // Wait for scripts to load
@@ -159,38 +327,40 @@ export const TradingViewChart = memo(({
         // Get API URL from environment or use default
         const apiUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
         const datafeedUrl = `${apiUrl}/api/v1/tradingview`;
-        
+        const datafeedInstance = new window.Datafeeds.UDFCompatibleDatafeed(
+          datafeedUrl
+          // Remove limitedServerResponse to disable automatic pagination
+          // The backend will return all requested data in one response
+        );
+        datafeedRef.current = datafeedInstance;
+
         const widget = new window.TradingView.widget({
           symbol: actualSymbol,
           interval: interval,
           container: containerRef.current,
-          datafeed: new window.Datafeeds.UDFCompatibleDatafeed(
-            datafeedUrl
-            // Remove limitedServerResponse to disable automatic pagination
-            // The backend will return all requested data in one response
-          ),
+          datafeed: datafeedInstance,
           library_path: '/charting_library/',
           locale: 'en',
           disabled_features: [
             'use_localstorage_for_settings',
-            'header_compare',
-            'header_undo_redo',
-            'header_screenshot',
-            'header_chart_type',
-            'header_resolutions',
-            'header_saveload',
-            'header_symbol_search',
-            'header_interval_dialog_button',
-            'show_interval_dialog_on_key_press',
-            'header_widget',
-            'header_widget_dom_node',
-            'context_menus',  // Disable TradingView's context menu
           ],
-          enabled_features: ['study_templates'],
+          enabled_features: ['study_templates', 'move_logo_to_main_pane'],
           charts_storage_url: 'https://saveload.tradingview.com',
           charts_storage_api_version: '1.1',
           client_id: 'tradingview.com',
           user_id: 'public_user_id',
+          time_frames: [
+            { text: '1d', resolution: '1D', description: '1 Day', title: '1D' },
+            { text: '5d', resolution: '1D', description: '5 Days', title: '5D' },
+            { text: '1w', resolution: '1W', description: '1 Week', title: '1W' },
+            { text: '1m', resolution: '1D', description: '1 Month', title: '1M' },
+            { text: '3m', resolution: '1D', description: '3 Months', title: '3M' },
+            { text: '6m', resolution: '1D', description: '6 Months', title: '6M' },
+            { text: '1y', resolution: '1D', description: 'Year to Date', title: 'YTD' },
+            { text: '12m', resolution: '1W', description: '1 Year', title: '1Y' },
+            { text: '5y', resolution: '1M', description: '5 Years', title: '5Y' },
+            { text: '1000y', resolution: '1M', description: 'All', title: 'All' },
+          ],
           fullscreen: false,
           autosize: autosize,
           height: height,
@@ -208,7 +378,48 @@ export const TradingViewChart = memo(({
 
         // Setup chart when ready
         widget.onChartReady(() => {
-          chartRef.current = widget.chart();
+          const chart = widget.chart();
+          chartRef.current = chart;
+
+          const upperSymbol = actualSymbol?.toUpperCase();
+          if (upperSymbol) {
+            resetQuoteState();
+            fetchLatestQuote(upperSymbol);
+            subscribeToQuotes(upperSymbol);
+          }
+
+          const symbolChangedHandler = (symbolInfo: any) => {
+            const nextSymbol =
+              symbolInfo?.name ||
+              symbolInfo?.ticker ||
+              symbolInfo?.pro_name ||
+              symbolInfo?.description ||
+              chart?.symbol() ||
+              '';
+            const normalized = String(nextSymbol).toUpperCase().trim();
+            if (normalized && normalized !== actualSymbol) {
+              setActualSymbol(normalized);
+            } else if (normalized) {
+              fetchLatestQuote(normalized);
+            }
+          };
+
+          chart.onSymbolChanged().subscribe(null, symbolChangedHandler);
+          symbolChangedHandlerRef.current = symbolChangedHandler;
+
+          const tickHandler = (bar: any) => {
+            if (bar && typeof bar.close !== 'undefined') {
+              const closeValue = Number(bar.close);
+              if (!Number.isNaN(closeValue)) {
+                applyQuoteUpdate(closeValue);
+              }
+            }
+          };
+
+          if (typeof widget.subscribe === 'function') {
+            widget.subscribe('onTick', tickHandler);
+          }
+          tickHandlerRef.current = tickHandler;
         });
       } catch (error) {
         console.error('Error initializing TradingView widget:', error);
@@ -259,6 +470,26 @@ export const TradingViewChart = memo(({
 
     // Cleanup on unmount
     return () => {
+      if (chartRef.current && symbolChangedHandlerRef.current) {
+        try {
+          chartRef.current.onSymbolChanged().unsubscribe(null, symbolChangedHandlerRef.current);
+        } catch (error) {
+          // ignore
+        }
+        symbolChangedHandlerRef.current = null;
+      }
+
+      if (widgetRef.current && tickHandlerRef.current && typeof widgetRef.current.unsubscribe === 'function') {
+        try {
+          widgetRef.current.unsubscribe('onTick', tickHandlerRef.current);
+        } catch (error) {
+          // ignore
+        }
+      }
+      tickHandlerRef.current = null;
+
+      unsubscribeQuotes();
+
       if (widgetRef.current) {
         try {
           // Check if widget has a valid container before trying to remove
@@ -270,8 +501,21 @@ export const TradingViewChart = memo(({
         }
         widgetRef.current = null;
       }
+      datafeedRef.current = null;
     };
-  }, [actualSymbol, interval, theme, autosize, height, isLoadingDefault, onPlaceOrder]);
+  }, [
+    actualSymbol,
+    interval,
+    theme,
+    autosize,
+    height,
+    isLoadingDefault,
+    resetQuoteState,
+    fetchLatestQuote,
+    subscribeToQuotes,
+    unsubscribeQuotes,
+    applyQuoteUpdate,
+  ]);
 
   // Update position lines when positions change
   useEffect(() => {
@@ -312,74 +556,29 @@ export const TradingViewChart = memo(({
     }
   }, [positions]);
 
-  // Attach context menu handler with proper cleanup
-  useEffect(() => {
-    if (!containerRef.current || !onPlaceOrder) {
-      console.log('Context menu not attached:', { hasContainer: !!containerRef.current, hasCallback: !!onPlaceOrder });
-      return;
-    }
+  const formattedPrice =
+    lastPrice !== null
+      ? lastPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : '--';
 
-    const handleContextMenu = (e: MouseEvent) => {
-      console.log('Context menu triggered at:', { x: e.clientX, y: e.clientY, symbol: actualSymbol });
-      e.preventDefault();
-      e.stopPropagation();
-      setContextMenuPosition({ x: e.clientX, y: e.clientY });
-      setShowContextMenu(true);
-    };
+  const formattedChange =
+    priceChange !== null
+      ? `${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(2)}`
+      : null;
 
-    const container = containerRef.current;
-    container.addEventListener('contextmenu', handleContextMenu);
-    console.log('Context menu handler attached successfully');
+  const formattedChangePercent =
+    priceChangePercent !== null
+      ? `${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toFixed(2)}%`
+      : null;
 
-    return () => {
-      container.removeEventListener('contextmenu', handleContextMenu);
-      console.log('Context menu handler removed');
-    };
-  }, [onPlaceOrder, actualSymbol]);
+  const priceColorClass =
+    priceDirection === 'up'
+      ? 'text-emerald-500'
+      : priceDirection === 'down'
+        ? 'text-rose-500'
+        : 'text-foreground';
 
-  // Handle closing context menu
-  const handleCloseMenu = useCallback(() => {
-    console.log('Context menu closed');
-    setShowContextMenu(false);
-  }, []);
-
-  // Log when context menu state changes
-  useEffect(() => {
-    console.log('Context menu visibility changed:', showContextMenu);
-  }, [showContextMenu]);
-
-  // Handle buy/sell actions
-  const handleBuy = useCallback(() => {
-    if (onPlaceOrder && actualSymbol) {
-      onPlaceOrder(actualSymbol, 'buy');
-    }
-    handleCloseMenu();
-  }, [onPlaceOrder, actualSymbol, handleCloseMenu]);
-
-  const handleSell = useCallback(() => {
-    if (onPlaceOrder && actualSymbol) {
-      onPlaceOrder(actualSymbol, 'sell');
-    }
-    handleCloseMenu();
-  }, [onPlaceOrder, actualSymbol, handleCloseMenu]);
-
-  // Handle close position
-  const handleClosePositionClick = useCallback(async (position: Position) => {
-    if (onClosePosition) {
-      try {
-        await onClosePosition(position.portfolio_id, position.id);
-        // Refresh positions after closing
-        await fetchPositions(actualSymbol);
-        // Notify parent of position update
-        if (onPositionUpdate) {
-          onPositionUpdate();
-        }
-      } catch (error) {
-        console.error('Error closing position:', error);
-      }
-    }
-    handleCloseMenu();
-  }, [onClosePosition, actualSymbol, fetchPositions, handleCloseMenu, onPositionUpdate]);
+  const canPlaceOrder = Boolean(onPlaceOrder && actualSymbol);
 
   // Show loading state while fetching default symbol
   if (isLoadingDefault || !actualSymbol) {
@@ -393,84 +592,64 @@ export const TradingViewChart = memo(({
   }
 
   return (
-    <>
+    <div
+      className="relative w-full tradingview-chart"
+      style={{
+        height: autosize ? '100vh' : `${height}px`,
+        minHeight: autosize ? '520px' : `${Math.max(height, 520)}px`,
+      }}
+    >
       <div 
         ref={containerRef} 
         className="tradingview-chart-container"
         style={{ 
           width: '100%', 
-          height: autosize ? '100vh' : `${height}px`,
-          minHeight: '100vh'
+          height: '100%',
         }}
       />
-      
-      {/* Context Menu */}
-      {showContextMenu && (
-        <>
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={handleCloseMenu}
-            style={{ backgroundColor: 'transparent' }}
-          />
-          <div 
-            className="fixed z-50 rounded-lg shadow-2xl py-2 min-w-[200px]"
-            style={{ 
-              left: `${contextMenuPosition.x}px`, 
-              top: `${contextMenuPosition.y}px`,
-              backgroundColor: 'white',
-              border: '1px solid #e5e7eb',
-              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)'
-            }}
+      <div className="pointer-events-none absolute right-5 top-20 z-20 hidden md:flex flex-col items-end gap-2">
+        <div className="flex gap-2 pointer-events-auto">
+          <button
+            type="button"
+            disabled={!canPlaceOrder}
+            onClick={() => onPlaceOrder && actualSymbol && onPlaceOrder(actualSymbol, 'sell')}
+            className="flex min-w-[84px] flex-col items-start rounded-md bg-rose-500 px-3 py-2 text-white shadow ring-1 ring-rose-500/40 transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <div className="space-y-1 px-2">
-              <button
-                className="w-full text-left px-3 py-2 rounded hover:bg-accent text-sm font-medium text-green-600 hover:text-green-700"
-                onClick={handleBuy}
-              >
-                Buy {actualSymbol}
-              </button>
-              
-              {positions.length > 0 && (
-                <>
-                  <button
-                    className="w-full text-left px-3 py-2 rounded hover:bg-accent text-sm font-medium text-red-600 hover:text-red-700"
-                    onClick={handleSell}
-                  >
-                    Sell {actualSymbol}
-                  </button>
-                  
-                  <div className="border-t border-border my-1" />
-                  
-                  <div className="px-3 py-1 text-xs font-semibold text-muted-foreground uppercase">
-                    Positions
-                  </div>
-                  
-                  {positions.map((position) => (
-                    <div key={position.id} className="px-3 py-2 text-sm">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium">{position.portfolio_name}</span>
-                        <span className={`text-xs ${position.unrealized_pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {position.unrealized_pnl >= 0 ? '+' : ''}{position.unrealized_pnl.toFixed(2)}
-                        </span>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {position.quantity} @ {position.price}
-                      </div>
-                      <button
-                        className="mt-1 text-xs text-red-600 hover:text-red-700 hover:underline"
-                        onClick={() => handleClosePositionClick(position)}
-                      >
-                        Close Position
-                      </button>
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
+            <span className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
+              Sell
+            </span>
+            <span className="text-sm font-semibold">{formattedPrice}</span>
+          </button>
+          <button
+            type="button"
+            disabled={!canPlaceOrder}
+            onClick={() => onPlaceOrder && actualSymbol && onPlaceOrder(actualSymbol, 'buy')}
+            className="flex min-w-[84px] flex-col items-start rounded-md bg-emerald-500 px-3 py-2 text-white shadow ring-1 ring-emerald-500/40 transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <span className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
+              Buy
+            </span>
+            <span className="text-sm font-semibold">{formattedPrice}</span>
+          </button>
+        </div>
+
+        <div className="pointer-events-auto rounded-md border border-border bg-background/90 px-3 py-2 shadow backdrop-blur">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {actualSymbol}
           </div>
-        </>
-      )}
-    </>
+          <div className={`text-sm font-semibold ${priceColorClass}`}>
+            {formattedPrice}
+          </div>
+          {(formattedChange || formattedChangePercent) && (
+            <div className={`text-xs ${priceColorClass}`}>
+              {formattedChange ?? '--'}
+              {formattedChange && formattedChangePercent ? ' ' : ''}
+              {formattedChangePercent ?? ''}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 });
 

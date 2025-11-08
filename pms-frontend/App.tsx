@@ -507,63 +507,6 @@ export default function App() {
                             overflow: 'hidden',
                             position: 'relative'
                         }}>
-                            {/* Quick Trade Button */}
-                            <button
-                                onClick={() => handleQuickTrade(researchChartSymbol || undefined, undefined)}
-                                style={{
-                                    position: 'absolute',
-                                    top: '16px',
-                                    right: '16px',
-                                    zIndex: 1000,
-                                    backgroundColor: '#10b981',
-                                    color: 'white',
-                                    padding: '12px 24px',
-                                    borderRadius: '8px',
-                                    fontSize: '14px',
-                                    fontWeight: '600',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#059669';
-                                    e.currentTarget.style.transform = 'translateY(-2px)';
-                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.5)';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#10b981';
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)';
-                                }}
-                            >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                     strokeWidth="2">
-                                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-                                </svg>
-                                Quick Trade
-                            </button>
-
-                            {/* Right-click hint */}
-                            <div style={{
-                                position: 'absolute',
-                                bottom: '16px',
-                                right: '16px',
-                                zIndex: 1000,
-                                backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                                color: 'white',
-                                padding: '8px 12px',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                backdropFilter: 'blur(4px)',
-                                pointerEvents: 'none'
-                            }}>
-                                💡 Right-click chart for more options
-                            </div>
-
                             <TradingViewChart
                                 symbol={researchChartSymbol}
                                 interval="1D"
