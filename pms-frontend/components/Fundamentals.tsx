@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -8,8 +8,11 @@ import { Badge } from "./ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Slider } from "./ui/slider";
 import { Separator } from "./ui/separator";
-import {MarketService, OpenAPI} from "../src/client";
+import { MarketService, OpenAPI } from "../src/client";
 import { useFundamentals, useCompanyComparison } from "../hooks/useFundamentals";
+import { ShareholdingChart } from "./charts/ShareholdingChart";
+import { DividendsChart } from "./charts/DividendsChart";
+import { PriceChart } from "./charts/PriceChart";
 import {
   Search, Building2, BarChart3, Users, Percent, Scale,
   Landmark, GitBranch, LineChart, Sparkles, TrendingUp,
@@ -46,18 +49,41 @@ function formatPct(n?: number | string | null) {
 }
 
 export function Fundamentals({ defaultSymbol }: FundamentalsProps) {
-  const [query, setQuery] = useState("");
-  // Set a default stock immediately - common DSE stocks
-  const [selectedSymbol, setSelectedSymbol] = useState<string | undefined>(
-    defaultSymbol || 'GP' // Default to GP (Grameenphone) as it's a major DSE stock
-  );
+  // Always ensure we have a default symbol
+  const [selectedSymbol, setSelectedSymbol] = useState<string>(defaultSymbol || 'GP');
+  
+  // Update selected symbol if defaultSymbol changes
+  useEffect(() => {
+    if (defaultSymbol) {
+      setSelectedSymbol(defaultSymbol);
+    } else if (!selectedSymbol) {
+      // If no symbol is selected and no default is provided, use 'GP' as default
+      setSelectedSymbol('GP');
+    }
+  }, [defaultSymbol, selectedSymbol]);
 
-  // Stock list for search/select (following the same pattern as useTrading)
-  const { data: stockList = [], isLoading: listLoading, error: stockListError } = useQuery({
-    queryKey: ["market", "list", { limit: 100, offset: 0 }],
-    enabled: !!(OpenAPI as any).TOKEN,
+  // Stock information for the selected symbol
+  const { data: stockInfo } = useQuery({
+    queryKey: ["stock", selectedSymbol],
     queryFn: async () => {
-      const list = await MarketService.listStocks({ limit: 100, offset: 0 });
+      if (!selectedSymbol) return null;
+      try {
+        // Use the correct method name from MarketService
+        const info = await MarketService.getStock({ symbol: selectedSymbol });
+        return info as any;
+      } catch (error) {
+        console.error('Error fetching stock info:', error);
+        return null;
+      }
+    },
+    enabled: !!selectedSymbol,
+  });
+
+  // Get the list of stocks for the peer comparison
+  const { data: stockList = [] } = useQuery({
+    queryKey: ["market", "list"],
+    queryFn: async () => {
+      const list = await MarketService.listStocks({ limit: 200, offset: 0 });
       return (list as any[]).map((c: any) => ({
         id: String(c.id),
         symbol: String(c.symbol),
@@ -65,19 +91,9 @@ export function Fundamentals({ defaultSymbol }: FundamentalsProps) {
         sector: String(c.sector || "Unknown"),
         industry: String(c.industry || "Unknown"),
       }));
-    }
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
-
-  // Update selected symbol from list if we have a better option
-  useEffect(() => {
-    if (stockList.length > 0 && !defaultSymbol) {
-      // Only update if we don't have a default and the current selection isn't in the list
-      const currentExists = stockList.some(s => s.symbol === selectedSymbol);
-      if (!currentExists) {
-        setSelectedSymbol(stockList[0].symbol);
-      }
-    }
-  }, [stockList, defaultSymbol, selectedSymbol]);
 
   // Use our new fundamentals hook
   const {
@@ -117,11 +133,6 @@ export function Fundamentals({ defaultSymbol }: FundamentalsProps) {
     }
   });
 
-  const filteredStocks = useMemo(() => {
-    const q = query.trim().toUpperCase();
-    if (!q) return stockList;
-    return stockList.filter((s) => s.symbol.includes(q) || s.name.toUpperCase().includes(q));
-  }, [query, stockList]);
 
   // Calculate fundamental strength score
   const fundamentalScore = useMemo(() => {
@@ -158,38 +169,40 @@ export function Fundamentals({ defaultSymbol }: FundamentalsProps) {
 
   return (
     <div className="space-y-6">
-      {/* Stock Selector */}
+      {/* Stock Header */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Search className="h-5 w-5" /> Fundamental Analysis (DSE)
-          </CardTitle>
+        <CardHeader className="pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle className="text-2xl font-bold flex items-center gap-2">
+                {companyInfo?.company_name || 'Fundamental Analysis'}
+                {selectedSymbol && (
+                  <Badge variant="outline" className="text-sm h-6">
+                    {selectedSymbol}
+                  </Badge>
+                )}
+              </CardTitle>
+              <div className="text-sm text-muted-foreground mt-1">
+                {companyInfo?.sector} • {companyInfo?.category || 'N/A'}
+              </div>
+            </div>
+            
+            <div className="flex flex-wrap gap-2">
+              {companyInfo?.market_cap && (
+                <div className="text-right">
+                  <div className="text-sm text-muted-foreground">Market Cap</div>
+                  <div className="font-medium">{formatNumber(companyInfo.market_cap as any)}</div>
+                </div>
+              )}
+              {companyInfo?.listed_shares && (
+                <div className="text-right">
+                  <div className="text-sm text-muted-foreground">Listed Shares</div>
+                  <div className="font-medium">{formatNumber(companyInfo.listed_shares as any)}</div>
+                </div>
+              )}
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          <div className="col-span-2 flex gap-2">
-            <Input
-              placeholder="Search ticker or company name (e.g., GP, ROBI, BATBC)"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <Select value={selectedSymbol} onValueChange={setSelectedSymbol}>
-              <SelectTrigger className="w-52">
-                <SelectValue placeholder={listLoading ? "Loading..." : "Select symbol"} />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredStocks.map((s) => (
-                  <SelectItem key={s.symbol} value={s.symbol}>
-                    {s.symbol} — {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">Sector: {companyInfo?.sector || "-"}</Badge>
-            <Badge variant="secondary">Category: {companyInfo?.category || "-"}</Badge>
-          </div>
-        </CardContent>
       </Card>
 
       {/* Data Availability Notice */}
@@ -440,88 +453,101 @@ export function Fundamentals({ defaultSymbol }: FundamentalsProps) {
           <Card>
             <CardHeader>
               <CardTitle>Shareholding Pattern</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                As of: {shareholding?.date ? new Date(shareholding.date).toLocaleDateString() : '-'}
-              </p>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Percentage</TableHead>
-                    <TableHead>Change</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell>Sponsors/Directors</TableCell>
-                    <TableCell>{formatPct(shareholding?.director)}</TableCell>
-                    <TableCell className="text-muted-foreground">-</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Government</TableCell>
-                    <TableCell>{formatPct(shareholding?.govt)}</TableCell>
-                    <TableCell className="text-muted-foreground">-</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Institutions</TableCell>
-                    <TableCell>{formatPct(shareholding?.institute)}</TableCell>
-                    <TableCell className="text-muted-foreground">-</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Foreign Investors</TableCell>
-                    <TableCell>{formatPct(shareholding?.foreign)}</TableCell>
-                    <TableCell className={Number(shareholding?.change?.foreign) >= 0 ? 'text-green-600' : 'text-red-600'}>
-                      {shareholding?.change?.foreign ? `${Number(shareholding.change.foreign) >= 0 ? '+' : ''}${formatPct(shareholding.change.foreign)}` : '-'}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Public</TableCell>
-                    <TableCell>{formatPct(shareholding?.public)}</TableCell>
-                    <TableCell className={Number(shareholding?.change?.public) >= 0 ? 'text-green-600' : 'text-red-600'}>
-                      {shareholding?.change?.public ? `${Number(shareholding.change.public) >= 0 ? '+' : ''}${formatPct(shareholding.change.public)}` : '-'}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+              <div className="h-[400px] w-full">
+                <ShareholdingChart 
+                  data={[
+                    { name: 'Directors', value: parseFloat(shareholding?.director || '0'), color: '#0088FE' },
+                    { name: 'Government', value: parseFloat(shareholding?.govt || '0'), color: '#00C49F' },
+                    { name: 'Institutions', value: parseFloat(shareholding?.institute || '0'), color: '#FFBB28' },
+                    { name: 'Foreign', value: parseFloat(shareholding?.foreign || '0'), color: '#FF8042' },
+                    { name: 'Public', value: parseFloat(shareholding?.public || '0'), color: '#8884d8' },
+                  ].filter(item => item.value > 0)} 
+                />
+              </div>
+              <div className="mt-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Percentage</TableHead>
+                      <TableHead>Change</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-medium">Directors</TableCell>
+                      <TableCell>{formatPct(shareholding?.director)}</TableCell>
+                      <TableCell>-</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Government</TableCell>
+                      <TableCell>{formatPct(shareholding?.govt)}</TableCell>
+                      <TableCell>-</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Institutions</TableCell>
+                      <TableCell>{formatPct(shareholding?.institute)}</TableCell>
+                      <TableCell>-</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Foreign</TableCell>
+                      <TableCell>{formatPct(shareholding?.foreign)}</TableCell>
+                      <TableCell className={shareholding?.change?.foreign ? 'text-green-600' : ''}>
+                        {shareholding?.change?.foreign ? `+${formatPct(shareholding.change.foreign)}` : '-'}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Public</TableCell>
+                      <TableCell>{formatPct(shareholding?.public)}</TableCell>
+                      <TableCell className={shareholding?.change?.public ? 'text-green-600' : ''}>
+                        {shareholding?.change?.public ? `+${formatPct(shareholding.change.public)}` : '-'}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* Dividends */}
-        <TabsContent value="dividends">
+        <TabsContent value="dividends" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Dividend History (Last 10 Years)</CardTitle>
+              <CardTitle>Dividend History</CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="h-[400px] w-full mb-6">
+                <DividendsChart 
+                  data={dividends?.map(div => ({
+                    year: div.year,
+                    cash_dividend: div.cash_dividend,
+                    stock_dividend: div.stock_dividend,
+                    dividend_yield: div.dividend_yield
+                  }))}
+                />
+              </div>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Year</TableHead>
                     <TableHead>Cash Dividend</TableHead>
                     <TableHead>Stock Dividend</TableHead>
-                    <TableHead>Dividend Yield</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Yield</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {dividends && dividends.length > 0 ? (
-                    dividends.map((d, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell>{d.year}</TableCell>
-                        <TableCell>{d.cash_dividend || "-"}</TableCell>
-                        <TableCell>{d.stock_dividend || "-"}</TableCell>
-                        <TableCell>{formatPct(d.dividend_yield)}</TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground">
-                        No dividend history available
-                      </TableCell>
+                  {dividends?.map((div, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell>{div.year}</TableCell>
+                      <TableCell>{formatPct(div.cash_dividend)}</TableCell>
+                      <TableCell>{formatPct(div.stock_dividend)}</TableCell>
+                      <TableCell>{formatPct(div.dividend_yield)}</TableCell>
                     </TableRow>
-                  )}
+                  ))}
                 </TableBody>
               </Table>
             </CardContent>
@@ -638,35 +664,28 @@ export function Fundamentals({ defaultSymbol }: FundamentalsProps) {
               <CardTitle>5-Year Price History</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="relative h-72 bg-gradient-to-b from-background to-muted/20 rounded-md overflow-hidden">
-                <svg className="absolute inset-0 w-full h-full">
-                  {Array.isArray(chart?.candles) && chart.candles.length > 1 && (
-                    <polyline
-                      fill="none"
-                      stroke="currentColor"
-                      strokeOpacity="0.7"
-                      strokeWidth="2"
-                      points={(() => {
-                        const c = chart.candles as any[];
-                        const prices = c.map((x) => Number(x.c));
-                        const max = Math.max(...prices);
-                        const min = Math.min(...prices);
-                        const range = Math.max(1, max - min);
-                        return c.map((pt, i) => {
-                          const x = (i / (c.length - 1)) * 100;
-                          const y = 100 - ((Number(pt.c) - min) / range) * 100;
-                          return `${x},${y}`;
-                        }).join(" ");
-                      })()}
-                    />
-                  )}
-                </svg>
-                {(chartLoading || isLoading) && (
-                  <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-                    Loading chart...
-                  </div>
-                )}
-              </div>
+              {chartLoading ? (
+                <div className="flex items-center justify-center h-96">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+                </div>
+              ) : Array.isArray(chart) && chart.length > 0 ? (
+                <div className="h-[500px] w-full">
+                  <PriceChart 
+                    data={chart.map(c => ({
+                      time: c.date,
+                      open: c.open,
+                      high: c.high,
+                      low: c.low,
+                      close: c.close,
+                      volume: c.volume || 0 // Ensure volume has a default value
+                    }))}
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-96 text-muted-foreground">
+                  {chart === null ? 'Loading chart data...' : 'No chart data available'}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

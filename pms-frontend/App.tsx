@@ -103,6 +103,7 @@ export default function App() {
     const [quickTradeSide, setQuickTradeSide] = useState<"buy" | "sell" | undefined>();
     const [selectedChartStock, setSelectedChartStock] = useState<string>("AAPL");
     const [researchChartSymbol, setResearchChartSymbol] = useState<string>("");
+    const [fundamentalsSymbol, setFundamentalsSymbol] = useState<string>("");
 
     // Portfolio hooks
     const {
@@ -295,8 +296,18 @@ export default function App() {
     };
 
     const handleChartStock = (symbol: string) => {
-        setSelectedChartStock(symbol);
+        setResearchChartSymbol(symbol);
         setCurrentView("research");
+    };
+
+    const handleOpenChart = (symbol: string) => {
+        setResearchChartSymbol(symbol);
+        setCurrentView("research");
+    };
+
+    const handleOpenFundamentals = (symbol: string) => {
+        setFundamentalsSymbol(symbol);
+        setCurrentView("fundamentals");
     };
 
     const renderContent = () => {
@@ -531,7 +542,7 @@ export default function App() {
             case "fundamentals":
                 return (
                     <Suspense fallback={<div>Loading Fundamentals...</div>}>
-                        <Fundamentals/>
+                        <Fundamentals defaultSymbol={fundamentalsSymbol}/>
                     </Suspense>
                 );
 
@@ -773,7 +784,12 @@ export default function App() {
             />
 
             <div className="flex-1 overflow-hidden flex flex-col">
-                <GlobalTopBar accountBalance={accountBalance} onQuickTrade={handleQuickTrade}/>
+                <GlobalTopBar 
+                    accountBalance={accountBalance} 
+                    onQuickTrade={handleQuickTrade}
+                    onOpenChart={handleOpenChart}
+                    onOpenFundamentals={handleOpenFundamentals}
+                />
 
                 <div className="flex-1 overflow-y-auto">
                     <div className={currentView === "research" ? "" : "p-8"}>
