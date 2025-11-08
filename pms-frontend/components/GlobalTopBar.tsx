@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -14,17 +14,22 @@ import {
   Settings
 } from "lucide-react";
 import { AccountBalance } from "../types/trading";
+import { SymbolSearchDropdown } from "./SymbolSearchDropdown";
 
 interface GlobalTopBarProps {
   accountBalance: AccountBalance;
   onQuickTrade: (symbol?: string) => void;
+  onOpenChart: (symbol: string) => void;
+  onOpenFundamentals: (symbol: string) => void;
   className?: string;
 }
 
-export function GlobalTopBar({ accountBalance, onQuickTrade, className }: GlobalTopBarProps) {
+export function GlobalTopBar({ accountBalance, onQuickTrade, onOpenChart, onOpenFundamentals, className }: GlobalTopBarProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [autoRefresh, setAutoRefresh] = useState<number | 'off'>('off');
   const [now, setNow] = useState<Date>(new Date());
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   // Auto-update clock
   useEffect(() => {
@@ -72,6 +77,37 @@ export function GlobalTopBar({ accountBalance, onQuickTrade, className }: Global
 
   const todayPnL = accountBalance.dayChange ?? 0;
   const todayPnLPercent = accountBalance.dayChangePercent ?? 0;
+
+  // Handle picking chart from dropdown
+  const handlePickChart = (symbol: string) => {
+    onOpenChart(symbol);
+    setSearchTerm('');
+    setDropdownOpen(false);
+  };
+
+  // Handle picking fundamentals from dropdown
+  const handlePickFundamentals = (symbol: string) => {
+    onOpenFundamentals(symbol);
+    setSearchTerm('');
+    setDropdownOpen(false);
+  };
+
+  // Handle dropdown close
+  const handleCloseDropdown = () => {
+    setDropdownOpen(false);
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <div className={`border-b border-sidebar-border bg-background px-6 py-3 ${className || ''}`}>
@@ -127,21 +163,43 @@ export function GlobalTopBar({ accountBalance, onQuickTrade, className }: Global
         </div>
 
         {/* Center: Search */}
-        <div className="flex-1 max-w-md mx-8">
+        <div className="flex-1 max-w-md mx-8" ref={searchContainerRef}>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
             <input
               type="text"
-              placeholder="Search news by ticker, sector, or keyword"
+              placeholder="Search symbols by ticker or company name"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setDropdownOpen(true);
+              }}
+              onFocus={() => {
+                if (searchTerm.trim()) {
+                  setDropdownOpen(true);
+                }
+              }}
               className="w-full pl-10 pr-4 py-2 bg-input-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && searchTerm.trim()) {
+                // Let dropdown handle arrow keys and enter when open
+                if (dropdownOpen && searchTerm.trim() && ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) {
+                  // Dropdown will handle these
+                  return;
+                }
+                // Fallback: Enter with no dropdown opens quick trade
+                if (e.key === 'Enter' && searchTerm.trim() && !dropdownOpen) {
                   onQuickTrade(searchTerm.trim().toUpperCase());
                   setSearchTerm('');
                 }
               }}
+            />
+            
+            <SymbolSearchDropdown
+              query={searchTerm}
+              onPickChart={handlePickChart}
+              onPickFundamentals={handlePickFundamentals}
+              onClose={handleCloseDropdown}
+              isOpen={dropdownOpen}
             />
           </div>
         </div>
