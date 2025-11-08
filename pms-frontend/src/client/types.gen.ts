@@ -1726,6 +1726,14 @@ export type ResearchStockScreenerData = {
      */
     limit?: number;
     /**
+     * Sector filter
+     */
+    sector?: (string | null);
+    /**
+     * Industry filter
+     */
+    industry?: (string | null);
+    /**
      * Maximum dividend yield %
      */
     maxDividendYield?: (number | null);
@@ -1741,6 +1749,10 @@ export type ResearchStockScreenerData = {
      * Maximum stock price
      */
     maxPrice?: (number | null);
+    /**
+     * Maximum price-to-book ratio
+     */
+    maxPriceToBook?: (number | null);
     /**
      * Minimum dividend yield %
      */
@@ -1758,16 +1770,58 @@ export type ResearchStockScreenerData = {
      */
     minPrice?: (number | null);
     /**
+     * Minimum price-to-book ratio
+     */
+    minPriceToBook?: (number | null);
+    /**
+     * Minimum RSI value
+     */
+    minRsi?: (number | null);
+    /**
      * Minimum average volume
      */
     minVolume?: (number | null);
     /**
-     * Sector filter
+     * Maximum RSI value
      */
-    sector?: (string | null);
+    maxRsi?: (number | null);
+    /**
+     * Minimum daily price change percent
+     */
+    minPriceChange?: (number | null);
+    /**
+     * Maximum daily price change percent
+     */
+    maxPriceChange?: (number | null);
+    /**
+     * Moving average position filter (all, above_20, above_50, below_20, below_50)
+     */
+    movingAverage?: (string | null);
 };
 
-export type ResearchStockScreenerResponse = (unknown);
+export type ResearchStockScreenerResponse = {
+    total_results: number;
+    filters_applied: Record<string, unknown>;
+    stocks: Array<{
+        stock_id: string;
+        symbol: string;
+        name: string;
+        sector: (string | null);
+        industry: (string | null);
+        current_price: (number | null);
+        change: (number | null);
+        change_percent: (number | null);
+        volume: (number | null);
+        market_cap: (number | null);
+        pe_ratio: (number | null);
+        pb_ratio: (number | null);
+        dividend_yield: (number | null);
+        rsi: (number | null);
+        sma_20: (number | null);
+        sma_50: (number | null);
+        rating: ('Strong Buy' | 'Buy' | 'Hold' | 'Sell' | 'Strong Sell');
+    }>;
+};
 
 export type ResearchGetFundamentalAnalysisData = {
     symbol: string;

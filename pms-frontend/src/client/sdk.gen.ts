@@ -2014,9 +2014,17 @@ export class ResearchService {
                 min_dividend_yield: data.minDividendYield,
                 max_dividend_yield: data.maxDividendYield,
                 sector: data.sector,
+                industry: data.industry,
                 min_volume: data.minVolume,
                 min_price: data.minPrice,
                 max_price: data.maxPrice,
+                min_price_to_book: data.minPriceToBook,
+                max_price_to_book: data.maxPriceToBook,
+                min_rsi: data.minRsi,
+                max_rsi: data.maxRsi,
+                min_price_change: data.minPriceChange,
+                max_price_change: data.maxPriceChange,
+                moving_average: data.movingAverage,
                 limit: data.limit
             },
             errors: {

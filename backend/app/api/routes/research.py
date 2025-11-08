@@ -10,10 +10,139 @@ from app.api.deps import get_current_user, get_session_dep
 from app.model.user import User
 from app.model.stock import StockData, DailyOHLC
 from app.model.company import Company
+from app.model.fundamental import FinancialPerformance
 from app.model.alert import News, StockNews
 from app.services.research_service import ResearchService
 
 router = APIRouter(prefix="/research", tags=["research"])
+
+
+def _to_float(value: Optional[Decimal | float | int]) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _calculate_sma(closes: List[float], period: int) -> Optional[float]:
+    if period <= 0 or len(closes) < period:
+        return None
+    window = closes[-period:]
+    return sum(window) / period
+
+
+def _calculate_rsi(closes: List[float], period: int = 14) -> Optional[float]:
+    if period <= 0 or len(closes) < period + 1:
+        return None
+
+    gains: List[float] = []
+    losses: List[float] = []
+
+    for i in range(1, len(closes)):
+        delta = closes[i] - closes[i - 1]
+        if delta > 0:
+            gains.append(delta)
+            losses.append(0.0)
+        else:
+            gains.append(0.0)
+            losses.append(abs(delta))
+
+    avg_gain = sum(gains[-period:]) / period
+    avg_loss = sum(losses[-period:]) / period
+
+    if avg_loss == 0:
+        return 100.0
+
+    rs = avg_gain / avg_loss if avg_loss != 0 else 0.0
+    return 100 - (100 / (1 + rs))
+
+
+def _matches_moving_average_filter(
+    moving_average_filter: Optional[str],
+    current_price: Optional[float],
+    sma_20: Optional[float],
+    sma_50: Optional[float],
+) -> bool:
+    if moving_average_filter in (None, "all"):
+        return True
+
+    if current_price is None:
+        return False
+
+    if moving_average_filter == "above_20":
+        return sma_20 is not None and current_price >= sma_20
+    if moving_average_filter == "above_50":
+        return sma_50 is not None and current_price >= sma_50
+    if moving_average_filter == "below_20":
+        return sma_20 is not None and current_price <= sma_20
+    if moving_average_filter == "below_50":
+        return sma_50 is not None and current_price <= sma_50
+
+    return True
+
+
+def _calculate_rating(
+    pe_ratio: Optional[float],
+    pb_ratio: Optional[float],
+    rsi: Optional[float],
+    change_percent: Optional[float],
+    dividend_yield: Optional[float],
+) -> str:
+    score = 0
+
+    if pe_ratio is not None:
+        if 8 <= pe_ratio <= 20:
+            score += 2
+        elif pe_ratio < 8:
+            score += 1
+        elif pe_ratio > 30:
+            score -= 1
+
+    if pb_ratio is not None:
+        if 1 <= pb_ratio <= 3:
+            score += 1
+        elif pb_ratio > 5:
+            score -= 1
+
+    if rsi is not None:
+        if 30 <= rsi <= 60:
+            score += 2
+        elif rsi < 30:
+            score += 1
+        elif rsi > 70:
+            score -= 2
+
+    if change_percent is not None:
+        if change_percent >= 3:
+            score += 1
+        elif change_percent <= -3:
+            score -= 1
+
+    if dividend_yield is not None and dividend_yield >= 3:
+        score += 1
+
+    if score >= 5:
+        return "Strong Buy"
+    if score >= 3:
+        return "Buy"
+    if score >= 1:
+        return "Hold"
+    if score <= -1:
+        return "Sell"
+    return "Strong Sell"
+
+
+def _rating_to_score(rating: str) -> int:
+    mapping = {
+        "Strong Buy": 5,
+        "Buy": 4,
+        "Hold": 3,
+        "Sell": 2,
+        "Strong Sell": 1,
+    }
+    return mapping.get(rating, 0)
 
 
 @router.get("/stock-screener")
@@ -25,90 +154,239 @@ def stock_screener(
     min_dividend_yield: Optional[float] = Query(None, description="Minimum dividend yield %"),
     max_dividend_yield: Optional[float] = Query(None, description="Maximum dividend yield %"),
     sector: Optional[str] = Query(None, description="Sector filter"),
+    industry: Optional[str] = Query(None, description="Industry filter"),
     min_volume: Optional[int] = Query(None, description="Minimum average volume"),
     min_price: Optional[float] = Query(None, description="Minimum stock price"),
     max_price: Optional[float] = Query(None, description="Maximum stock price"),
-    limit: int = Query(50, description="Maximum number of results"),
+    min_price_to_book: Optional[float] = Query(None, description="Minimum price-to-book ratio"),
+    max_price_to_book: Optional[float] = Query(None, description="Maximum price-to-book ratio"),
+    min_rsi: Optional[float] = Query(None, description="Minimum RSI value"),
+    max_rsi: Optional[float] = Query(None, description="Maximum RSI value"),
+    min_price_change: Optional[float] = Query(None, description="Minimum daily price change percent"),
+    max_price_change: Optional[float] = Query(None, description="Maximum daily price change percent"),
+    moving_average: Optional[str] = Query(
+        "all",
+        description="Moving average position filter (all, above_20, above_50, below_20, below_50)",
+    ),
+    limit: int = Query(20, ge=1, le=200, description="Maximum number of results"),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session_dep)
 ):
     """Advanced stock screener with fundamental and technical filters"""
-    
-    # Build the query
-    query = select(Company)
-    
-    # Apply filters
-    conditions = []
-    
-    if sector:
-        conditions.append(Company.sector == sector)
-    
-    if min_price is not None:
-        conditions.append(Company.current_price >= min_price)
-    
-    if max_price is not None:
-        conditions.append(Company.current_price <= max_price)
-    
-    if conditions:
-        query = query.where(and_(*conditions))
-    
-    # Execute query
-    stocks = session.exec(query.limit(limit)).all()
-    
-    # Calculate additional metrics for each stock
-    screener_results = []
-    for stock in stocks:
-        # Mock financial ratios (in real implementation, calculate from financial data)
-        mock_pe_ratio = 15.5 + (hash(stock.trading_code) % 20)  # Mock P/E between 15-35
-        mock_market_cap = float(stock.current_price or 100) * 1000000  # Mock market cap
-        mock_dividend_yield = 2.0 + (hash(stock.trading_code) % 50) / 10  # Mock dividend yield 2-7%
-        mock_volume = 500000 + (hash(stock.trading_code) % 2000000)  # Mock volume
-        
-        # Apply additional filters
-        if min_market_cap is not None and mock_market_cap < min_market_cap * 1000000:
+    candidates_query = select(Company)
+
+    sector_value = sector.strip() if sector else None
+    industry_value = industry.strip() if industry else None
+
+    normalized_sector = sector_value.lower() if sector_value else None
+    normalized_industry = industry_value.lower() if industry_value else None
+
+    if normalized_sector:
+        candidates_query = candidates_query.where(
+            and_(
+                Company.sector.is_not(None),
+                func.lower(Company.sector) == normalized_sector,
+            )
+        )
+    if normalized_industry:
+        candidates_query = candidates_query.where(
+            and_(
+                Company.industry.is_not(None),
+                func.lower(Company.industry) == normalized_industry,
+            )
+        )
+
+    pool_size = max(limit * 8, 200)
+    companies: List[Company] = session.exec(
+        candidates_query.order_by(Company.trading_code).limit(pool_size)
+    ).all()
+
+    if not companies:
+        return {
+            "total_results": 0,
+            "filters_applied": {
+                "min_market_cap": min_market_cap,
+                "max_market_cap": max_market_cap,
+                "min_pe_ratio": min_pe_ratio,
+                "max_pe_ratio": max_pe_ratio,
+                "min_dividend_yield": min_dividend_yield,
+                "max_dividend_yield": max_dividend_yield,
+                "sector": sector_value,
+                "industry": industry_value,
+                "min_volume": min_volume,
+                "min_price": min_price,
+                "max_price": max_price,
+                "min_price_to_book": min_price_to_book,
+                "max_price_to_book": max_price_to_book,
+                "min_rsi": min_rsi,
+                "max_rsi": max_rsi,
+                "min_price_change": min_price_change,
+                "max_price_change": max_price_change,
+                "moving_average": moving_average,
+                "limit": limit,
+            },
+            "stocks": [],
+        }
+
+    company_ids = [company.id for company in companies]
+
+    latest_stock_data: Dict[UUID, StockData] = {}
+    if company_ids:
+        stock_stmt = (
+            select(StockData)
+            .where(StockData.company_id.in_(company_ids))
+            .order_by(StockData.company_id, StockData.timestamp.desc())
+        )
+        stock_rows = session.exec(stock_stmt).all()
+        for row in stock_rows:
+            if row.company_id not in latest_stock_data:
+                latest_stock_data[row.company_id] = row
+
+    latest_financials: Dict[UUID, FinancialPerformance] = {}
+    if company_ids:
+        financial_stmt = (
+            select(FinancialPerformance)
+            .where(FinancialPerformance.company_id.in_(company_ids))
+            .order_by(FinancialPerformance.company_id, FinancialPerformance.year.desc())
+        )
+        financial_rows = session.exec(financial_stmt).all()
+        for row in financial_rows:
+            if row.company_id not in latest_financials:
+                latest_financials[row.company_id] = row
+
+    moving_average_filter = (moving_average or "all").lower()
+    results: List[Dict[str, Any]] = []
+
+    for company in companies:
+        stock_row = latest_stock_data.get(company.id)
+        if not stock_row:
             continue
-        if max_market_cap is not None and mock_market_cap > max_market_cap * 1000000:
+
+        financial_row = latest_financials.get(company.id)
+
+        current_price = _to_float(stock_row.last_trade_price)
+        if current_price is None:
             continue
-        if min_pe_ratio is not None and mock_pe_ratio < min_pe_ratio:
+
+        if min_price is not None and current_price < min_price:
             continue
-        if max_pe_ratio is not None and mock_pe_ratio > max_pe_ratio:
+        if max_price is not None and current_price > max_price:
             continue
-        if min_dividend_yield is not None and mock_dividend_yield < min_dividend_yield:
+
+        change_value = _to_float(stock_row.change)
+        change_percent = _to_float(stock_row.change_percent)
+        volume = stock_row.volume
+
+        market_cap = _to_float(stock_row.market_cap) if stock_row and stock_row.market_cap is not None else None
+        if market_cap is None:
+            market_cap = _to_float(company.market_cap)
+        if market_cap is None and company.total_shares:
+            market_cap = current_price * company.total_shares
+
+        if min_market_cap is not None and (
+            market_cap is None or market_cap < min_market_cap * 1_000_000
+        ):
             continue
-        if max_dividend_yield is not None and mock_dividend_yield > max_dividend_yield:
+        if max_market_cap is not None and (
+            market_cap is None or market_cap > max_market_cap * 1_000_000
+        ):
             continue
-        if min_volume is not None and mock_volume < min_volume:
+
+        pe_ratio = _to_float(company.pe_ratio)
+        if pe_ratio is None and financial_row and financial_row.pe_ratio is not None:
+            pe_ratio = _to_float(financial_row.pe_ratio)
+
+        if min_pe_ratio is not None and (pe_ratio is None or pe_ratio < min_pe_ratio):
             continue
-        
-        # Calculate score based on criteria
-        score = 0
-        if mock_pe_ratio < 20:
-            score += 1
-        if mock_dividend_yield > 3:
-            score += 1
-        if mock_market_cap > 1000000000:  # > $1B market cap
-            score += 1
-        
-        screener_results.append({
-            "stock_id": str(stock.id),
-            "symbol": stock.trading_code,
-            "name": stock.company_name,
-            "sector": stock.sector,
-            "current_price": float(stock.current_price or 0),
-            "market_cap": mock_market_cap,
-            "pe_ratio": round(mock_pe_ratio, 2),
-            "dividend_yield": round(mock_dividend_yield, 2),
-            "avg_volume": mock_volume,
-            "score": score,
-            "52_week_high": float(stock.week_52_high or stock.current_price or 0),
-            "52_week_low": float(stock.week_52_low or stock.current_price or 0)
-        })
-    
-    # Sort by score descending
-    screener_results.sort(key=lambda x: x["score"], reverse=True)
-    
+        if max_pe_ratio is not None and (pe_ratio is None or pe_ratio > max_pe_ratio):
+            continue
+
+        pb_ratio = _to_float(company.pb_ratio)
+        if pb_ratio is None and financial_row and financial_row.pb_ratio is not None:
+            pb_ratio = _to_float(financial_row.pb_ratio)
+
+        if min_price_to_book is not None and (pb_ratio is None or pb_ratio < min_price_to_book):
+            continue
+        if max_price_to_book is not None and (pb_ratio is None or pb_ratio > max_price_to_book):
+            continue
+
+        dividend_yield = _to_float(company.dividend_yield)
+
+        if min_dividend_yield is not None and (
+            dividend_yield is None or dividend_yield < min_dividend_yield
+        ):
+            continue
+        if max_dividend_yield is not None and (
+            dividend_yield is None or dividend_yield > max_dividend_yield
+        ):
+            continue
+
+        if min_volume is not None and (volume is None or volume < min_volume):
+            continue
+
+        if min_price_change is not None and (
+            change_percent is None or change_percent < min_price_change
+        ):
+            continue
+        if max_price_change is not None and (
+            change_percent is None or change_percent > max_price_change
+        ):
+            continue
+
+        ohlc_rows: List[DailyOHLC] = session.exec(
+            select(DailyOHLC)
+            .where(DailyOHLC.company_id == company.id)
+            .order_by(DailyOHLC.date.desc())
+            .limit(120)
+        ).all()
+
+        closes: List[float] = [float(row.close_price) for row in reversed(ohlc_rows)] if ohlc_rows else []
+
+        sma_20 = _calculate_sma(closes, 20)
+        sma_50 = _calculate_sma(closes, 50)
+        rsi = _calculate_rsi(closes, 14)
+
+        if min_rsi is not None and (rsi is None or rsi < min_rsi):
+            continue
+        if max_rsi is not None and (rsi is None or rsi > max_rsi):
+            continue
+
+        if not _matches_moving_average_filter(moving_average_filter, current_price, sma_20, sma_50):
+            continue
+
+        rating = _calculate_rating(pe_ratio, pb_ratio, rsi, change_percent, dividend_yield)
+        score = _rating_to_score(rating)
+
+        results.append(
+            {
+                "stock_id": str(company.id),
+                "symbol": company.trading_code,
+                "name": company.company_name or company.name,
+                "sector": company.sector,
+                "industry": company.industry,
+                "current_price": current_price,
+                "change": change_value,
+                "change_percent": change_percent,
+                "volume": volume,
+                "market_cap": market_cap,
+                "pe_ratio": pe_ratio,
+                "pb_ratio": pb_ratio,
+                "dividend_yield": dividend_yield,
+                "rsi": rsi,
+                "sma_20": sma_20,
+                "sma_50": sma_50,
+                "rating": rating,
+                "_score": score,
+            }
+        )
+
+    results.sort(key=lambda item: (item.get("_score", 0), item.get("change_percent") or 0), reverse=True)
+
+    for item in results:
+        item.pop("_score", None)
+
     return {
-        "total_results": len(screener_results),
+        "total_results": len(results),
         "filters_applied": {
             "min_market_cap": min_market_cap,
             "max_market_cap": max_market_cap,
@@ -116,12 +394,21 @@ def stock_screener(
             "max_pe_ratio": max_pe_ratio,
             "min_dividend_yield": min_dividend_yield,
             "max_dividend_yield": max_dividend_yield,
-            "sector": sector,
+            "sector": sector_value,
+            "industry": industry_value,
             "min_volume": min_volume,
             "min_price": min_price,
-            "max_price": max_price
+            "max_price": max_price,
+            "min_price_to_book": min_price_to_book,
+            "max_price_to_book": max_price_to_book,
+            "min_rsi": min_rsi,
+            "max_rsi": max_rsi,
+            "min_price_change": min_price_change,
+            "max_price_change": max_price_change,
+            "moving_average": moving_average_filter,
+            "limit": limit,
         },
-        "stocks": screener_results
+        "stocks": results[:limit],
     }
 
 
