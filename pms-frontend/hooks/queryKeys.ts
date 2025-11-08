@@ -72,4 +72,10 @@ export const queryKeys = {
   performanceRisk: (portfolioId: string, period: string) => ['performance', 'risk', portfolioId, period] as const,
   bestWorst: (portfolioId: string, period: string) => ['performance', 'best-worst', portfolioId, period] as const,
   cashFlows: (portfolioId: string, period: string) => ['performance', 'cash-flows', portfolioId, period] as const,
+
+  rebalancingSettings: (portfolioId: string) => ['rebalancing', 'settings', portfolioId] as const,
+  rebalancingSuggestions: (portfolioId: string, params: { thresholdPct: number; minTradeValue: number; strategy: string }) =>
+    ['rebalancing', 'suggestions', portfolioId, params.thresholdPct, params.minTradeValue, params.strategy] as const,
+  rebalancingHistory: (portfolioId: string, limit: number, offset: number) =>
+    ['rebalancing', 'history', portfolioId, limit, offset] as const,
 };

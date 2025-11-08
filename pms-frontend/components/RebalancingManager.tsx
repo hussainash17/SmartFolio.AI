@@ -1,8 +1,7 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import { Progress } from "./ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Switch } from "./ui/switch";
@@ -20,11 +19,8 @@ import {
   Calculator,
   AlertCircle,
   CheckCircle2,
-  Clock,
-  DollarSign,
   Zap,
   Info,
-  ArrowRight,
   ShoppingCart
 } from "lucide-react";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -32,25 +28,13 @@ import { queryKeys } from '../hooks/queryKeys';
 import { AnalyticsService, OpenAPI } from '../src/client';
 import { toast } from 'sonner';
 import { usePortfolios } from '../hooks/usePortfolios';
+import { useRebalancing } from '../hooks/useRebalancing';
+import type { RebalancingSuggestion } from '../types/rebalancing';
 
 interface RebalancingManagerProps {
   onNavigate: (view: string) => void;
   onQuickTrade: (symbol?: string, side?: 'buy' | 'sell') => void;
   portfolioId?: string;
-}
-
-interface RebalancingSuggestion {
-  symbol: string;
-  companyName: string;
-  sector: string;
-  currentAllocation: number;
-  targetAllocation: number;
-  deviation: number;
-  action: 'BUY' | 'SELL';
-  suggestedShares: number;
-  suggestedValue: number;
-  currentValue: number;
-  priority: 'high' | 'medium' | 'low';
 }
 
 export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: RebalancingManagerProps) {
@@ -60,6 +44,8 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
   const [rebalanceFrequency, setRebalanceFrequency] = useState('quarterly');
   const [selectedStrategy, setSelectedStrategy] = useState('strategic');
   const [minTradeValue, setMinTradeValue] = useState(100);
+  const [settingsInitialized, setSettingsInitialized] = useState(false);
+  const lastSavedSettingsRef = useRef<string>('');
   const { portfolios, selectedPortfolio, setSelectedPortfolioId } = usePortfolios();
 
   // Local current portfolio selection used by this view
@@ -76,13 +62,104 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [portfolioId, selectedPortfolio, portfolios]);
 
+  const historyLimit = 20;
+  const historyOffset = 0;
+
+  const {
+    settings,
+    isSettingsLoading,
+    saveSettings,
+    isSavingSettings,
+    suggestions: apiSuggestions,
+    isSuggestionsLoading,
+    isSuggestionsFetching,
+    refetchSuggestions,
+    history,
+    isHistoryLoading,
+    isHistoryFetching,
+    refetchHistory,
+    executeRebalancing,
+    isExecuting,
+  } = useRebalancing({
+    portfolioId: currentPortfolioId,
+    thresholdPct: rebalanceThreshold[0],
+    minTradeValue,
+    strategy: selectedStrategy,
+    historyLimit,
+    historyOffset,
+  });
+
   // Keep global selection in sync (optional)
   useEffect(() => {
     if (currentPortfolioId) setSelectedPortfolioId(currentPortfolioId);
   }, [currentPortfolioId, setSelectedPortfolioId]);
 
+  useEffect(() => {
+    if (!settings) {
+      return;
+    }
+    const nextThreshold = Number(settings.thresholdPct ?? 5) || 5;
+    const nextFrequency = settings.frequency || 'quarterly';
+    const nextMinTradeValue = Number(settings.minTradeValue ?? 100) || 100;
+
+    setAutoRebalancing(Boolean(settings.enabled));
+    setRebalanceThreshold([nextThreshold]);
+    setRebalanceFrequency(nextFrequency);
+    setMinTradeValue(nextMinTradeValue);
+
+    lastSavedSettingsRef.current = JSON.stringify({
+      enabled: Boolean(settings.enabled),
+      thresholdPct: nextThreshold,
+      frequency: nextFrequency,
+      minTradeValue: nextMinTradeValue,
+    });
+    setSettingsInitialized(true);
+  }, [settings]);
+
+  useEffect(() => {
+    if (!settingsInitialized || !currentPortfolioId) {
+      return;
+    }
+
+    const snapshot = JSON.stringify({
+      enabled: autoRebalancing,
+      thresholdPct: rebalanceThreshold[0],
+      frequency: rebalanceFrequency,
+      minTradeValue,
+    });
+
+    if (snapshot === lastSavedSettingsRef.current) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      lastSavedSettingsRef.current = snapshot;
+      saveSettings({
+        enabled: autoRebalancing,
+        threshold_pct: rebalanceThreshold[0],
+        frequency: rebalanceFrequency,
+        min_trade_value: minTradeValue,
+      }).catch(() => {
+        lastSavedSettingsRef.current = '';
+      });
+    }, 600);
+
+    return () => window.clearTimeout(timer);
+  }, [autoRebalancing, rebalanceFrequency, rebalanceThreshold, minTradeValue, currentPortfolioId, saveSettings, settingsInitialized]);
+
+  const toNumber = (value: unknown): number => {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : 0;
+    }
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+      return Number.isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+  };
+
   // Fetch allocation data
-  const { data: allocation, isLoading } = useQuery({
+  const { data: allocation, isLoading: isAllocationLoading } = useQuery({
     queryKey: queryKeys.portfolioAllocation(currentPortfolioId || 'none'),
     enabled: !!currentPortfolioId,
     queryFn: async () => {
@@ -121,95 +198,132 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
     return `${percent >= 0 ? '+' : ''}${percent.toFixed(1)}%`;
   };
 
-  // Calculate rebalancing suggestions
-  const rebalancingSuggestions: RebalancingSuggestion[] = useMemo(() => {
+  const formatDateTime = (date: Date) => {
+    return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  };
+
+  const sliderThreshold = rebalanceThreshold[0];
+
+  const localSuggestions: RebalancingSuggestion[] = useMemo(() => {
     if (!allocation || !targets.length) return [];
 
-    const totalValue = allocation.total_value || 0;
+    const totalValue = toNumber(allocation.total_value);
     if (totalValue <= 0) return [];
 
     const suggestions: RebalancingSuggestion[] = [];
     const stocks = allocation.stock_wise_allocation || [];
     const sectors = allocation.sector_wise_allocation || [];
 
-    // Create target map by sector
-    const targetMap = new Map();
+    const targetMap = new Map<string, number>();
     targets.forEach((t: any) => {
-      targetMap.set(t.category, t.target_percent);
+      targetMap.set(t.category, toNumber(t.target_percent));
     });
 
-    // Group stocks by sector
-    const stocksBySector = new Map();
+    const stocksBySector = new Map<string, any[]>();
     stocks.forEach((stock: any) => {
       const sector = stock.sector || 'Unknown';
       if (!stocksBySector.has(sector)) {
         stocksBySector.set(sector, []);
       }
-      stocksBySector.get(sector).push(stock);
+      stocksBySector.get(sector)!.push(stock);
     });
 
-    // Calculate suggestions for each sector
     sectors.forEach((sector: any) => {
       const sectorName = sector.sector;
-      const currentPercent = sector.allocation_percent || 0;
-      const targetPercent = targetMap.get(sectorName) || currentPercent;
+      const currentPercent = toNumber(sector.allocation_percent);
+      const targetPercent = targetMap.get(sectorName) ?? currentPercent;
       const deviation = currentPercent - targetPercent;
 
-      if (Math.abs(deviation) > rebalanceThreshold[0]) {
-        const sectorStocks = stocksBySector.get(sectorName) || [];
-        const targetValue = (targetPercent / 100) * totalValue;
-        const currentValue = (currentPercent / 100) * totalValue;
-        const difference = targetValue - currentValue;
-
-        sectorStocks.forEach((stock: any) => {
-          const stockValue = stock.current_value || 0;
-          const stockPercent = sectorStocks.length > 0 
-            ? stockValue / sectorStocks.reduce((sum: number, s: any) => sum + (s.current_value || 0), 0)
-            : 1;
-
-          const suggestedValueChange = difference * stockPercent;
-          const currentPrice = stock.quantity > 0 ? stockValue / stock.quantity : 0;
-          
-          if (currentPrice > 0) {
-            const suggestedShares = Math.abs(Math.round(suggestedValueChange / currentPrice));
-
-            if (suggestedShares > 0 && Math.abs(suggestedValueChange) >= minTradeValue) {
-              const priority = Math.abs(deviation) > 10 ? 'high' : Math.abs(deviation) > 5 ? 'medium' : 'low';
-              
-              suggestions.push({
-                symbol: stock.symbol,
-                companyName: stock.name,
-                sector: sectorName,
-                currentAllocation: stock.allocation_percent || 0,
-                targetAllocation: targetPercent,
-                deviation: deviation,
-                action: suggestedValueChange > 0 ? 'BUY' : 'SELL',
-                suggestedShares: suggestedShares,
-                suggestedValue: Math.abs(suggestedValueChange),
-                currentValue: stockValue,
-                priority: priority,
-              });
-            }
-          }
-        });
+      if (Math.abs(deviation) <= sliderThreshold) {
+        return;
       }
+
+      const sectorStocks = stocksBySector.get(sectorName) || [];
+      if (!sectorStocks.length) {
+        return;
+      }
+
+      const targetValue = (targetPercent / 100) * totalValue;
+      const currentValue = (currentPercent / 100) * totalValue;
+      const difference = targetValue - currentValue;
+      const sectorTotalValue = sectorStocks.reduce((sum: number, s: any) => sum + toNumber(s.current_value), 0);
+
+      sectorStocks.forEach((stock: any) => {
+        const stockValue = toNumber(stock.current_value);
+        const stockPercent = sectorTotalValue > 0 ? stockValue / sectorTotalValue : 1;
+
+        const suggestedValueChange = difference * stockPercent;
+        const currentPrice = stock.quantity > 0 ? stockValue / stock.quantity : 0;
+
+        if (currentPrice <= 0) {
+          return;
+        }
+
+        const suggestedShares = Math.abs(Math.round(suggestedValueChange / currentPrice));
+
+        if (suggestedShares > 0 && Math.abs(suggestedValueChange) >= minTradeValue) {
+          const priority = Math.abs(deviation) > 10 ? 'high' : Math.abs(deviation) > 5 ? 'medium' : 'low';
+
+          suggestions.push({
+            symbol: stock.symbol,
+            companyName: stock.name,
+            sector: sectorName,
+            currentAllocation: toNumber(stock.allocation_percent),
+            targetAllocation: targetPercent,
+            deviation,
+            action: suggestedValueChange > 0 ? 'BUY' : 'SELL',
+            suggestedShares,
+            suggestedValue: Math.abs(suggestedValueChange),
+            currentValue: stockValue,
+            priority,
+          });
+        }
+      });
     });
 
     return suggestions.sort((a, b) => {
       const priorityOrder = { high: 3, medium: 2, low: 1 };
       return (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
     });
-  }, [allocation, targets, rebalanceThreshold, minTradeValue]);
+  }, [allocation, targets, sliderThreshold, minTradeValue]);
 
-  const totalBuyValue = rebalancingSuggestions
-    .filter(s => s.action === 'BUY')
-    .reduce((sum, s) => sum + s.suggestedValue, 0);
+  const fallbackTotals = useMemo(() => {
+    const totalBuy = localSuggestions
+      .filter((s) => s.action === 'BUY')
+      .reduce((sum, s) => sum + s.suggestedValue, 0);
+    const totalSell = localSuggestions
+      .filter((s) => s.action === 'SELL')
+      .reduce((sum, s) => sum + s.suggestedValue, 0);
+    const estimated = (totalBuy + totalSell) * 0.001;
 
-  const totalSellValue = rebalancingSuggestions
-    .filter(s => s.action === 'SELL')
-    .reduce((sum, s) => sum + s.suggestedValue, 0);
+    return {
+      buyValue: totalBuy,
+      sellValue: totalSell,
+      estimatedCost: estimated,
+    };
+  }, [localSuggestions]);
 
-  const estimatedCost = (totalBuyValue + totalSellValue) * 0.001; // 0.1% transaction cost
+  const suggestionsData = apiSuggestions ?? null;
+  const rebalancingSuggestions = suggestionsData ? suggestionsData.suggestions : localSuggestions;
+  const totals = suggestionsData ? suggestionsData.totals : fallbackTotals;
+
+  const totalBuyValue = totals.buyValue ?? 0;
+  const totalSellValue = totals.sellValue ?? 0;
+  const estimatedCost = totals.estimatedCost ?? (totalBuyValue + totalSellValue) * 0.001;
+  const historyRuns = history?.runs ?? [];
+  const isUsingFallbackSuggestions = !suggestionsData && rebalancingSuggestions.length > 0;
+  const averageDeviation =
+    rebalancingSuggestions.length > 0
+      ? rebalancingSuggestions.reduce((sum, s) => sum + Math.abs(s.deviation), 0) / rebalancingSuggestions.length
+      : 0;
+  const maxDeviation =
+    rebalancingSuggestions.length > 0
+      ? Math.max(...rebalancingSuggestions.map((s) => Math.abs(s.deviation)))
+      : 0;
+  const projectedAverageDeviation = averageDeviation * 0.2;
+  const projectedMaxDeviation = maxDeviation * 0.2;
+
+  const isDataLoading = isAllocationLoading || isSettingsLoading || (isSuggestionsLoading && !suggestionsData);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -220,8 +334,40 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
     }
   };
 
-  const handleExecuteRebalancing = () => {
-    toast.info('Rebalancing execution will be implemented in the next phase');
+  const handleExecuteRebalancing = async () => {
+    if (!currentPortfolioId) {
+      return;
+    }
+    const actionableSuggestions = rebalancingSuggestions.filter((s) => s.suggestedShares > 0);
+    if (actionableSuggestions.length === 0) {
+      toast.info('No rebalancing trades to execute');
+      return;
+    }
+
+    try {
+      await executeRebalancing({
+        suggestions: actionableSuggestions.map((s) => ({
+          symbol: s.symbol,
+          action: s.action,
+          quantity: s.suggestedShares,
+        })),
+        simulate: true,
+      });
+    } catch (error) {
+      console.error('Rebalancing execution failed', error);
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (!currentPortfolioId) {
+      return;
+    }
+    await Promise.allSettled([
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolioAllocation(currentPortfolioId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.allocationTargets(currentPortfolioId) }),
+      refetchSuggestions(),
+      refetchHistory(),
+    ]);
   };
 
   if (!currentPortfolioId) {
@@ -236,7 +382,7 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
     );
   }
 
-  if (isLoading) {
+  if (isDataLoading) {
     return (
       <Card>
         <CardContent className="pt-6">
@@ -271,7 +417,11 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
             <BarChart3 className="h-4 w-4 mr-2" />
             Asset Allocation
           </Button>
-          <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.portfolioAllocation(currentPortfolioId || 'none') })}>
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={isAllocationLoading || isSuggestionsFetching || isHistoryFetching}
+          >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -363,6 +513,7 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
                 <Switch
                   checked={autoRebalancing}
                   onCheckedChange={setAutoRebalancing}
+                  disabled={isSettingsLoading || isSavingSettings}
                 />
               </div>
               
@@ -377,6 +528,14 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
                   </p>
                 </div>
               )}
+              <div className="text-xs text-muted-foreground space-y-1">
+                {settings?.lastRebalanceAt && (
+                  <p>Last run: {formatDateTime(settings.lastRebalanceAt)}</p>
+                )}
+                {settings?.nextRebalanceAt && (
+                  <p>Next scheduled: {formatDateTime(settings.nextRebalanceAt)}</p>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -391,6 +550,7 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
                 max={15}
                 step={1}
                 className="w-full"
+                disabled={isSettingsLoading || isSavingSettings}
               />
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>1%</span>
@@ -402,15 +562,20 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
             <div className="space-y-2">
               <label className="text-sm font-medium">Frequency</label>
               <p className="text-xs text-muted-foreground mb-2">Check interval</p>
-              <Select value={rebalanceFrequency} onValueChange={setRebalanceFrequency}>
+              <Select
+                value={rebalanceFrequency}
+                onValueChange={setRebalanceFrequency}
+                disabled={isSettingsLoading || isSavingSettings}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="daily">Daily</SelectItem>
                   <SelectItem value="weekly">Weekly</SelectItem>
                   <SelectItem value="monthly">Monthly</SelectItem>
                   <SelectItem value="quarterly">Quarterly</SelectItem>
-                  <SelectItem value="semi-annual">Semi-Annual</SelectItem>
+                  <SelectItem value="semiannual">Semi-Annual</SelectItem>
                   <SelectItem value="annual">Annual</SelectItem>
                 </SelectContent>
               </Select>
@@ -425,6 +590,7 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
                 onChange={(e) => setMinTradeValue(Number(e.target.value) || 100)}
                 min="0"
                 step="50"
+                disabled={isSettingsLoading || isSavingSettings}
               />
             </div>
           </div>
@@ -497,6 +663,12 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
                       </Select>
                     </div>
                   </div>
+                  {isUsingFallbackSuggestions && (
+                    <div className="mt-2 text-xs text-muted-foreground flex items-center gap-2">
+                      <AlertCircle className="h-3 w-3 text-yellow-600" />
+                      Using locally computed fallback suggestions while the API response is unavailable.
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <Table>
@@ -582,8 +754,16 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
                     </div>
                     
                     <div className="flex gap-2 pt-4 border-t">
-                      <Button onClick={handleExecuteRebalancing} className="flex-1 gap-2">
-                        <Play className="h-4 w-4" />
+                      <Button
+                        onClick={handleExecuteRebalancing}
+                        className="flex-1 gap-2"
+                        disabled={isExecuting || rebalancingSuggestions.length === 0}
+                      >
+                        {isExecuting ? (
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Play className="h-4 w-4" />
+                        )}
                         Execute All Rebalancing Trades
                       </Button>
                       <Button variant="outline" className="gap-2">
@@ -623,17 +803,13 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
                         <div className="flex justify-between text-sm">
                           <span>Avg. Drift:</span>
                           <span className="font-medium text-yellow-600">
-                            {rebalancingSuggestions.length > 0 
-                              ? (rebalancingSuggestions.reduce((sum, s) => sum + Math.abs(s.deviation), 0) / rebalancingSuggestions.length).toFixed(2)
-                              : '0.00'}%
+                            {averageDeviation.toFixed(2)}%
                           </span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>Max Deviation:</span>
                           <span className="font-medium text-red-600">
-                            {rebalancingSuggestions.length > 0
-                              ? Math.max(...rebalancingSuggestions.map(s => Math.abs(s.deviation))).toFixed(2)
-                              : '0.00'}%
+                            {maxDeviation.toFixed(2)}%
                           </span>
                         </div>
                       </div>
@@ -654,11 +830,15 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-green-700">Avg. Drift:</span>
-                          <span className="font-medium text-green-800">~0.5%</span>
+                          <span className="font-medium text-green-800">
+                            {projectedAverageDeviation.toFixed(2)}%
+                          </span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-green-700">Max Deviation:</span>
-                          <span className="font-medium text-green-800">~1.0%</span>
+                          <span className="font-medium text-green-800">
+                            {projectedMaxDeviation.toFixed(2)}%
+                          </span>
                         </div>
                       </div>
                     </CardContent>
@@ -693,84 +873,64 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
                 Track your portfolio rebalancing activity and performance impact
               </p>
             </CardHeader>
-            <CardContent>
+          <CardContent>
+            {isHistoryLoading || isHistoryFetching ? (
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : historyRuns.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                No rebalancing activity recorded yet.
+              </div>
+            ) : (
               <div className="space-y-3">
-                {[
-                  { 
-                    date: '2024-09-15', 
-                    type: 'Auto', 
-                    trades: 4, 
-                    buyValue: 18500, 
-                    sellValue: 16200,
-                    cost: 34.7, 
-                    status: 'completed',
-                    drift: 6.2,
-                    impact: '+0.3%'
-                  },
-                  { 
-                    date: '2024-06-12', 
-                    type: 'Manual', 
-                    trades: 6, 
-                    buyValue: 25200, 
-                    sellValue: 23100,
-                    cost: 48.3, 
-                    status: 'completed',
-                    drift: 8.5,
-                    impact: '+0.5%'
-                  },
-                  { 
-                    date: '2024-03-08', 
-                    type: 'Auto', 
-                    trades: 3, 
-                    buyValue: 12900, 
-                    sellValue: 11800,
-                    cost: 24.7, 
-                    status: 'completed',
-                    drift: 5.3,
-                    impact: '+0.2%'
-                  },
-                ].map((rebalance, index) => (
-                  <Card key={index} className="border">
+                {historyRuns.map((run) => (
+                  <Card key={run.id} className="border">
                     <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 flex-1">
                           <CheckCircle2 className="h-5 w-5 text-green-600" />
                           <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium">{rebalance.date}</p>
-                              <Badge variant="outline">{rebalance.type}</Badge>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium">{formatDateTime(run.executedAt)}</p>
+                              <Badge variant="outline" className="capitalize">{run.type}</Badge>
+                              <Badge variant="secondary">{run.tradesCount} trades</Badge>
                             </div>
-                            <div className="grid grid-cols-4 gap-4 mt-2 text-sm">
-                              <div>
-                                <span className="text-muted-foreground">Trades:</span>
-                                <span className="ml-1 font-medium">{rebalance.trades}</span>
-                              </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 text-sm">
                               <div>
                                 <span className="text-muted-foreground">Buy:</span>
-                                <span className="ml-1 font-medium text-green-600">{formatCurrency(rebalance.buyValue)}</span>
+                                <span className="ml-1 font-medium text-green-600">{formatCurrency(run.buyValue)}</span>
                               </div>
                               <div>
                                 <span className="text-muted-foreground">Sell:</span>
-                                <span className="ml-1 font-medium text-red-600">{formatCurrency(rebalance.sellValue)}</span>
+                                <span className="ml-1 font-medium text-red-600">{formatCurrency(run.sellValue)}</span>
                               </div>
                               <div>
-                                <span className="text-muted-foreground">Cost:</span>
-                                <span className="ml-1 font-medium">{formatCurrency(rebalance.cost)}</span>
+                                <span className="text-muted-foreground">Net Cost:</span>
+                                <span className="ml-1 font-medium">{formatCurrency(run.transactionCost)}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Trades:</span>
+                                <span className="ml-1 font-medium">{run.tradesCount}</span>
                               </div>
                             </div>
                           </div>
                         </div>
                         <div className="text-right">
-                          <Badge variant="outline" className="mb-2">Drift: {rebalance.drift}%</Badge>
-                          <p className="text-sm font-medium text-green-600">{rebalance.impact}</p>
-                          <p className="text-xs text-muted-foreground">Performance impact</p>
+                          <Badge variant="outline" className="mb-2">
+                            Drift: {formatPercent(run.driftBefore)} → {formatPercent(run.driftAfter)}
+                          </Badge>
+                          <p className="text-xs text-muted-foreground">
+                            {run.trades.length > 0 ? `${run.trades[0].action} ${run.trades[0].symbol}` : 'Batch execution'}
+                          </p>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
                 ))}
               </div>
-            </CardContent>
+            )}
+          </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
