@@ -89,6 +89,78 @@ export type AnnualEarnings = {
     profit_million?: (string | null);
 };
 
+/**
+ * Asset allocation recommendation for a goal
+ */
+export type AssetAllocationRecommendation = {
+    equity_percent: number;
+    debt_percent: number;
+    gold_percent: number;
+    cash_percent: number;
+    rationale: string;
+    risk_level: RiskAppetite;
+};
+
+/**
+ * Attribution analysis API response
+ */
+export type AttributionResponse = {
+    portfolio_id: string;
+    period: string;
+    attribution: Array<{
+        [key: string]: unknown;
+    }>;
+    total_attribution?: ({
+    [key: string]: unknown;
+} | null);
+};
+
+/**
+ * Benchmark comparison for a single period
+ */
+export type BenchmarkComparisonPeriod = {
+    period: string;
+    portfolio_return: number;
+    benchmark_return: number;
+    relative_return: number;
+    alpha?: (number | null);
+    beta?: (number | null);
+    tracking_error?: (number | null);
+    information_ratio?: (number | null);
+};
+
+/**
+ * Benchmark comparison API response
+ */
+export type BenchmarkComparisonResponse = {
+    portfolio_id: string;
+    benchmark_id: string;
+    benchmark_name: string;
+    comparison: Array<BenchmarkComparisonPeriod>;
+};
+
+/**
+ * List of available benchmarks
+ */
+export type BenchmarkListResponse = {
+    benchmarks: Array<BenchmarkPublic>;
+};
+
+/**
+ * Public benchmark model for API responses
+ */
+export type BenchmarkPublic = {
+    name: string;
+    ticker?: (string | null);
+    description?: (string | null);
+    asset_class?: (string | null);
+    region?: (string | null);
+    data_source?: (string | null);
+    is_active?: boolean;
+    id: string;
+    created_at: string;
+};
+
 export type Body_analytics_upsert_allocation_targets = {
     targets: Array<AllocationTargetCreate>;
 };
@@ -102,6 +174,41 @@ export type Body_login_login_access_token = {
     client_secret?: (string | null);
 };
 
+export type Body_portfolio_upload_portfolio_statement = {
+    file: (Blob | File);
+};
+
+/**
+ * Request model for bulk saving holdings
+ */
+export type BulkHoldingsSaveRequest = {
+    client_info: ClientInfo;
+    holdings: Array<HoldingItem_Input>;
+    total_portfolio_value: (number | string);
+    total_unrealized_gain_loss: (number | string);
+};
+
+/**
+ * Response model after saving holdings
+ */
+export type BulkHoldingsSaveResponse = {
+    success: boolean;
+    message: string;
+    /**
+     * Number of holdings added
+     */
+    added_count?: number;
+    /**
+     * Number of holdings updated
+     */
+    updated_count?: number;
+    portfolio_id: string;
+    /**
+     * Any warnings during save
+     */
+    warnings?: Array<(string)>;
+};
+
 export type BulkRemoveRequest = {
     item_ids?: (Array<(string)> | null);
     stock_ids?: (Array<(string)> | null);
@@ -109,6 +216,32 @@ export type BulkRemoveRequest = {
 
 export type BulkSymbolsRequest = {
     symbols: Array<(string)>;
+};
+
+/**
+ * Client information from portfolio statement
+ */
+export type ClientInfo = {
+    /**
+     * Client code from the statement
+     */
+    client_code: string;
+    /**
+     * Beneficiary Owner ID
+     */
+    bo_id?: (string | null);
+    /**
+     * Account name or type
+     */
+    name: string;
+    /**
+     * Statement date
+     */
+    statement_date: string;
+    /**
+     * Account type (CASH, MARGIN, etc.)
+     */
+    account_type?: string;
 };
 
 /**
@@ -266,6 +399,49 @@ export type FundsSettingsRequest = {
 };
 
 /**
+ * Goal-related alert
+ */
+export type GoalAlert = {
+    alert_type: string;
+    severity: string;
+    message: string;
+    action_required?: (string | null);
+    created_at: string;
+};
+
+/**
+ * List of alerts for a goal
+ */
+export type GoalAlertResponse = {
+    goal_id: string;
+    alerts: Array<GoalAlert>;
+    total_alerts: number;
+};
+
+/**
+ * Detailed goal progress information
+ */
+export type GoalProgressResponse = {
+    goal_id: string;
+    goal_name: string;
+    current_value: number;
+    target_amount: number;
+    progress_percentage: number;
+    on_track_status: GoalTrackingStatus;
+    shortfall_amount: number;
+    total_contributions: number;
+    total_returns: number;
+    months_remaining: number;
+    projected_final_value: number;
+    recommended_action?: (string | null);
+};
+
+/**
+ * Goal progress tracking status
+ */
+export type GoalTrackingStatus = 'ON_TRACK' | 'BEHIND' | 'AHEAD' | 'AT_RISK';
+
+/**
  * Historical financial ratios for charting
  */
 export type HistoricalRatios = {
@@ -291,6 +467,82 @@ export type HistoricalRatios = {
     years?: Array<(number)>;
 };
 
+/**
+ * Individual holding/position from statement
+ */
+export type HoldingItem_Input = {
+    /**
+     * Stock trading code/symbol from database
+     */
+    symbol: string;
+    /**
+     * Company name
+     */
+    company_name: string;
+    /**
+     * Number of shares
+     */
+    quantity: number;
+    /**
+     * Average cost price per share
+     */
+    cost_price: (number | string);
+    /**
+     * Current market price per share
+     */
+    market_price: (number | string);
+    /**
+     * Current market value of position
+     */
+    market_value: (number | string);
+    /**
+     * Unrealized profit/loss
+     */
+    unrealized_gain_loss: (number | string);
+    /**
+     * Unrealized profit/loss percentage
+     */
+    unrealized_gain_loss_percent: (number | string);
+};
+
+/**
+ * Individual holding/position from statement
+ */
+export type HoldingItem_Output = {
+    /**
+     * Stock trading code/symbol from database
+     */
+    symbol: string;
+    /**
+     * Company name
+     */
+    company_name: string;
+    /**
+     * Number of shares
+     */
+    quantity: number;
+    /**
+     * Average cost price per share
+     */
+    cost_price: string;
+    /**
+     * Current market price per share
+     */
+    market_price: string;
+    /**
+     * Current market value of position
+     */
+    market_value: string;
+    /**
+     * Unrealized profit/loss
+     */
+    unrealized_gain_loss: string;
+    /**
+     * Unrealized profit/loss percentage
+     */
+    unrealized_gain_loss_percent: string;
+};
+
 export type HTTPValidationError = {
     detail?: Array<ValidationError>;
 };
@@ -298,7 +550,7 @@ export type HTTPValidationError = {
 /**
  * Investment objectives
  */
-export type InvestmentGoal = 'RETIREMENT' | 'EDUCATION' | 'WEALTH_BUILDING' | 'INCOME_GENERATION' | 'CAPITAL_PRESERVATION' | 'SHORT_TERM_GAINS';
+export type InvestmentGoal = 'RETIREMENT' | 'EDUCATION' | 'WEALTH_BUILDING' | 'INCOME_GENERATION' | 'CAPITAL_PRESERVATION' | 'SHORT_TERM_GAINS' | 'HOME_PURCHASE' | 'VACATION' | 'EMERGENCY_FUND' | 'WEDDING' | 'VEHICLE_PURCHASE' | 'BUSINESS_STARTUP';
 
 export type ItemCreate = {
     title: string;
@@ -456,6 +708,36 @@ export type MarketSummary = {
 
 export type Message = {
     message: string;
+};
+
+/**
+ * Monthly return data
+ */
+export type MonthlyReturn = {
+    month: string;
+    month_number: number;
+    return_value: number;
+    portfolio_value_start: number;
+    portfolio_value_end: number;
+    benchmark_return?: (number | null);
+};
+
+/**
+ * Monthly returns API response
+ */
+export type MonthlyReturnsResponse = {
+    portfolio_id: string;
+    year: number;
+    monthly_returns: Array<MonthlyReturn>;
+    ytd_return: number;
+    best_month?: ({
+    [key: string]: unknown;
+} | null);
+    worst_month?: ({
+    [key: string]: unknown;
+} | null);
+    positive_months: number;
+    negative_months: number;
 };
 
 export type NewPassword = {
@@ -636,6 +918,49 @@ export type PaymentResponse = {
 } | null);
 };
 
+/**
+ * Performance summary response model
+ */
+export type PerformanceSummary = {
+    total_value: number;
+    total_cost: number;
+    cumulative_return: number;
+    cumulative_return_percent: number;
+    time_weighted_return: number;
+    money_weighted_return: number;
+    annualized_return: number;
+    sharpe_ratio?: (number | null);
+    sortino_ratio?: (number | null);
+    max_drawdown?: (number | null);
+    volatility?: (number | null);
+    best_month?: ({
+    [key: string]: unknown;
+} | null);
+    worst_month?: ({
+    [key: string]: unknown;
+} | null);
+    best_quarter?: ({
+    [key: string]: unknown;
+} | null);
+    worst_quarter?: ({
+    [key: string]: unknown;
+} | null);
+    net_contributions?: (number | null);
+    net_withdrawals?: (number | null);
+    inception_date?: (string | null);
+    days_since_inception?: (number | null);
+};
+
+/**
+ * Complete performance summary API response
+ */
+export type PerformanceSummaryResponse = {
+    portfolio_id: string;
+    portfolio_name: string;
+    period: string;
+    summary: PerformanceSummary;
+};
+
 export type PortfolioCreate = {
     name: string;
     description?: (string | null);
@@ -668,6 +993,22 @@ export type PortfolioPublic = {
     cash_balance?: (string | null);
 };
 
+/**
+ * Response model for parsed portfolio statement
+ */
+export type PortfolioStatementResponse = {
+    client_info: ClientInfo;
+    holdings?: Array<HoldingItem_Output>;
+    /**
+     * Total portfolio value
+     */
+    total_portfolio_value: string;
+    /**
+     * Total unrealized gain/loss
+     */
+    total_unrealized_gain_loss: string;
+};
+
 export type PortfolioSummary = {
     portfolio_id: string;
     portfolio_name: string;
@@ -695,6 +1036,29 @@ export type PrivateUserCreate = {
 };
 
 /**
+ * Investment product recommendation
+ */
+export type ProductRecommendation = {
+    product_type: string;
+    product_name: string;
+    ticker?: (string | null);
+    allocation_percent: number;
+    expected_return: number;
+    risk_level: string;
+    rationale: string;
+};
+
+/**
+ * List of product recommendations for a goal
+ */
+export type ProductRecommendationResponse = {
+    goal_id: string;
+    recommendations: Array<ProductRecommendation>;
+    total_allocation: number;
+    diversification_score: number;
+};
+
+/**
  * Quarterly earnings data
  */
 export type QuarterlyEarnings = {
@@ -703,6 +1067,119 @@ export type QuarterlyEarnings = {
     current_year_eps?: (string | null);
     growth_percent?: (string | null);
     period: string;
+};
+
+/**
+ * Request to execute rebalancing
+ */
+export type RebalancingExecuteRequest = {
+    suggestions: Array<{
+        [key: string]: unknown;
+    }>;
+    simulate?: boolean;
+};
+
+/**
+ * Response after executing rebalancing
+ */
+export type RebalancingExecuteResponse = {
+    run_id: string;
+    executed_at: string;
+    trades: Array<RebalancingTradePublic>;
+    buy_value: string;
+    sell_value: string;
+    transaction_cost: string;
+    drift_before: string;
+    drift_after: string;
+};
+
+/**
+ * Response for history endpoint
+ */
+export type RebalancingHistoryResponse = {
+    portfolio_id: string;
+    runs: Array<RebalancingRunPublic>;
+    total_runs: number;
+};
+
+/**
+ * Public rebalancing run info
+ */
+export type RebalancingRunPublic = {
+    id: string;
+    portfolio_id: string;
+    type: string;
+    drift_before: string;
+    drift_after: string;
+    trades_count: number;
+    buy_value: string;
+    sell_value: string;
+    transaction_cost: string;
+    notes: (string | null);
+    executed_at: string;
+    trades?: Array<RebalancingTradePublic>;
+};
+
+export type RebalancingSettingsPublic = {
+    enabled?: boolean;
+    threshold_pct?: string;
+    frequency?: string;
+    min_trade_value?: string;
+    id: string;
+    user_id: string;
+    portfolio_id: string;
+    last_rebalance_at?: (string | null);
+    next_rebalance_at?: (string | null);
+    created_at: string;
+    updated_at: string;
+};
+
+export type RebalancingSettingsUpdate = {
+    enabled?: (boolean | null);
+    threshold_pct?: (number | string | null);
+    frequency?: (string | null);
+    min_trade_value?: (number | string | null);
+};
+
+/**
+ * Single rebalancing suggestion
+ */
+export type RebalancingSuggestion = {
+    symbol: string;
+    company_name: string;
+    sector: string;
+    action: string;
+    current_allocation: string;
+    target_allocation: string;
+    deviation: string;
+    suggested_shares: number;
+    suggested_value: string;
+    current_value: string;
+    priority: string;
+};
+
+/**
+ * Response for suggestions endpoint
+ */
+export type RebalancingSuggestionsResponse = {
+    portfolio_id: string;
+    threshold_pct: string;
+    min_trade_value: string;
+    suggestions: Array<RebalancingSuggestion>;
+    totals: {
+        [key: string]: unknown;
+    };
+};
+
+/**
+ * Public trade info
+ */
+export type RebalancingTradePublic = {
+    symbol: string;
+    action: string;
+    quantity: number;
+    price: string;
+    value: string;
 };
 
 export type RiskAlertPublic = {
@@ -717,6 +1194,22 @@ export type RiskAlertPublic = {
     portfolio_id: (string | null);
     created_at: string;
     resolved_at: (string | null);
+};
+
+/**
+ * Risk tolerance levels
+ */
+export type RiskAppetite = 'CONSERVATIVE' | 'MODERATE' | 'AGGRESSIVE';
+
+/**
+ * Risk metrics API response
+ */
+export type RiskMetricsResponse = {
+    portfolio_id: string;
+    period: string;
+    risk_metrics: {
+        [key: string]: unknown;
+    };
 };
 
 /**
@@ -758,6 +1251,18 @@ export type ShareholdingPattern = {
      */
     public?: (string | null);
     change?: (ShareholdingChange | null);
+};
+
+/**
+ * SIP calculation response
+ */
+export type SIPCalculationResult = {
+    monthly_sip_required: number;
+    total_investment: number;
+    expected_final_value: number;
+    expected_returns: number;
+    time_period_months: number;
+    probability_of_success: number;
 };
 
 export type StockScreenerCreate = {
@@ -930,12 +1435,18 @@ export type UserCreate = {
     password: string;
 };
 
+/**
+ * Create a new goal contribution
+ */
 export type UserInvestmentGoalContributionCreate = {
     amount: number;
     contributed_at?: (string | null);
     notes?: (string | null);
 };
 
+/**
+ * Public-facing contribution data
+ */
 export type UserInvestmentGoalContributionPublic = {
     amount: number;
     contributed_at: string;
@@ -946,6 +1457,9 @@ export type UserInvestmentGoalContributionPublic = {
     created_at: string;
 };
 
+/**
+ * Create a new investment goal
+ */
 export type UserInvestmentGoalCreate = {
     goal_type: InvestmentGoal;
     target_amount?: (number | null);
@@ -953,8 +1467,17 @@ export type UserInvestmentGoalCreate = {
     priority?: number;
     description?: (string | null);
     is_active?: boolean;
+    current_savings?: (number | null);
+    risk_appetite?: (RiskAppetite | null);
+    current_monthly_sip?: (number | null);
+    linked_portfolio_id?: (string | null);
+    auto_rebalance_enabled?: boolean;
+    rebalance_threshold?: (number | null);
 };
 
+/**
+ * Public-facing investment goal data
+ */
 export type UserInvestmentGoalPublic = {
     goal_type: InvestmentGoal;
     target_amount?: (number | null);
@@ -962,12 +1485,43 @@ export type UserInvestmentGoalPublic = {
     priority?: number;
     description?: (string | null);
     is_active?: boolean;
+    current_savings?: (number | null);
+    risk_appetite?: (RiskAppetite | null);
+    current_monthly_sip?: (number | null);
+    linked_portfolio_id?: (string | null);
+    auto_rebalance_enabled?: boolean;
+    rebalance_threshold?: (number | null);
     id: string;
     user_id: string;
+    monthly_sip_required?: (number | null);
+    equity_allocation?: (number | null);
+    debt_allocation?: (number | null);
+    gold_allocation?: (number | null);
+    cash_allocation?: (number | null);
+    expected_return_min?: (number | null);
+    expected_return_max?: (number | null);
+    expected_return_avg?: (number | null);
+    probability_achievement?: (number | null);
+    projected_final_value?: (number | null);
+    current_value?: (number | null);
+    total_contributions?: (number | null);
+    total_returns?: (number | null);
+    progress_percentage?: (number | null);
+    on_track_status?: (GoalTrackingStatus | null);
+    shortfall_amount?: (number | null);
+    last_rebalance_date?: (string | null);
+    next_rebalance_date?: (string | null);
+    last_reviewed_date?: (string | null);
+    milestones?: {
+        [key: string]: unknown;
+    };
     created_at: string;
     updated_at: string;
 };
 
+/**
+ * Update an existing investment goal
+ */
 export type UserInvestmentGoalUpdate = {
     goal_type?: (InvestmentGoal | null);
     target_amount?: (number | null);
@@ -975,6 +1529,12 @@ export type UserInvestmentGoalUpdate = {
     priority?: (number | null);
     description?: (string | null);
     is_active?: (boolean | null);
+    current_savings?: (number | null);
+    risk_appetite?: (RiskAppetite | null);
+    current_monthly_sip?: (number | null);
+    linked_portfolio_id?: (string | null);
+    auto_rebalance_enabled?: (boolean | null);
+    rebalance_threshold?: (number | null);
 };
 
 export type UserPublic = {
@@ -1057,6 +1617,32 @@ export type ValidationError = {
     type: string;
 };
 
+/**
+ * Single point in portfolio value history
+ */
+export type ValueHistoryPoint = {
+    date: string;
+    portfolio_value: number;
+    portfolio_return?: (number | null);
+    portfolio_cumulative_return?: (number | null);
+    benchmark_value?: (number | null);
+    benchmark_return?: (number | null);
+    benchmark_cumulative_return?: (number | null);
+    relative_return?: (number | null);
+    alpha?: (number | null);
+};
+
+/**
+ * Portfolio value history API response
+ */
+export type ValueHistoryResponse = {
+    portfolio_id: string;
+    benchmark_id?: (string | null);
+    benchmark_name?: (string | null);
+    frequency: string;
+    data: Array<ValueHistoryPoint>;
+};
+
 export type WatchlistCreate = {
     name: string;
     description?: (string | null);
@@ -1101,6 +1687,27 @@ export type WatchlistUpdate = {
 export type Week52Range = {
     low?: (string | null);
     high?: (string | null);
+};
+
+/**
+ * What-if scenario input parameters
+ */
+export type WhatIfScenarioRequest = {
+    additional_monthly_investment?: (number | null);
+    delay_months?: (number | null);
+    return_adjustment?: (number | null);
+};
+
+/**
+ * What-if scenario calculation results
+ */
+export type WhatIfScenarioResponse = {
+    scenario_description: string;
+    new_monthly_sip: number;
+    new_projected_value: number;
+    new_probability: number;
+    impact_on_goal: string;
+    recommendation: string;
 };
 
 export type AlertsListAlertsResponse = (Array<AlertPublic>);
@@ -1404,6 +2011,43 @@ export type KycDeleteGoalContributionData = {
 
 export type KycDeleteGoalContributionResponse = (unknown);
 
+export type KycCalculateGoalSipData = {
+    goalId: string;
+};
+
+export type KycCalculateGoalSipResponse = (SIPCalculationResult);
+
+export type KycGetGoalProgressData = {
+    goalId: string;
+};
+
+export type KycGetGoalProgressResponse = (GoalProgressResponse);
+
+export type KycCalculateWhatIfScenarioData = {
+    goalId: string;
+    requestBody: WhatIfScenarioRequest;
+};
+
+export type KycCalculateWhatIfScenarioResponse = (WhatIfScenarioResponse);
+
+export type KycGetAssetAllocationRecommendationData = {
+    goalId: string;
+};
+
+export type KycGetAssetAllocationRecommendationResponse = (AssetAllocationRecommendation);
+
+export type KycGetProductRecommendationsData = {
+    goalId: string;
+};
+
+export type KycGetProductRecommendationsResponse = (ProductRecommendationResponse);
+
+export type KycGetGoalAlertsData = {
+    goalId: string;
+};
+
+export type KycGetGoalAlertsResponse = (GoalAlertResponse);
+
 export type KycGetUserAccountsResponse = (Array<UserAccountPublic>);
 
 export type KycCreateUserAccountData = {
@@ -1608,6 +2252,133 @@ export type OrdersGetOrderSummaryData = {
 
 export type OrdersGetOrderSummaryResponse = (OrderSummary);
 
+export type PerformanceGetPortfolioReturnsData = {
+    period?: string;
+    portfolioId: string;
+};
+
+export type PerformanceGetPortfolioReturnsResponse = (unknown);
+
+export type PerformanceGetRiskMetricsData = {
+    benchmarkId?: (string | null);
+    period?: string;
+    portfolioId: string;
+};
+
+export type PerformanceGetRiskMetricsResponse = (RiskMetricsResponse);
+
+export type PerformanceGetPortfolioBestWorstPeriodsData = {
+    period?: string;
+    portfolioId: string;
+};
+
+export type PerformanceGetPortfolioBestWorstPeriodsResponse = (unknown);
+
+export type PerformanceGetCashFlowAnalysisData = {
+    period?: string;
+    portfolioId: string;
+    transactionType?: string;
+};
+
+export type PerformanceGetCashFlowAnalysisResponse = (unknown);
+
+export type PerformanceGetPortfolioCurrentValueData = {
+    portfolioId: string;
+};
+
+export type PerformanceGetPortfolioCurrentValueResponse = (unknown);
+
+export type PerformanceGetPortfolioPerformanceSummaryData = {
+    period?: string;
+    portfolioId: string;
+};
+
+export type PerformanceGetPortfolioPerformanceSummaryResponse = (PerformanceSummaryResponse);
+
+export type PerformanceGetPortfolioValueHistoryData = {
+    benchmarkId?: (string | null);
+    frequency?: string;
+    period?: string;
+    portfolioId: string;
+};
+
+export type PerformanceGetPortfolioValueHistoryResponse = (ValueHistoryResponse);
+
+export type PerformanceGetBenchmarkComparisonData = {
+    benchmarkId?: string;
+    portfolioId: string;
+};
+
+export type PerformanceGetBenchmarkComparisonResponse = (BenchmarkComparisonResponse);
+
+export type PerformanceGetAvailableBenchmarksResponse = (BenchmarkListResponse);
+
+export type PerformanceGetMonthlyReturnsData = {
+    portfolioId: string;
+    year?: (number | null);
+};
+
+export type PerformanceGetMonthlyReturnsResponse = (MonthlyReturnsResponse);
+
+export type PerformanceGetAssetClassAttributionData = {
+    period?: string;
+    portfolioId: string;
+};
+
+export type PerformanceGetAssetClassAttributionResponse = (AttributionResponse);
+
+export type PerformanceGetSectorAttributionData = {
+    benchmarkId?: (string | null);
+    period?: string;
+    portfolioId: string;
+};
+
+export type PerformanceGetSectorAttributionResponse = (AttributionResponse);
+
+export type PerformanceGetSecurityAttributionData = {
+    limit?: number;
+    period?: string;
+    portfolioId: string;
+};
+
+export type PerformanceGetSecurityAttributionResponse = (unknown);
+
+export type PerformanceGetReturnDecompositionData = {
+    period?: string;
+    portfolioId: string;
+};
+
+export type PerformanceGetReturnDecompositionResponse = (unknown);
+
+export type PerformanceGetPeriodPerformanceData = {
+    portfolioId: string;
+};
+
+export type PerformanceGetPeriodPerformanceResponse = (unknown);
+
+export type PerformanceBackfillPortfolioValuationsData = {
+    /**
+     * Number of days to backfill if start_date not provided
+     */
+    days?: number;
+    portfolioId: string;
+    /**
+     * Start date for backfill
+     */
+    startDate?: (string | null);
+};
+
+export type PerformanceBackfillPortfolioValuationsResponse = (unknown);
+
+export type PerformanceBackfillAllPortfoliosData = {
+    /**
+     * Number of days to backfill
+     */
+    days?: number;
+};
+
+export type PerformanceBackfillAllPortfoliosResponse = (unknown);
+
 export type PortfolioGetUserPortfoliosResponse = (Array<PortfolioPublic>);
 
 export type PortfolioCreatePortfolioData = {
@@ -1649,6 +2420,12 @@ export type PortfolioGetPortfolioPositionsData = {
 };
 
 export type PortfolioGetPortfolioPositionsResponse = (Array<PortfolioPositionPublic>);
+
+export type PortfolioGetPositionsBySymbolData = {
+    symbol: string;
+};
+
+export type PortfolioGetPositionsBySymbolResponse = (unknown);
 
 export type PortfolioGetPortfolioPositionsWithDetailsData = {
     portfolioId: string;
@@ -1714,25 +2491,82 @@ export type PortfolioGetRecentTradesResponse = (Array<TradeWithDetails>);
 
 export type PortfolioGetOrdersTradesSummaryResponse = (unknown);
 
+export type PortfolioUploadPortfolioStatementData = {
+    brokerHouse?: (string | null);
+    formData: Body_portfolio_upload_portfolio_statement;
+    portfolioId: string;
+};
+
+export type PortfolioUploadPortfolioStatementResponse = (PortfolioStatementResponse);
+
+export type PortfolioSaveBulkHoldingsData = {
+    portfolioId: string;
+    requestBody: BulkHoldingsSaveRequest;
+};
+
+export type PortfolioSaveBulkHoldingsResponse = (BulkHoldingsSaveResponse);
+
 export type PrivateCreateUserData = {
     requestBody: PrivateUserCreate;
 };
 
 export type PrivateCreateUserResponse = (UserPublic);
 
-export type ResearchStockScreenerData = {
+export type RebalancingGetRebalancingSuggestionsData = {
     /**
-     * Maximum number of results
+     * Minimum trade value
      */
+    minTradeValue?: number;
+    portfolioId: string;
+    /**
+     * Rebalancing strategy
+     */
+    strategy?: string;
+    /**
+     * Drift threshold percentage
+     */
+    thresholdPct?: number;
+};
+
+export type RebalancingGetRebalancingSuggestionsResponse = (RebalancingSuggestionsResponse);
+
+export type RebalancingExecuteRebalancingData = {
+    portfolioId: string;
+    requestBody: RebalancingExecuteRequest;
+};
+
+export type RebalancingExecuteRebalancingResponse = (RebalancingExecuteResponse);
+
+export type RebalancingGetRebalancingHistoryData = {
     limit?: number;
-    /**
-     * Sector filter
-     */
-    sector?: (string | null);
+    offset?: number;
+    portfolioId: string;
+};
+
+export type RebalancingGetRebalancingHistoryResponse = (RebalancingHistoryResponse);
+
+export type RebalancingGetRebalancingSettingsData = {
+    portfolioId: string;
+};
+
+export type RebalancingGetRebalancingSettingsResponse = (RebalancingSettingsPublic);
+
+export type RebalancingUpdateRebalancingSettingsData = {
+    portfolioId: string;
+    requestBody: RebalancingSettingsUpdate;
+};
+
+export type RebalancingUpdateRebalancingSettingsResponse = (RebalancingSettingsPublic);
+
+export type ResearchStockScreenerData = {
     /**
      * Industry filter
      */
     industry?: (string | null);
+    /**
+     * Maximum number of results
+     */
+    limit?: number;
     /**
      * Maximum dividend yield %
      */
@@ -1750,9 +2584,17 @@ export type ResearchStockScreenerData = {
      */
     maxPrice?: (number | null);
     /**
+     * Maximum daily price change percent
+     */
+    maxPriceChange?: (number | null);
+    /**
      * Maximum price-to-book ratio
      */
     maxPriceToBook?: (number | null);
+    /**
+     * Maximum RSI value
+     */
+    maxRsi?: (number | null);
     /**
      * Minimum dividend yield %
      */
@@ -1770,6 +2612,10 @@ export type ResearchStockScreenerData = {
      */
     minPrice?: (number | null);
     /**
+     * Minimum daily price change percent
+     */
+    minPriceChange?: (number | null);
+    /**
      * Minimum price-to-book ratio
      */
     minPriceToBook?: (number | null);
@@ -1782,46 +2628,16 @@ export type ResearchStockScreenerData = {
      */
     minVolume?: (number | null);
     /**
-     * Maximum RSI value
-     */
-    maxRsi?: (number | null);
-    /**
-     * Minimum daily price change percent
-     */
-    minPriceChange?: (number | null);
-    /**
-     * Maximum daily price change percent
-     */
-    maxPriceChange?: (number | null);
-    /**
      * Moving average position filter (all, above_20, above_50, below_20, below_50)
      */
     movingAverage?: (string | null);
+    /**
+     * Sector filter
+     */
+    sector?: (string | null);
 };
 
-export type ResearchStockScreenerResponse = {
-    total_results: number;
-    filters_applied: Record<string, unknown>;
-    stocks: Array<{
-        stock_id: string;
-        symbol: string;
-        name: string;
-        sector: (string | null);
-        industry: (string | null);
-        current_price: (number | null);
-        change: (number | null);
-        change_percent: (number | null);
-        volume: (number | null);
-        market_cap: (number | null);
-        pe_ratio: (number | null);
-        pb_ratio: (number | null);
-        dividend_yield: (number | null);
-        rsi: (number | null);
-        sma_20: (number | null);
-        sma_50: (number | null);
-        rating: ('Strong Buy' | 'Buy' | 'Hold' | 'Sell' | 'Strong Sell');
-    }>;
-};
+export type ResearchStockScreenerResponse = (unknown);
 
 export type ResearchGetFundamentalAnalysisData = {
     symbol: string;
@@ -1915,6 +2731,117 @@ export type SubscriptionsBkashPaymentData = {
 };
 
 export type SubscriptionsBkashPaymentResponse = (PaymentResponse);
+
+export type TradingviewGetConfigResponse = ({
+    [key: string]: unknown;
+});
+
+export type TradingviewSearchSymbolsData = {
+    /**
+     * Exchange filter
+     */
+    exchange?: (string | null);
+    /**
+     * Maximum number of results
+     */
+    limit?: number;
+    /**
+     * Search query for symbol or company name
+     */
+    query?: (string | null);
+    /**
+     * Symbol name for individual symbol resolution
+     */
+    symbol?: (string | null);
+    /**
+     * Type filter (stock, index, etc)
+     */
+    type?: (string | null);
+};
+
+export type TradingviewSearchSymbolsResponse = (({
+    [key: string]: unknown;
+} | Array<{
+    [key: string]: unknown;
+}>));
+
+export type TradingviewSearchSymbolsSearchData = {
+    /**
+     * Exchange filter
+     */
+    exchange?: (string | null);
+    /**
+     * Maximum number of results
+     */
+    limit?: number;
+    /**
+     * Search query for symbol or company name
+     */
+    query?: (string | null);
+    /**
+     * Type filter (stock, index, etc)
+     */
+    type?: (string | null);
+};
+
+export type TradingviewSearchSymbolsSearchResponse = (Array<{
+    [key: string]: unknown;
+}>);
+
+export type TradingviewGetSymbolInfoData = {
+    /**
+     * Exchange group
+     */
+    group?: (string | null);
+};
+
+export type TradingviewGetSymbolInfoResponse = ({
+    [key: string]: unknown;
+});
+
+export type TradingviewGetHistoryData = {
+    /**
+     * Number of bars to return
+     */
+    countback?: (number | null);
+    /**
+     * Unix timestamp (seconds) of the leftmost bar
+     */
+    from: number;
+    /**
+     * Resolution (1D, 1W, 1M, etc)
+     */
+    resolution: string;
+    /**
+     * Symbol name
+     */
+    symbol: string;
+    /**
+     * Unix timestamp (seconds) of the rightmost bar
+     */
+    to: number;
+};
+
+export type TradingviewGetHistoryResponse = ({
+    [key: string]: unknown;
+});
+
+export type TradingviewGetQuotesData = {
+    /**
+     * Comma-separated list of symbols
+     */
+    symbols: string;
+};
+
+export type TradingviewGetQuotesResponse = ({
+    [key: string]: unknown;
+});
+
+export type TradingviewGetPositionsForTradingviewData = {
+    symbol: string;
+};
+
+export type TradingviewGetPositionsForTradingviewResponse = (unknown);
 
 export type UsersReadUsersData = {
     limit?: number;

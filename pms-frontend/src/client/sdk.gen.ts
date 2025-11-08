@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { AlertsListAlertsResponse, AlertsCreateAlertData, AlertsCreateAlertResponse, AlertsUpdateAlertData, AlertsUpdateAlertResponse, AlertsDeleteAlertData, AlertsDeleteAlertResponse, AlertsEvaluateAlertData, AlertsEvaluateAlertResponse, AnalyticsGetPortfolioPerformanceData, AnalyticsGetPortfolioPerformanceResponse, AnalyticsGetPortfolioAllocationData, AnalyticsGetPortfolioAllocationResponse, AnalyticsGetBenchmarkComparisonData, AnalyticsGetBenchmarkComparisonResponse, AnalyticsGetDividendAnalysisData, AnalyticsGetDividendAnalysisResponse, AnalyticsGetCostBasisAnalysisData, AnalyticsGetCostBasisAnalysisResponse, AnalyticsGetMarketSentimentData, AnalyticsGetMarketSentimentResponse, AnalyticsGetAllocationTargetsData, AnalyticsGetAllocationTargetsResponse, AnalyticsUpsertAllocationTargetsData, AnalyticsUpsertAllocationTargetsResponse, DashboardGetDashboardSummaryResponse, FundamentalsGetCompanyInfoData, FundamentalsGetCompanyInfoResponse, FundamentalsGetMarketSummaryData, FundamentalsGetMarketSummaryResponse, FundamentalsGetShareholdingPatternData, FundamentalsGetShareholdingPatternResponse, FundamentalsGetEarningsProfitData, FundamentalsGetEarningsProfitResponse, FundamentalsGetFinancialHealthData, FundamentalsGetFinancialHealthResponse, FundamentalsGetDividendHistoryData, FundamentalsGetDividendHistoryResponse, FundamentalsGetHistoricalRatiosData, FundamentalsGetHistoricalRatiosResponse, FundamentalsCompareCompaniesData, FundamentalsCompareCompaniesResponse, FundamentalsSearchCompaniesData, FundamentalsSearchCompaniesResponse, FundamentalsCheckDataAvailabilityData, FundamentalsCheckDataAvailabilityResponse, FundsGetFundsSummaryResponse, FundsListTransactionsData, FundsListTransactionsResponse, FundsDepositFundsData, FundsDepositFundsResponse, FundsWithdrawFundsData, FundsWithdrawFundsResponse, FundsUpdateFundsSettingsData, FundsUpdateFundsSettingsResponse, ItemsReadItemsData, ItemsReadItemsResponse, ItemsCreateItemData, ItemsCreateItemResponse, ItemsReadItemData, ItemsReadItemResponse, ItemsUpdateItemData, ItemsUpdateItemResponse, ItemsDeleteItemData, ItemsDeleteItemResponse, KycGetKycInformationResponse, KycUpdateKycInformationData, KycUpdateKycInformationResponse, KycCreateKycInformationData, KycCreateKycInformationResponse, KycGetKycStatusResponse, KycGetInvestmentGoalsResponse, KycCreateInvestmentGoalData, KycCreateInvestmentGoalResponse, KycUpdateInvestmentGoalData, KycUpdateInvestmentGoalResponse, KycDeleteInvestmentGoalData, KycDeleteInvestmentGoalResponse, KycCreateGoalContributionData, KycCreateGoalContributionResponse, KycListGoalContributionsData, KycListGoalContributionsResponse, KycDeleteGoalContributionData, KycDeleteGoalContributionResponse, KycGetUserAccountsResponse, KycCreateUserAccountData, KycCreateUserAccountResponse, KycUpdateUserAccountData, KycUpdateUserAccountResponse, KycDeleteUserAccountData, KycDeleteUserAccountResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, MarketGetMarketSummaryResponse, MarketListStocksData, MarketListStocksResponse, MarketGetStockData, MarketGetStockResponse, MarketGetChartDataData, MarketGetChartDataResponse, MarketGetTopMoversData, MarketGetTopMoversResponse, MarketGetMostActiveData, MarketGetMostActiveResponse, MarketGetIndicesData, MarketGetIndicesResponse, MarketGetTurnoverCompareResponse, MarketGetMarketFlowsResponse, MarketGetMacroSnapshotResponse, MarketGetUpcomingEventsData, MarketGetUpcomingEventsResponse, NewsListNewsData, NewsListNewsResponse, NewsCreateNewsData, NewsCreateNewsResponse, NewsGetStockNewsData, NewsGetStockNewsResponse, OrdersCreateOrderData, OrdersCreateOrderResponse, OrdersGetUserOrdersData, OrdersGetUserOrdersResponse, OrdersGetUserOrdersWithDetailsData, OrdersGetUserOrdersWithDetailsResponse, OrdersGetOrderData, OrdersGetOrderResponse, OrdersUpdateOrderData, OrdersUpdateOrderResponse, OrdersCancelOrderData, OrdersCancelOrderResponse, OrdersGetOrderExecutionsData, OrdersGetOrderExecutionsResponse, OrdersGetOrderSummaryData, OrdersGetOrderSummaryResponse, PortfolioGetUserPortfoliosResponse, PortfolioCreatePortfolioData, PortfolioCreatePortfolioResponse, PortfolioGetPortfolioData, PortfolioGetPortfolioResponse, PortfolioUpdatePortfolioData, PortfolioUpdatePortfolioResponse, PortfolioDeletePortfolioData, PortfolioDeletePortfolioResponse, PortfolioAddPositionData, PortfolioAddPositionResponse, PortfolioGetPortfolioPositionsData, PortfolioGetPortfolioPositionsResponse, PortfolioGetPortfolioPositionsWithDetailsData, PortfolioGetPortfolioPositionsWithDetailsResponse, PortfolioUpdatePositionData, PortfolioUpdatePositionResponse, PortfolioRemovePositionData, PortfolioRemovePositionResponse, PortfolioAddTradeData, PortfolioAddTradeResponse, PortfolioGetPortfolioTradesData, PortfolioGetPortfolioTradesResponse, PortfolioUpdateTradeData, PortfolioUpdateTradeResponse, PortfolioDeleteTradeData, PortfolioDeleteTradeResponse, PortfolioGetPortfolioSummaryData, PortfolioGetPortfolioSummaryResponse, PortfolioGetRecentTradesData, PortfolioGetRecentTradesResponse, PortfolioGetOrdersTradesSummaryResponse, PrivateCreateUserData, PrivateCreateUserResponse, ResearchStockScreenerData, ResearchStockScreenerResponse, ResearchGetFundamentalAnalysisData, ResearchGetFundamentalAnalysisResponse, ResearchGetTechnicalAnalysisData, ResearchGetTechnicalAnalysisResponse, ResearchGetStockNewsData, ResearchGetStockNewsResponse, ResearchGetSectorAnalysisResponse, ResearchGetStockOfTheDayResponse, ResearchGetAnalystPicksData, ResearchGetAnalystPicksResponse, ResearchGetEarningsHighlightsData, ResearchGetEarningsHighlightsResponse, ResearchGetThematicIdeasResponse, RiskManagementGetUserRiskProfileResponse, RiskManagementCreateUserRiskProfileData, RiskManagementCreateUserRiskProfileResponse, RiskManagementGetRiskAlertsData, RiskManagementGetRiskAlertsResponse, RiskManagementCreateStockScreenerData, RiskManagementCreateStockScreenerResponse, RiskManagementGetStockScreenersData, RiskManagementGetStockScreenersResponse, SubscriptionsListPlansResponse, SubscriptionsCreatePlanData, SubscriptionsCreatePlanResponse, SubscriptionsSubscribeData, SubscriptionsSubscribeResponse, SubscriptionsStatusCheckResponse, SubscriptionsBkashPaymentData, SubscriptionsBkashPaymentResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse, WatchlistGetUserWatchlistsResponse, WatchlistCreateWatchlistData, WatchlistCreateWatchlistResponse, WatchlistGetWatchlistData, WatchlistGetWatchlistResponse, WatchlistUpdateWatchlistData, WatchlistUpdateWatchlistResponse, WatchlistDeleteWatchlistData, WatchlistDeleteWatchlistResponse, WatchlistAddWatchlistItemData, WatchlistAddWatchlistItemResponse, WatchlistGetWatchlistItemsData, WatchlistGetWatchlistItemsResponse, WatchlistUpdateWatchlistItemData, WatchlistUpdateWatchlistItemResponse, WatchlistRemoveWatchlistItemData, WatchlistRemoveWatchlistItemResponse, WatchlistAddMultipleStocksData, WatchlistAddMultipleStocksResponse, WatchlistRemoveMultipleStocksData, WatchlistRemoveMultipleStocksResponse, WatchlistAddMultipleBySymbolsData, WatchlistAddMultipleBySymbolsResponse, WatchlistSearchStocksData, WatchlistSearchStocksResponse, WatchlistGetWatchlistItemsWithDetailsData, WatchlistGetWatchlistItemsWithDetailsResponse } from './types.gen';
+import type { AlertsListAlertsResponse, AlertsCreateAlertData, AlertsCreateAlertResponse, AlertsUpdateAlertData, AlertsUpdateAlertResponse, AlertsDeleteAlertData, AlertsDeleteAlertResponse, AlertsEvaluateAlertData, AlertsEvaluateAlertResponse, AnalyticsGetPortfolioPerformanceData, AnalyticsGetPortfolioPerformanceResponse, AnalyticsGetPortfolioAllocationData, AnalyticsGetPortfolioAllocationResponse, AnalyticsGetBenchmarkComparisonData, AnalyticsGetBenchmarkComparisonResponse, AnalyticsGetDividendAnalysisData, AnalyticsGetDividendAnalysisResponse, AnalyticsGetCostBasisAnalysisData, AnalyticsGetCostBasisAnalysisResponse, AnalyticsGetMarketSentimentData, AnalyticsGetMarketSentimentResponse, AnalyticsGetAllocationTargetsData, AnalyticsGetAllocationTargetsResponse, AnalyticsUpsertAllocationTargetsData, AnalyticsUpsertAllocationTargetsResponse, DashboardGetDashboardSummaryResponse, FundamentalsGetCompanyInfoData, FundamentalsGetCompanyInfoResponse, FundamentalsGetMarketSummaryData, FundamentalsGetMarketSummaryResponse, FundamentalsGetShareholdingPatternData, FundamentalsGetShareholdingPatternResponse, FundamentalsGetEarningsProfitData, FundamentalsGetEarningsProfitResponse, FundamentalsGetFinancialHealthData, FundamentalsGetFinancialHealthResponse, FundamentalsGetDividendHistoryData, FundamentalsGetDividendHistoryResponse, FundamentalsGetHistoricalRatiosData, FundamentalsGetHistoricalRatiosResponse, FundamentalsCompareCompaniesData, FundamentalsCompareCompaniesResponse, FundamentalsSearchCompaniesData, FundamentalsSearchCompaniesResponse, FundamentalsCheckDataAvailabilityData, FundamentalsCheckDataAvailabilityResponse, FundsGetFundsSummaryResponse, FundsListTransactionsData, FundsListTransactionsResponse, FundsDepositFundsData, FundsDepositFundsResponse, FundsWithdrawFundsData, FundsWithdrawFundsResponse, FundsUpdateFundsSettingsData, FundsUpdateFundsSettingsResponse, ItemsReadItemsData, ItemsReadItemsResponse, ItemsCreateItemData, ItemsCreateItemResponse, ItemsReadItemData, ItemsReadItemResponse, ItemsUpdateItemData, ItemsUpdateItemResponse, ItemsDeleteItemData, ItemsDeleteItemResponse, KycGetKycInformationResponse, KycUpdateKycInformationData, KycUpdateKycInformationResponse, KycCreateKycInformationData, KycCreateKycInformationResponse, KycGetKycStatusResponse, KycGetInvestmentGoalsResponse, KycCreateInvestmentGoalData, KycCreateInvestmentGoalResponse, KycUpdateInvestmentGoalData, KycUpdateInvestmentGoalResponse, KycDeleteInvestmentGoalData, KycDeleteInvestmentGoalResponse, KycCreateGoalContributionData, KycCreateGoalContributionResponse, KycListGoalContributionsData, KycListGoalContributionsResponse, KycDeleteGoalContributionData, KycDeleteGoalContributionResponse, KycCalculateGoalSipData, KycCalculateGoalSipResponse, KycGetGoalProgressData, KycGetGoalProgressResponse, KycCalculateWhatIfScenarioData, KycCalculateWhatIfScenarioResponse, KycGetAssetAllocationRecommendationData, KycGetAssetAllocationRecommendationResponse, KycGetProductRecommendationsData, KycGetProductRecommendationsResponse, KycGetGoalAlertsData, KycGetGoalAlertsResponse, KycGetUserAccountsResponse, KycCreateUserAccountData, KycCreateUserAccountResponse, KycUpdateUserAccountData, KycUpdateUserAccountResponse, KycDeleteUserAccountData, KycDeleteUserAccountResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, MarketGetMarketSummaryResponse, MarketListStocksData, MarketListStocksResponse, MarketGetStockData, MarketGetStockResponse, MarketGetChartDataData, MarketGetChartDataResponse, MarketGetTopMoversData, MarketGetTopMoversResponse, MarketGetMostActiveData, MarketGetMostActiveResponse, MarketGetIndicesData, MarketGetIndicesResponse, MarketGetTurnoverCompareResponse, MarketGetMarketFlowsResponse, MarketGetMacroSnapshotResponse, MarketGetUpcomingEventsData, MarketGetUpcomingEventsResponse, NewsListNewsData, NewsListNewsResponse, NewsCreateNewsData, NewsCreateNewsResponse, NewsGetStockNewsData, NewsGetStockNewsResponse, OrdersCreateOrderData, OrdersCreateOrderResponse, OrdersGetUserOrdersData, OrdersGetUserOrdersResponse, OrdersGetUserOrdersWithDetailsData, OrdersGetUserOrdersWithDetailsResponse, OrdersGetOrderData, OrdersGetOrderResponse, OrdersUpdateOrderData, OrdersUpdateOrderResponse, OrdersCancelOrderData, OrdersCancelOrderResponse, OrdersGetOrderExecutionsData, OrdersGetOrderExecutionsResponse, OrdersGetOrderSummaryData, OrdersGetOrderSummaryResponse, PerformanceGetPortfolioReturnsData, PerformanceGetPortfolioReturnsResponse, PerformanceGetRiskMetricsData, PerformanceGetRiskMetricsResponse, PerformanceGetPortfolioBestWorstPeriodsData, PerformanceGetPortfolioBestWorstPeriodsResponse, PerformanceGetCashFlowAnalysisData, PerformanceGetCashFlowAnalysisResponse, PerformanceGetPortfolioCurrentValueData, PerformanceGetPortfolioCurrentValueResponse, PerformanceGetPortfolioPerformanceSummaryData, PerformanceGetPortfolioPerformanceSummaryResponse, PerformanceGetPortfolioValueHistoryData, PerformanceGetPortfolioValueHistoryResponse, PerformanceGetBenchmarkComparisonData, PerformanceGetBenchmarkComparisonResponse, PerformanceGetAvailableBenchmarksResponse, PerformanceGetMonthlyReturnsData, PerformanceGetMonthlyReturnsResponse, PerformanceGetAssetClassAttributionData, PerformanceGetAssetClassAttributionResponse, PerformanceGetSectorAttributionData, PerformanceGetSectorAttributionResponse, PerformanceGetSecurityAttributionData, PerformanceGetSecurityAttributionResponse, PerformanceGetReturnDecompositionData, PerformanceGetReturnDecompositionResponse, PerformanceGetPeriodPerformanceData, PerformanceGetPeriodPerformanceResponse, PerformanceBackfillPortfolioValuationsData, PerformanceBackfillPortfolioValuationsResponse, PerformanceBackfillAllPortfoliosData, PerformanceBackfillAllPortfoliosResponse, PortfolioGetUserPortfoliosResponse, PortfolioCreatePortfolioData, PortfolioCreatePortfolioResponse, PortfolioGetPortfolioData, PortfolioGetPortfolioResponse, PortfolioUpdatePortfolioData, PortfolioUpdatePortfolioResponse, PortfolioDeletePortfolioData, PortfolioDeletePortfolioResponse, PortfolioAddPositionData, PortfolioAddPositionResponse, PortfolioGetPortfolioPositionsData, PortfolioGetPortfolioPositionsResponse, PortfolioGetPositionsBySymbolData, PortfolioGetPositionsBySymbolResponse, PortfolioGetPortfolioPositionsWithDetailsData, PortfolioGetPortfolioPositionsWithDetailsResponse, PortfolioUpdatePositionData, PortfolioUpdatePositionResponse, PortfolioRemovePositionData, PortfolioRemovePositionResponse, PortfolioAddTradeData, PortfolioAddTradeResponse, PortfolioGetPortfolioTradesData, PortfolioGetPortfolioTradesResponse, PortfolioUpdateTradeData, PortfolioUpdateTradeResponse, PortfolioDeleteTradeData, PortfolioDeleteTradeResponse, PortfolioGetPortfolioSummaryData, PortfolioGetPortfolioSummaryResponse, PortfolioGetRecentTradesData, PortfolioGetRecentTradesResponse, PortfolioGetOrdersTradesSummaryResponse, PortfolioUploadPortfolioStatementData, PortfolioUploadPortfolioStatementResponse, PortfolioSaveBulkHoldingsData, PortfolioSaveBulkHoldingsResponse, PrivateCreateUserData, PrivateCreateUserResponse, RebalancingGetRebalancingSuggestionsData, RebalancingGetRebalancingSuggestionsResponse, RebalancingExecuteRebalancingData, RebalancingExecuteRebalancingResponse, RebalancingGetRebalancingHistoryData, RebalancingGetRebalancingHistoryResponse, RebalancingGetRebalancingSettingsData, RebalancingGetRebalancingSettingsResponse, RebalancingUpdateRebalancingSettingsData, RebalancingUpdateRebalancingSettingsResponse, ResearchStockScreenerData, ResearchStockScreenerResponse, ResearchGetFundamentalAnalysisData, ResearchGetFundamentalAnalysisResponse, ResearchGetTechnicalAnalysisData, ResearchGetTechnicalAnalysisResponse, ResearchGetStockNewsData, ResearchGetStockNewsResponse, ResearchGetSectorAnalysisResponse, ResearchGetStockOfTheDayResponse, ResearchGetAnalystPicksData, ResearchGetAnalystPicksResponse, ResearchGetEarningsHighlightsData, ResearchGetEarningsHighlightsResponse, ResearchGetThematicIdeasResponse, RiskManagementGetUserRiskProfileResponse, RiskManagementCreateUserRiskProfileData, RiskManagementCreateUserRiskProfileResponse, RiskManagementGetRiskAlertsData, RiskManagementGetRiskAlertsResponse, RiskManagementCreateStockScreenerData, RiskManagementCreateStockScreenerResponse, RiskManagementGetStockScreenersData, RiskManagementGetStockScreenersResponse, SubscriptionsListPlansResponse, SubscriptionsCreatePlanData, SubscriptionsCreatePlanResponse, SubscriptionsSubscribeData, SubscriptionsSubscribeResponse, SubscriptionsStatusCheckResponse, SubscriptionsBkashPaymentData, SubscriptionsBkashPaymentResponse, TradingviewGetConfigResponse, TradingviewSearchSymbolsData, TradingviewSearchSymbolsResponse, TradingviewSearchSymbolsSearchData, TradingviewSearchSymbolsSearchResponse, TradingviewGetSymbolInfoData, TradingviewGetSymbolInfoResponse, TradingviewGetHistoryData, TradingviewGetHistoryResponse, TradingviewGetQuotesData, TradingviewGetQuotesResponse, TradingviewGetPositionsForTradingviewData, TradingviewGetPositionsForTradingviewResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse, WatchlistGetUserWatchlistsResponse, WatchlistCreateWatchlistData, WatchlistCreateWatchlistResponse, WatchlistGetWatchlistData, WatchlistGetWatchlistResponse, WatchlistUpdateWatchlistData, WatchlistUpdateWatchlistResponse, WatchlistDeleteWatchlistData, WatchlistDeleteWatchlistResponse, WatchlistAddWatchlistItemData, WatchlistAddWatchlistItemResponse, WatchlistGetWatchlistItemsData, WatchlistGetWatchlistItemsResponse, WatchlistUpdateWatchlistItemData, WatchlistUpdateWatchlistItemResponse, WatchlistRemoveWatchlistItemData, WatchlistRemoveWatchlistItemResponse, WatchlistAddMultipleStocksData, WatchlistAddMultipleStocksResponse, WatchlistRemoveMultipleStocksData, WatchlistRemoveMultipleStocksResponse, WatchlistAddMultipleBySymbolsData, WatchlistAddMultipleBySymbolsResponse, WatchlistSearchStocksData, WatchlistSearchStocksResponse, WatchlistGetWatchlistItemsWithDetailsData, WatchlistGetWatchlistItemsWithDetailsResponse } from './types.gen';
 
 export class AlertsService {
     /**
@@ -809,7 +809,7 @@ export class KycService {
     
     /**
      * Get Investment Goals
-     * Get user's investment goals.
+     * Get user's investment goals with all calculated fields.
      * @returns UserInvestmentGoalPublic Successful Response
      * @throws ApiError
      */
@@ -822,7 +822,7 @@ export class KycService {
     
     /**
      * Create Investment Goal
-     * Create a new investment goal.
+     * Create a new investment goal with automatic calculations.
      * @param data The data for the request.
      * @param data.requestBody
      * @returns UserInvestmentGoalPublic Successful Response
@@ -842,7 +842,7 @@ export class KycService {
     
     /**
      * Update Investment Goal
-     * Update an investment goal.
+     * Update an investment goal with automatic recalculations.
      * @param data The data for the request.
      * @param data.goalId
      * @param data.requestBody
@@ -887,7 +887,7 @@ export class KycService {
     
     /**
      * Create Goal Contribution
-     * Add a contribution to an investment goal.
+     * Add a contribution to an investment goal and update progress.
      * @param data The data for the request.
      * @param data.goalId
      * @param data.requestBody
@@ -944,6 +944,135 @@ export class KycService {
             url: '/api/v1/kyc/goals/contributions/{contribution_id}',
             path: {
                 contribution_id: data.contributionId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Calculate Goal Sip
+     * Calculate required monthly SIP for achieving the goal.
+     * @param data The data for the request.
+     * @param data.goalId
+     * @returns SIPCalculationResult Successful Response
+     * @throws ApiError
+     */
+    public static calculateGoalSip(data: KycCalculateGoalSipData): CancelablePromise<KycCalculateGoalSipResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/kyc/goals/{goal_id}/calculate-sip',
+            path: {
+                goal_id: data.goalId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Goal Progress
+     * Get detailed progress information for a goal.
+     * @param data The data for the request.
+     * @param data.goalId
+     * @returns GoalProgressResponse Successful Response
+     * @throws ApiError
+     */
+    public static getGoalProgress(data: KycGetGoalProgressData): CancelablePromise<KycGetGoalProgressResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/kyc/goals/{goal_id}/progress',
+            path: {
+                goal_id: data.goalId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Calculate What If Scenario
+     * Calculate what-if scenarios for a goal (e.g., increase SIP, delay goal, change returns).
+     * @param data The data for the request.
+     * @param data.goalId
+     * @param data.requestBody
+     * @returns WhatIfScenarioResponse Successful Response
+     * @throws ApiError
+     */
+    public static calculateWhatIfScenario(data: KycCalculateWhatIfScenarioData): CancelablePromise<KycCalculateWhatIfScenarioResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/kyc/goals/{goal_id}/what-if',
+            path: {
+                goal_id: data.goalId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Asset Allocation Recommendation
+     * Get asset allocation recommendation based on goal, risk profile, and time horizon.
+     * @param data The data for the request.
+     * @param data.goalId
+     * @returns AssetAllocationRecommendation Successful Response
+     * @throws ApiError
+     */
+    public static getAssetAllocationRecommendation(data: KycGetAssetAllocationRecommendationData): CancelablePromise<KycGetAssetAllocationRecommendationResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/kyc/goals/{goal_id}/asset-allocation',
+            path: {
+                goal_id: data.goalId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Product Recommendations
+     * Get investment product recommendations (mutual funds, ETFs, stocks, bonds) for a goal.
+     * @param data The data for the request.
+     * @param data.goalId
+     * @returns ProductRecommendationResponse Successful Response
+     * @throws ApiError
+     */
+    public static getProductRecommendations(data: KycGetProductRecommendationsData): CancelablePromise<KycGetProductRecommendationsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/kyc/goals/{goal_id}/recommendations',
+            path: {
+                goal_id: data.goalId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Goal Alerts
+     * Get alerts for a goal (drift, milestones, rebalancing, review reminders).
+     * @param data The data for the request.
+     * @param data.goalId
+     * @returns GoalAlertResponse Successful Response
+     * @throws ApiError
+     */
+    public static getGoalAlerts(data: KycGetGoalAlertsData): CancelablePromise<KycGetGoalAlertsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/kyc/goals/{goal_id}/alerts',
+            path: {
+                goal_id: data.goalId
             },
             errors: {
                 422: 'Validation Error'
@@ -1586,6 +1715,462 @@ export class OrdersService {
     
 }
 
+export class PerformanceService {
+    /**
+     * Get Portfolio Returns
+     * Get basic return metrics only (TWR, MWR, annualized).
+     * FAST: ~20-50ms with cached valuations.
+     *
+     * - **portfolio_id**: UUID of the portfolio
+     * - **period**: Time period
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.period
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static getPortfolioReturns(data: PerformanceGetPortfolioReturnsData): CancelablePromise<PerformanceGetPortfolioReturnsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/portfolios/{portfolio_id}/performance/returns',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            query: {
+                period: data.period
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Risk Metrics
+     * Get comprehensive risk analysis.
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.period
+     * @param data.benchmarkId
+     * @returns RiskMetricsResponse Successful Response
+     * @throws ApiError
+     */
+    public static getRiskMetrics(data: PerformanceGetRiskMetricsData): CancelablePromise<PerformanceGetRiskMetricsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/portfolios/{portfolio_id}/performance/risk-metrics',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            query: {
+                period: data.period,
+                benchmark_id: data.benchmarkId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Portfolio Best Worst Periods
+     * Get best and worst performing periods.
+     * FAST: ~25-40ms with cached valuations.
+     *
+     * - **portfolio_id**: UUID of the portfolio
+     * - **period**: Time period
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.period
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static getPortfolioBestWorstPeriods(data: PerformanceGetPortfolioBestWorstPeriodsData): CancelablePromise<PerformanceGetPortfolioBestWorstPeriodsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/portfolios/{portfolio_id}/performance/best-worst',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            query: {
+                period: data.period
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Cash Flow Analysis
+     * Get detailed cash flow history (contributions and withdrawals).
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.period
+     * @param data.transactionType
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static getCashFlowAnalysis(data: PerformanceGetCashFlowAnalysisData): CancelablePromise<PerformanceGetCashFlowAnalysisResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/portfolios/{portfolio_id}/performance/cash-flows',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            query: {
+                period: data.period,
+                transaction_type: data.transactionType
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Portfolio Current Value
+     * Get current portfolio value and basic info.
+     * ULTRA FAST: ~5-15ms (single query).
+     *
+     * - **portfolio_id**: UUID of the portfolio
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static getPortfolioCurrentValue(data: PerformanceGetPortfolioCurrentValueData): CancelablePromise<PerformanceGetPortfolioCurrentValueResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/portfolios/{portfolio_id}/performance/current-value',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * @deprecated
+     * Get Portfolio Performance Summary
+     * DEPRECATED: Use split endpoints for better performance. This endpoint is slow and returns large payloads.
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.period
+     * @returns PerformanceSummaryResponse Successful Response
+     * @throws ApiError
+     */
+    public static getPortfolioPerformanceSummary(data: PerformanceGetPortfolioPerformanceSummaryData): CancelablePromise<PerformanceGetPortfolioPerformanceSummaryResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/portfolios/{portfolio_id}/performance/summary',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            query: {
+                period: data.period
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Portfolio Value History
+     * Get portfolio value over time with optional benchmark comparison.
+     *
+     * - **portfolio_id**: UUID of the portfolio
+     * - **period**: Time period
+     * - **benchmark_id**: Optional benchmark for comparison (e.g., 'sp500')
+     * - **frequency**: Data frequency (daily, weekly, monthly)
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.period
+     * @param data.benchmarkId
+     * @param data.frequency
+     * @returns ValueHistoryResponse Successful Response
+     * @throws ApiError
+     */
+    public static getPortfolioValueHistory(data: PerformanceGetPortfolioValueHistoryData): CancelablePromise<PerformanceGetPortfolioValueHistoryResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/portfolios/{portfolio_id}/performance/value-history',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            query: {
+                period: data.period,
+                benchmark_id: data.benchmarkId,
+                frequency: data.frequency
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Benchmark Comparison
+     * Get detailed benchmark comparison across multiple time periods.
+     *
+     * - **portfolio_id**: UUID of the portfolio
+     * - **benchmark_id**: Benchmark identifier (default: dsex)
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.benchmarkId
+     * @returns BenchmarkComparisonResponse Successful Response
+     * @throws ApiError
+     */
+    public static getBenchmarkComparison(data: PerformanceGetBenchmarkComparisonData): CancelablePromise<PerformanceGetBenchmarkComparisonResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/portfolios/{portfolio_id}/performance/benchmark-comparison',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            query: {
+                benchmark_id: data.benchmarkId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Available Benchmarks
+     * Get list of available benchmarks for comparison.
+     * @returns BenchmarkListResponse Successful Response
+     * @throws ApiError
+     */
+    public static getAvailableBenchmarks(): CancelablePromise<PerformanceGetAvailableBenchmarksResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/benchmarks'
+        });
+    }
+    
+    /**
+     * Get Monthly Returns
+     * Get month-by-month returns for a portfolio.
+     *
+     * - **portfolio_id**: UUID of the portfolio
+     * - **year**: Year to analyze (default: current year)
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.year
+     * @returns MonthlyReturnsResponse Successful Response
+     * @throws ApiError
+     */
+    public static getMonthlyReturns(data: PerformanceGetMonthlyReturnsData): CancelablePromise<PerformanceGetMonthlyReturnsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/portfolios/{portfolio_id}/performance/monthly-returns',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            query: {
+                year: data.year
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Asset Class Attribution
+     * Get performance attribution by asset class.
+     *
+     * Note: This is a placeholder. Full implementation requires asset class classification.
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.period
+     * @returns AttributionResponse Successful Response
+     * @throws ApiError
+     */
+    public static getAssetClassAttribution(data: PerformanceGetAssetClassAttributionData): CancelablePromise<PerformanceGetAssetClassAttributionResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/portfolios/{portfolio_id}/performance/attribution/asset-class',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            query: {
+                period: data.period
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Sector Attribution
+     * Get performance attribution by sector.
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.period
+     * @param data.benchmarkId
+     * @returns AttributionResponse Successful Response
+     * @throws ApiError
+     */
+    public static getSectorAttribution(data: PerformanceGetSectorAttributionData): CancelablePromise<PerformanceGetSectorAttributionResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/portfolios/{portfolio_id}/performance/attribution/sector',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            query: {
+                period: data.period,
+                benchmark_id: data.benchmarkId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Security Attribution
+     * Get top contributing and detracting securities.
+     *
+     * - **portfolio_id**: UUID of the portfolio
+     * - **period**: Time period
+     * - **limit**: Number of securities to return for contributors
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.period
+     * @param data.limit
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static getSecurityAttribution(data: PerformanceGetSecurityAttributionData): CancelablePromise<PerformanceGetSecurityAttributionResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/portfolios/{portfolio_id}/performance/attribution/securities',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            query: {
+                period: data.period,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Return Decomposition
+     * Get breakdown of returns by source (dividends, interest, capital gains).
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.period
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static getReturnDecomposition(data: PerformanceGetReturnDecompositionData): CancelablePromise<PerformanceGetReturnDecompositionResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/portfolios/{portfolio_id}/performance/decomposition',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            query: {
+                period: data.period
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Period Performance
+     * Get performance across all standard time periods.
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static getPeriodPerformance(data: PerformanceGetPeriodPerformanceData): CancelablePromise<PerformanceGetPeriodPerformanceResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/portfolios/{portfolio_id}/performance/periods',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Backfill Portfolio Valuations
+     * Backfill historical valuations for faster performance queries.
+     *
+     * This endpoint pre-calculates and caches daily portfolio valuations,
+     * dramatically improving the speed of performance analytics endpoints.
+     *
+     * - **portfolio_id**: UUID of the portfolio
+     * - **start_date**: Optional start date (default: days ago from today)
+     * - **days**: Number of days to backfill (default: 365)
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.startDate Start date for backfill
+     * @param data.days Number of days to backfill if start_date not provided
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static backfillPortfolioValuations(data: PerformanceBackfillPortfolioValuationsData): CancelablePromise<PerformanceBackfillPortfolioValuationsResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/portfolios/{portfolio_id}/performance/backfill',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            query: {
+                start_date: data.startDate,
+                days: data.days
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Backfill All Portfolios
+     * Backfill valuations for all user's portfolios (admin/power user feature).
+     *
+     * - **days**: Number of days to backfill (default: 365)
+     * @param data The data for the request.
+     * @param data.days Number of days to backfill
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static backfillAllPortfolios(data: PerformanceBackfillAllPortfoliosData = {}): CancelablePromise<PerformanceBackfillAllPortfoliosResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/admin/performance/backfill-all',
+            query: {
+                days: data.days
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+}
+
 export class PortfolioService {
     /**
      * Get User Portfolios
@@ -1729,6 +2314,27 @@ export class PortfolioService {
             url: '/api/v1/portfolio/{portfolio_id}/positions',
             path: {
                 portfolio_id: data.portfolioId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Positions By Symbol
+     * Get all positions for a specific symbol across all user portfolios
+     * @param data The data for the request.
+     * @param data.symbol
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static getPositionsBySymbol(data: PortfolioGetPositionsBySymbolData): CancelablePromise<PortfolioGetPositionsBySymbolResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/portfolio/positions/by-symbol/{symbol}',
+            path: {
+                symbol: data.symbol
             },
             errors: {
                 422: 'Validation Error'
@@ -1958,6 +2564,101 @@ export class PortfolioService {
         });
     }
     
+    /**
+     * Upload Portfolio Statement
+     * Upload and parse a portfolio statement PDF file.
+     *
+     * Extracts holdings data from the PDF and returns structured information
+     * for review before saving to the database.
+     *
+     * Args:
+     * portfolio_id: UUID of the portfolio to associate holdings with
+     * file: PDF file of the portfolio statement
+     * broker_house: (Optional) Broker house name to use specific parser.
+     * Supported values: 'lankabangla', 'doha', 'generic'
+     * If not provided, will attempt to auto-detect from PDF content.
+     * current_user: Current authenticated user
+     * session: Database session
+     *
+     * Returns:
+     * PortfolioStatementResponse with parsed client info and holdings
+     *
+     * Raises:
+     * 400: Invalid file format, corrupted PDF, or unsupported broker
+     * 404: Portfolio not found
+     * 413: File size exceeds limit
+     * 422: PDF parsing failed
+     *
+     * Example:
+     * POST /api/v1/portfolio/{portfolio_id}/upload-statement?broker_house=lankabangla
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.formData
+     * @param data.brokerHouse
+     * @returns PortfolioStatementResponse Successful Response
+     * @throws ApiError
+     */
+    public static uploadPortfolioStatement(data: PortfolioUploadPortfolioStatementData): CancelablePromise<PortfolioUploadPortfolioStatementResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/portfolio/{portfolio_id}/upload-statement',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            query: {
+                broker_house: data.brokerHouse
+            },
+            formData: data.formData,
+            mediaType: 'multipart/form-data',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Save Bulk Holdings
+     * Save parsed holdings from portfolio statement to the database.
+     *
+     * This endpoint should be called after reviewing the parsed data from
+     * the upload-statement endpoint. It will create or update portfolio
+     * positions based on the provided holdings.
+     *
+     * Args:
+     * portfolio_id: UUID of the portfolio
+     * request: Bulk holdings save request with client info and holdings
+     * current_user: Current authenticated user
+     * session: Database session
+     *
+     * Returns:
+     * BulkHoldingsSaveResponse with operation results
+     *
+     * Raises:
+     * 400: Invalid data format
+     * 404: Portfolio not found
+     * 409: Conflict with existing data (if configured)
+     * 500: Internal server error
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.requestBody
+     * @returns BulkHoldingsSaveResponse Successful Response
+     * @throws ApiError
+     */
+    public static saveBulkHoldings(data: PortfolioSaveBulkHoldingsData): CancelablePromise<PortfolioSaveBulkHoldingsResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/portfolio/{portfolio_id}/holdings/bulk',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
 }
 
 export class PrivateService {
@@ -1983,6 +2684,142 @@ export class PrivateService {
     
 }
 
+export class RebalancingService {
+    /**
+     * Get Rebalancing Suggestions
+     * Calculate rebalancing suggestions for a portfolio.
+     *
+     * Compares current allocation against target allocation and suggests
+     * trades to bring the portfolio back within the target ranges.
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.thresholdPct Drift threshold percentage
+     * @param data.minTradeValue Minimum trade value
+     * @param data.strategy Rebalancing strategy
+     * @returns RebalancingSuggestionsResponse Successful Response
+     * @throws ApiError
+     */
+    public static getRebalancingSuggestions(data: RebalancingGetRebalancingSuggestionsData): CancelablePromise<RebalancingGetRebalancingSuggestionsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/rebalancing/portfolio/{portfolio_id}/suggestions',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            query: {
+                threshold_pct: data.thresholdPct,
+                min_trade_value: data.minTradeValue,
+                strategy: data.strategy
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Execute Rebalancing
+     * Execute rebalancing trades for a portfolio.
+     *
+     * Creates orders and simulated trades to rebalance the portfolio
+     * according to the provided suggestions.
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.requestBody
+     * @returns RebalancingExecuteResponse Successful Response
+     * @throws ApiError
+     */
+    public static executeRebalancing(data: RebalancingExecuteRebalancingData): CancelablePromise<RebalancingExecuteRebalancingResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/rebalancing/portfolio/{portfolio_id}/execute',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Rebalancing History
+     * Get rebalancing history for a portfolio.
+     *
+     * Returns paginated list of past rebalancing runs with details.
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.limit
+     * @param data.offset
+     * @returns RebalancingHistoryResponse Successful Response
+     * @throws ApiError
+     */
+    public static getRebalancingHistory(data: RebalancingGetRebalancingHistoryData): CancelablePromise<RebalancingGetRebalancingHistoryResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/rebalancing/portfolio/{portfolio_id}/history',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            query: {
+                limit: data.limit,
+                offset: data.offset
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Rebalancing Settings
+     * Get rebalancing settings for a portfolio
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @returns RebalancingSettingsPublic Successful Response
+     * @throws ApiError
+     */
+    public static getRebalancingSettings(data: RebalancingGetRebalancingSettingsData): CancelablePromise<RebalancingGetRebalancingSettingsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/rebalancing/portfolio/{portfolio_id}/settings',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Update Rebalancing Settings
+     * Update rebalancing settings for a portfolio
+     * @param data The data for the request.
+     * @param data.portfolioId
+     * @param data.requestBody
+     * @returns RebalancingSettingsPublic Successful Response
+     * @throws ApiError
+     */
+    public static updateRebalancingSettings(data: RebalancingUpdateRebalancingSettingsData): CancelablePromise<RebalancingUpdateRebalancingSettingsResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/v1/rebalancing/portfolio/{portfolio_id}/settings',
+            path: {
+                portfolio_id: data.portfolioId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+}
+
 export class ResearchService {
     /**
      * Stock Screener
@@ -1995,9 +2832,17 @@ export class ResearchService {
      * @param data.minDividendYield Minimum dividend yield %
      * @param data.maxDividendYield Maximum dividend yield %
      * @param data.sector Sector filter
+     * @param data.industry Industry filter
      * @param data.minVolume Minimum average volume
      * @param data.minPrice Minimum stock price
      * @param data.maxPrice Maximum stock price
+     * @param data.minPriceToBook Minimum price-to-book ratio
+     * @param data.maxPriceToBook Maximum price-to-book ratio
+     * @param data.minRsi Minimum RSI value
+     * @param data.maxRsi Maximum RSI value
+     * @param data.minPriceChange Minimum daily price change percent
+     * @param data.maxPriceChange Maximum daily price change percent
+     * @param data.movingAverage Moving average position filter (all, above_20, above_50, below_20, below_50)
      * @param data.limit Maximum number of results
      * @returns unknown Successful Response
      * @throws ApiError
@@ -2363,6 +3208,180 @@ export class SubscriptionsService {
             url: '/api/v1/subscriptions/payments/bkash',
             body: data.requestBody,
             mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+}
+
+export class TradingviewService {
+    /**
+     * Get Config
+     * Returns the configuration of the data feed.
+     * https://www.tradingview.com/charting-library-docs/latest/connecting_data/UDF#response-1
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static getConfig(): CancelablePromise<TradingviewGetConfigResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/tradingview/config'
+        });
+    }
+    
+    /**
+     * Search Symbols
+     * Search for symbols or resolve individual symbol.
+     * If 'symbol' parameter is provided, returns single symbol info (for resolution).
+     * If 'query' parameter is provided, returns list of matching symbols (for search).
+     * https://www.tradingview.com/charting-library-docs/latest/connecting_data/UDF#search
+     * @param data The data for the request.
+     * @param data.symbol Symbol name for individual symbol resolution
+     * @param data.query Search query for symbol or company name
+     * @param data.type Type filter (stock, index, etc)
+     * @param data.exchange Exchange filter
+     * @param data.limit Maximum number of results
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static searchSymbols(data: TradingviewSearchSymbolsData = {}): CancelablePromise<TradingviewSearchSymbolsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/tradingview/symbols',
+            query: {
+                symbol: data.symbol,
+                query: data.query,
+                type: data.type,
+                exchange: data.exchange,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Search Symbols Search
+     * Search for symbols (TradingView search endpoint).
+     * https://www.tradingview.com/charting-library-docs/latest/connecting_data/UDF#search
+     * @param data The data for the request.
+     * @param data.query Search query for symbol or company name
+     * @param data.type Type filter (stock, index, etc)
+     * @param data.exchange Exchange filter
+     * @param data.limit Maximum number of results
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static searchSymbolsSearch(data: TradingviewSearchSymbolsSearchData = {}): CancelablePromise<TradingviewSearchSymbolsSearchResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/tradingview/search',
+            query: {
+                query: data.query,
+                type: data.type,
+                exchange: data.exchange,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Symbol Info
+     * Returns symbol info for a group of symbols.
+     * https://www.tradingview.com/charting-library-docs/latest/connecting_data/UDF#symbol-info
+     * @param data The data for the request.
+     * @param data.group Exchange group
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static getSymbolInfo(data: TradingviewGetSymbolInfoData = {}): CancelablePromise<TradingviewGetSymbolInfoResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/tradingview/symbol_info',
+            query: {
+                group: data.group
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get History
+     * Returns historical bars for a symbol.
+     * https://www.tradingview.com/charting-library-docs/latest/connecting_data/UDF#history
+     * @param data The data for the request.
+     * @param data.symbol Symbol name
+     * @param data.resolution Resolution (1D, 1W, 1M, etc)
+     * @param data.from Unix timestamp (seconds) of the leftmost bar
+     * @param data.to Unix timestamp (seconds) of the rightmost bar
+     * @param data.countback Number of bars to return
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static getHistory(data: TradingviewGetHistoryData): CancelablePromise<TradingviewGetHistoryResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/tradingview/history',
+            query: {
+                symbol: data.symbol,
+                resolution: data.resolution,
+                from: data.from,
+                to: data.to,
+                countback: data.countback
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Quotes
+     * Returns real-time quotes for symbols.
+     * https://www.tradingview.com/charting-library-docs/latest/connecting_data/UDF#quotes
+     * @param data The data for the request.
+     * @param data.symbols Comma-separated list of symbols
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static getQuotes(data: TradingviewGetQuotesData): CancelablePromise<TradingviewGetQuotesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/tradingview/quotes',
+            query: {
+                symbols: data.symbols
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Positions For Tradingview
+     * Get positions for a symbol formatted for TradingView marks.
+     * This endpoint is public (no auth) since TradingView widget needs to access it.
+     * Returns position marks with timestamp, price, quantity, and portfolio info.
+     * @param data The data for the request.
+     * @param data.symbol
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static getPositionsForTradingview(data: TradingviewGetPositionsForTradingviewData): CancelablePromise<TradingviewGetPositionsForTradingviewResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/tradingview/positions/{symbol}',
+            path: {
+                symbol: data.symbol
+            },
             errors: {
                 422: 'Validation Error'
             }
