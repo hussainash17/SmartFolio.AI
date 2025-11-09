@@ -1,6 +1,5 @@
 package com.dohatec.oms.datascraper.scheduler;
 
-import com.dohatec.oms.datascraper.config.ScraperProperties;
 import com.dohatec.oms.datascraper.service.scraper.RealTimeMarketScraper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,14 +18,13 @@ import org.springframework.stereotype.Component;
 public class RealTimeMarketScheduler {
 
     private final RealTimeMarketScraper realTimeMarketScraper;
-    private final ScraperProperties scraperProperties;
 
     /**
      * Scrape real-time market data every 1 minute during market hours
      * DSE trading hours: 10:00 AM - 2:30 PM (Monday to Thursday)
      */
     @Scheduled(cron = "${scraper.schedule.realtime-cron:0 */1 10-14 * * MON-THU}",
-               zone = "${scraper.schedule.timezone:Asia/Dhaka}")
+            zone = "${scraper.schedule.timezone:Asia/Dhaka}")
     public void scrapeRealTimeData() {
         try {
             log.info("=== Real-time market data scraping started ===");

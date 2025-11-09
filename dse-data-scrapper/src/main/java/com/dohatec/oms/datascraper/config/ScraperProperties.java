@@ -44,6 +44,11 @@ public class ScraperProperties {
         private String latestSharePriceUrl = "https://dsebd.org/latest_share_price_scroll_by_ltp.php";
         private String companyDetailUrl = "https://dsebd.org/displayCompany.php?name=%s";
         private String marketSummaryUrl = "https://dsebd.org";
+        private String newsUrl = "https://dsebd.org/display_news.php";
+        private String newsAjaxUrl = "https://dsebd.org/ajax/load-news.php";
+        // Waiting configuration for news page load
+        private long newsLoadMaxWaitMs = 20000; // maximum wait time in ms
+        private long newsLoadPollIntervalMs = 3000; // polling interval in ms
     }
 
     @Data
@@ -65,6 +70,9 @@ public class ScraperProperties {
         
         // Cleanup runs monthly on 1st day at 2 AM
         private String cleanupCron = "0 0 2 1 * *";
+        
+        // DSE news scraper runs every 30 seconds
+        private String newsCron = "0/30 * * * * *";
     }
 
     @Data
