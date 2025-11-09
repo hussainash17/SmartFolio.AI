@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Portfolio, Stock, PortfolioSummary } from '../types/portfolio';
 import { OpenAPI, PortfolioService } from '../src/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -95,7 +95,7 @@ export function usePortfolios() {
   const portfolios = useMemo(() => portfoliosRaw, [portfoliosRaw]);
 
   // Initialize selected portfolio when data loads
-  useMemo(() => {
+  useEffect(() => {
     if (!selectedPortfolioId && portfolios.length > 0) {
       setSelectedPortfolioId(portfolios[0].id);
     }

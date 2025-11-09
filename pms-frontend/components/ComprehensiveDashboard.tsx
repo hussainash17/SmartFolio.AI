@@ -20,7 +20,7 @@ import {
   Activity
 } from "lucide-react";
 import { AccountBalance, Order, Transaction, NewsItem, MarketData as MarketDataType } from "../types/trading";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnalyticsService, RiskManagementService, KycService, OpenAPI } from "../src/client";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "../hooks/queryKeys";
@@ -62,7 +62,7 @@ export function ComprehensiveDashboard({
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | undefined>(initialPortfolioId);
   
   // Set default portfolio when portfolios load
-  useMemo(() => {
+  useEffect(() => {
     if (!selectedPortfolioId && portfolios.length > 0) {
       setSelectedPortfolioId(portfolios[0].id);
     }
@@ -263,7 +263,7 @@ export function ComprehensiveDashboard({
         <div className="flex gap-3 items-center">
           {/* Portfolio Selector */}
           <div className="min-w-[250px]">
-            <Select value={selectedPortfolioId} onValueChange={setSelectedPortfolioId}>
+            <Select value={selectedPortfolioId || ''} onValueChange={setSelectedPortfolioId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select Portfolio" />
               </SelectTrigger>

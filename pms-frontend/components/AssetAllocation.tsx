@@ -133,6 +133,14 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 		console.log('[AssetAllocation] Current portfolioId:', portfolioId, 'selectedPortfolioId:', selectedPortfolioId, 'propPortfolioId:', propPortfolioId)
 	}, [portfolioId, selectedPortfolioId, propPortfolioId])
 
+	// Ensure allocation and targets refetch when portfolio selection becomes available
+	useEffect(() => {
+		if (portfolioId) {
+			queryClient.invalidateQueries({ queryKey: queryKeys.portfolioAllocation(portfolioId || 'none') })
+			queryClient.invalidateQueries({ queryKey: queryKeys.allocationTargets(portfolioId || 'none') })
+		}
+	}, [portfolioId])
+
 	const { data: allocation = { total_value: 0, sector_wise_allocation: [], stock_wise_allocation: [], concentration_risk: { top_5_holdings: 0, top_10_holdings: 0, largest_holding: 0 } }, isLoading: allocationLoading } = useQuery({
 		queryKey: queryKeys.portfolioAllocation(portfolioId || 'none'),
 		enabled: !!portfolioId,
@@ -140,6 +148,7 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 			if (!portfolioId) return { total_value: 0, sector_wise_allocation: [], stock_wise_allocation: [], concentration_risk: { top_5_holdings: 0, top_10_holdings: 0, largest_holding: 0 } }
 			return AnalyticsService.getPortfolioAllocation({ portfolioId }) as any
 		},
+		refetchOnMount: 'always',
 		staleTime: 30 * 1000,
 	})
 
@@ -157,6 +166,7 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 			const rows = await res.json()
 			return rows as AllocationTargetRow[]
 		},
+		refetchOnMount: 'always',
 	})
 
 	const [editableTargets, setEditableTargets] = useState<AllocationTargetRow[]>([])
@@ -353,7 +363,7 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 							))}
 						</SelectContent>
 					</Select>
-					<Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.portfolioAllocation(portfolioId) })} className="gap-2">
+					<Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.portfolioAllocation(portfolioId || 'none') })} className="gap-2">
 						<RefreshCw className="h-4 w-4" /> Refresh
 					</Button>
 					<Button variant="outline" onClick={() => onNavigate('rebalancing')} className="gap-2">
