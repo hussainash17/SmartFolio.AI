@@ -203,7 +203,7 @@ export function PortfolioPerformance({ portfolioId: initialPortfolioId, portfoli
         <div className="flex items-center gap-2">
             <Briefcase className="h-4 w-4 text-muted-foreground" />
             <Select 
-              value={selectedPortfolioId || undefined} 
+              value={selectedPortfolioId || ''} 
               onValueChange={setSelectedPortfolioId}
             >
               <SelectTrigger className="w-[200px]">
