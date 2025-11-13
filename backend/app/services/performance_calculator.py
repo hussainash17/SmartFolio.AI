@@ -305,6 +305,298 @@ class PerformanceCalculator:
         alpha = portfolio_return - expected_return
         return float(alpha)
     
+    def calculate_var(
+        self,
+        returns: List[float],
+        portfolio_value: float,
+        confidence: float = 0.95
+    ) -> float:
+        """
+        Calculate Value at Risk (VaR) using historical simulation.
+        
+        Args:
+            returns: List of daily returns
+            portfolio_value: Current portfolio value
+            confidence: Confidence level (default 0.95 for 95% VaR)
+        
+        Returns:
+            VaR as a dollar amount
+        """
+        if len(returns) < 2:
+            return 0.0
+        
+        returns_array = np.array(returns)
+        # Calculate percentile (e.g., 5th percentile for 95% VaR)
+        percentile = (1 - confidence) * 100
+        var_return = np.percentile(returns_array, percentile)
+        
+        # Convert to dollar amount (negative because VaR is a loss)
+        var_amount = abs(var_return) * portfolio_value
+        
+        return float(var_amount)
+    
+    def calculate_cvar(
+        self,
+        returns: List[float],
+        portfolio_value: float,
+        confidence: float = 0.95
+    ) -> float:
+        """
+        Calculate Conditional Value at Risk (CVaR/Expected Shortfall).
+        
+        CVaR is the average of losses beyond VaR threshold.
+        """
+        if len(returns) < 2:
+            return 0.0
+        
+        returns_array = np.array(returns)
+        percentile = (1 - confidence) * 100
+        threshold = np.percentile(returns_array, percentile)
+        
+        # Get all returns below the threshold
+        tail_returns = returns_array[returns_array <= threshold]
+        
+        if len(tail_returns) == 0:
+            return 0.0
+        
+        # Average of tail returns
+        cvar_return = np.mean(tail_returns)
+        cvar_amount = abs(cvar_return) * portfolio_value
+        
+        return float(cvar_amount)
+    
+    def calculate_tracking_error(
+        self,
+        diff_returns: List[float],
+        annualize: bool = True
+    ) -> float:
+        """
+        Calculate tracking error: standard deviation of (portfolio return - benchmark return).
+        
+        Args:
+            diff_returns: List of differences between portfolio and benchmark returns
+            annualize: Whether to annualize the result
+        
+        Returns:
+            Tracking error as a percentage
+        """
+        if len(diff_returns) < 2:
+            return 0.0
+        
+        diff_array = np.array(diff_returns)
+        tracking_error = np.std(diff_array, ddof=1)
+        
+        if annualize:
+            # Annualize assuming daily returns
+            tracking_error = tracking_error * np.sqrt(252)
+        
+        return float(tracking_error * 100)  # Convert to percentage
+    
+    def calculate_tracking_difference(
+        self,
+        diff_returns: List[float],
+        annualize: bool = True
+    ) -> float:
+        """
+        Calculate tracking difference: mean of (portfolio return - benchmark return).
+        
+        Args:
+            diff_returns: List of differences between portfolio and benchmark returns
+            annualize: Whether to annualize the result
+        
+        Returns:
+            Tracking difference as a percentage
+        """
+        if len(diff_returns) == 0:
+            return 0.0
+        
+        diff_array = np.array(diff_returns)
+        tracking_diff = np.mean(diff_array)
+        
+        if annualize:
+            # Annualize assuming daily returns
+            tracking_diff = tracking_diff * 252
+        
+        return float(tracking_diff * 100)  # Convert to percentage
+    
+    def get_holdings_returns(
+        self,
+        portfolio_id: str,
+        start_date: date,
+        end_date: date,
+        top_n: Optional[int] = None
+    ) -> Dict[str, List[float]]:
+        """
+        Get daily returns for each holding in the portfolio.
+        
+        Args:
+            portfolio_id: Portfolio ID
+            start_date: Start date
+            end_date: End date
+            top_n: Limit to top N holdings by weight (default: all)
+        
+        Returns:
+            Dictionary mapping symbol to list of daily returns
+        """
+        # Get current holdings (using end_date as reference)
+        holdings = self._get_holdings_on_date(portfolio_id, end_date)
+        
+        # Sort by weight and limit if needed
+        holdings.sort(key=lambda x: x['weight'], reverse=True)
+        if top_n:
+            holdings = holdings[:top_n]
+        
+        holdings_returns = {}
+        
+        for holding in holdings:
+            company_id = holding['company_id']
+            symbol = holding['symbol']
+            
+            # Get daily prices for this stock
+            statement = select(DailyOHLC).where(
+                and_(
+                    DailyOHLC.company_id == company_id,
+                    func.date(DailyOHLC.date) >= start_date,
+                    func.date(DailyOHLC.date) <= end_date
+                )
+            ).order_by(DailyOHLC.date)
+            
+            ohlc_data = self.db.exec(statement).all()
+            
+            if len(ohlc_data) < 2:
+                continue
+            
+            # Calculate daily returns
+            returns = []
+            for i in range(1, len(ohlc_data)):
+                prev_close = float(ohlc_data[i-1].close_price)
+                curr_close = float(ohlc_data[i].close_price)
+                
+                if prev_close > 0:
+                    daily_return = (curr_close - prev_close) / prev_close
+                    returns.append(daily_return)
+            
+            if returns:
+                holdings_returns[symbol] = returns
+        
+        return holdings_returns
+    
+    def compute_correlation_matrix(
+        self,
+        holdings_returns: Dict[str, List[float]]
+    ) -> Dict[str, any]:
+        """
+        Compute correlation matrix for holdings.
+        
+        Args:
+            holdings_returns: Dictionary mapping symbol to list of returns
+        
+        Returns:
+            Dictionary with avg_correlation, pairs, and matrix
+        """
+        if len(holdings_returns) < 2:
+            return {
+                'avg_correlation': 0.0,
+                'pairs': [],
+                'matrix': []
+            }
+        
+        symbols = list(holdings_returns.keys())
+        n = len(symbols)
+        
+        # Align returns by length (use minimum length)
+        min_length = min(len(returns) for returns in holdings_returns.values())
+        if min_length < 2:
+            return {
+                'avg_correlation': 0.0,
+                'pairs': [],
+                'matrix': []
+            }
+        
+        # Create aligned return arrays
+        aligned_returns = {}
+        for symbol in symbols:
+            aligned_returns[symbol] = np.array(holdings_returns[symbol][:min_length])
+        
+        # Compute correlation matrix
+        returns_matrix = np.array([aligned_returns[symbol] for symbol in symbols])
+        correlation_matrix = np.corrcoef(returns_matrix)
+        
+        # Extract pairs
+        pairs = []
+        correlations = []
+        
+        for i in range(n):
+            for j in range(i + 1, n):
+                corr = float(correlation_matrix[i, j])
+                if not np.isnan(corr):
+                    pairs.append({
+                        'asset1': symbols[i],
+                        'asset2': symbols[j],
+                        'correlation': corr,
+                        'risk': self._get_correlation_risk(corr)
+                    })
+                    correlations.append(corr)
+        
+        # Calculate average correlation
+        avg_correlation = float(np.mean(correlations)) if correlations else 0.0
+        
+        return {
+            'avg_correlation': avg_correlation,
+            'pairs': pairs,
+            'matrix': correlation_matrix.tolist()
+        }
+    
+    def _get_correlation_risk(self, correlation: float) -> str:
+        """Determine risk level based on correlation."""
+        abs_corr = abs(correlation)
+        if abs_corr > 0.7:
+            return 'high'
+        elif abs_corr > 0.4:
+            return 'medium'
+        else:
+            return 'low'
+    
+    def compute_sector_weights(
+        self,
+        portfolio_id: str,
+        target_date: date
+    ) -> Dict[str, float]:
+        """
+        Compute sector weights for portfolio.
+        
+        Args:
+            portfolio_id: Portfolio ID
+            target_date: Date to compute weights for
+        
+        Returns:
+            Dictionary mapping sector to weight percentage
+        """
+        holdings = self._get_holdings_on_date(portfolio_id, target_date)
+        
+        sector_values = {}
+        total_value = sum(h['value'] for h in holdings)
+        
+        if total_value == 0:
+            return {}
+        
+        for holding in holdings:
+            sector = holding.get('sector', 'Unknown')
+            value = holding['value']
+            
+            if sector not in sector_values:
+                sector_values[sector] = 0.0
+            
+            sector_values[sector] += value
+        
+        # Convert to percentages
+        sector_weights = {
+            sector: (value / total_value) * 100
+            for sector, value in sector_values.items()
+        }
+        
+        return sector_weights
+    
     # ============================================================================
     # ATTRIBUTION ANALYSIS
     # ============================================================================

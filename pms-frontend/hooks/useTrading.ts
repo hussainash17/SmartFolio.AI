@@ -23,20 +23,54 @@ export function useTrading() {
   const queryClient = useQueryClient();
 
   const { data: marketData = [] } = useQuery({
-    queryKey: queryKeys.marketList(50, 0),
+    queryKey: queryKeys.marketList(500, 0),
     enabled: !!(OpenAPI as any).TOKEN,
     queryFn: async () => {
-      const list = (await MarketService.listStocks({ limit: 50, offset: 0 })) as any[];
-      const mapped: MarketData[] = (list || []).map((it: any) => ({
-        symbol: it.symbol,
-        companyName: it.company_name,
+      const pageSize = 200;
+      let offset = 0;
+      const seen = new Set<string>();
+      const allRows: any[] = [];
+
+      while (true) {
+        const page = (await MarketService.listStocks({ limit: pageSize, offset })) as any[];
+        const rows = page || [];
+        if (!rows.length) {
+          break;
+        }
+        for (const row of rows) {
+          const symbol: string = String(row?.symbol || '').toUpperCase();
+          if (!symbol || seen.has(symbol)) continue;
+          seen.add(symbol);
+          allRows.push(row);
+        }
+        if (rows.length < pageSize) {
+          break;
+        }
+        offset += pageSize;
+        if (offset >= 2000) {
+          // Safety guard to avoid unexpectedly large loops
+          break;
+        }
+      }
+
+      const mapped: MarketData[] = allRows.map((it: any) => ({
+        symbol: String(it.symbol || '').toUpperCase(),
+        companyName: it.company_name || it.name || String(it.symbol || '').toUpperCase(),
         currentPrice: Number(it.last || 0),
         change: Number(it.change || 0),
         changePercent: Number(it.change_percent || 0),
         volume: Number(it.volume || 0),
         high52Week: 0,
         low52Week: 0,
-        marketCap: Number(it.market_cap || 0),
+        marketCap: (() => {
+            const lastPrice = Number(it.last || 0);
+            const totalSecurities = Number(it.total_outstanding_securities || 0);
+            // Calculate market cap: last_trade_price × total_outstanding_securities (in crores)
+            // 1 crore = 10,000,000
+            return lastPrice > 0 && totalSecurities > 0 
+                ? (lastPrice * totalSecurities) / 10_000_000 
+                : Number(it.market_cap || 0);
+        })(),
         peRatio: undefined,
         dividend: undefined,
         dividendYield: undefined,
@@ -44,7 +78,8 @@ export function useTrading() {
         industry: it.industry || 'Unknown',
         lastUpdated: it.timestamp || new Date().toISOString(),
       }));
-      return mapped;
+
+      return mapped.sort((a, b) => a.symbol.localeCompare(b.symbol));
     },
     staleTime: 30 * 1000,
   });
@@ -168,7 +203,7 @@ export function useTrading() {
     staleTime: 15 * 1000,
   });
 
-  useQuery({
+  const { data: transactions = [] } = useQuery({
     queryKey: queryKeys.transactions,
     enabled: !!(OpenAPI as any).TOKEN,
     queryFn: async () => {
@@ -340,7 +375,7 @@ export function useTrading() {
     return created.id as string;
   };
 
-  const deposit = async (amount: number) => {
+  const deposit = async (amount: number, portfolioId?: string) => {
     const base = (OpenAPI as any).BASE || '';
     await fetch(`${String(base).replace(/\/$/, '')}/api/v1/funds/deposit`, {
       method: 'POST',
@@ -349,14 +384,17 @@ export function useTrading() {
         ...(OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : {},
       },
       credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-      body: JSON.stringify({ amount }),
+      body: JSON.stringify({
+        amount,
+        portfolio_id: portfolioId || undefined,
+      }),
     });
     queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
     queryClient.invalidateQueries({ queryKey: queryKeys.fundsSummary });
     queryClient.invalidateQueries({ queryKey: queryKeys.transactions });
   };
 
-  const withdraw = async (amount: number) => {
+  const withdraw = async (amount: number, portfolioId?: string) => {
     const base = (OpenAPI as any).BASE || '';
     await fetch(`${String(base).replace(/\/$/, '')}/api/v1/funds/withdraw`, {
       method: 'POST',
@@ -365,7 +403,10 @@ export function useTrading() {
         ...(OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : {},
       },
       credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-      body: JSON.stringify({ amount }),
+      body: JSON.stringify({
+        amount,
+        portfolio_id: portfolioId || undefined,
+      }),
     });
     queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
     queryClient.invalidateQueries({ queryKey: queryKeys.fundsSummary });
@@ -438,7 +479,7 @@ export function useTrading() {
     orders,
     trades,
     watchlists,
-    transactions: [] as Transaction[],
+    transactions,
     news,
     marketData,
     accountBalance,

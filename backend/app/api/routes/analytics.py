@@ -531,10 +531,153 @@ def get_allocation_targets(
     return targets
 
 
+@router.get("/sectors")
+def get_sectors_list(
+    session: Session = Depends(get_session_dep)
+):
+    """Get list of all available sectors"""
+    # Get distinct sectors from Company table
+    sectors = session.exec(
+        select(Company.sector).where(
+            Company.sector.isnot(None),
+            Company.sector != "",
+            Company.is_active == True
+        )
+    ).all()
+    
+    # Deduplicate manually since SQLModel doesn't support .distinct() on single column
+    sectors = list(set(sectors))
+    
+    # Normalize and deduplicate
+    sector_set = set()
+    for sector in sectors:
+        if sector:
+            # Normalize numeric sectors to names
+            if sector.isdigit():
+                sector_map = {
+                    '1': 'Banking',
+                    '2': 'NBFI',
+                    '3': 'Fuel & Power',
+                    '4': 'Cement',
+                    '5': 'Ceramics',
+                    '6': 'Engineering',
+                    '7': 'Food & Allied',
+                    '8': 'IT',
+                    '9': 'Jute',
+                    '10': 'Miscellaneous',
+                    '11': 'Paper & Printing',
+                    '12': 'Pharmaceuticals & Chemicals',
+                    '13': 'Services & Real Estate',
+                    '14': 'Tannery',
+                    '15': 'Telecommunication',
+                    '16': 'Travel & Leisure',
+                    '17': 'Textiles',
+                    '18': 'Mutual Funds',
+                    '19': 'Insurance',
+                }
+                sector = sector_map.get(sector, sector)
+            sector_set.add(sector)
+    
+    return sorted(list(sector_set))
+
+
+@router.get("/stocks/by-sector")
+def get_top_liquid_stocks_by_sector(
+    sector: str = Query(..., description="Sector name"),
+    limit: int = Query(3, ge=1, le=10, description="Number of stocks to return"),
+    session: Session = Depends(get_session_dep)
+):
+    """Get top liquid stocks in a sector, sorted by volume/turnover"""
+    # Normalize sector input (handle numeric codes)
+    sector_filter = sector
+    if sector.isdigit():
+        sector_map = {
+            '1': 'Banking',
+            '2': 'NBFI',
+            '3': 'Fuel & Power',
+            '4': 'Cement',
+            '5': 'Ceramics',
+            '6': 'Engineering',
+            '7': 'Food & Allied',
+            '8': 'IT',
+            '9': 'Jute',
+            '10': 'Miscellaneous',
+            '11': 'Paper & Printing',
+            '12': 'Pharmaceuticals & Chemicals',
+            '13': 'Services & Real Estate',
+            '14': 'Tannery',
+            '15': 'Telecommunication',
+            '16': 'Travel & Leisure',
+            '17': 'Textiles',
+            '18': 'Mutual Funds',
+            '19': 'Insurance',
+        }
+        sector_filter = sector_map.get(sector, sector)
+    
+    # Get companies in this sector
+    companies = session.exec(
+        select(Company).where(
+            or_(
+                Company.sector == sector_filter,
+                Company.sector == sector  # Also check numeric code
+            ),
+            Company.is_active == True
+        )
+    ).all()
+    
+    if not companies:
+        return []
+    
+    company_ids = [c.id for c in companies]
+    
+    # Get latest StockData for each company, ordered by liquidity (volume * price or turnover)
+    # We'll use a subquery to get the latest StockData per company
+    from sqlalchemy import desc
+    
+    latest_stock_data = []
+    for company_id in company_ids:
+        latest = session.exec(
+            select(StockData)
+            .where(StockData.company_id == company_id)
+            .order_by(desc(StockData.timestamp))
+            .limit(1)
+        ).first()
+        if latest:
+            latest_stock_data.append((company_id, latest))
+    
+    # Sort by liquidity (turnover preferred, fallback to volume * price)
+    def liquidity_score(data_tuple):
+        _, stock_data = data_tuple
+        if stock_data.turnover and stock_data.turnover > 0:
+            return float(stock_data.turnover)
+        elif stock_data.volume and stock_data.last_trade_price:
+            return float(stock_data.volume) * float(stock_data.last_trade_price)
+        return 0.0
+    
+    latest_stock_data.sort(key=liquidity_score, reverse=True)
+    
+    # Get top N companies with their stock data
+    result = []
+    for company_id, stock_data in latest_stock_data[:limit]:
+        company = next((c for c in companies if c.id == company_id), None)
+        if company:
+            result.append({
+                "id": str(company.id),
+                "symbol": company.trading_code,
+                "company_name": company.company_name or company.name,
+                "sector": company.sector,
+                "current_price": float(stock_data.last_trade_price) if stock_data.last_trade_price else 0.0,
+                "volume": int(stock_data.volume) if stock_data.volume else 0,
+                "turnover": float(stock_data.turnover) if stock_data.turnover else 0.0,
+            })
+    
+    return result
+
+
 @router.put("/portfolio/{portfolio_id}/allocation/targets", response_model=List[AllocationTargetPublic])
 def upsert_allocation_targets(
     portfolio_id: UUID,
-    targets: List[AllocationTargetCreate] = Body(..., embed=True),
+    targets: Dict[str, Any] = Body(...),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session_dep)
 ):
@@ -552,6 +695,35 @@ def upsert_allocation_targets(
             detail="Portfolio not found"
         )
 
+    # Extract targets list from request body
+    targets_list = targets.get("targets", [])
+    if not isinstance(targets_list, list):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="targets must be a list"
+        )
+
+    # Validate: sum of target_percent must equal 100%
+    total_percent = sum(float(t.get("target_percent", 0)) for t in targets_list)
+    if abs(total_percent - 100.0) > 0.01:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Total target allocation must equal 100%. Current total: {total_percent:.2f}%"
+        )
+
+    # Validate: no duplicate (category, category_type) pairs
+    seen_pairs = set()
+    for t in targets_list:
+        category = t.get("category", "")
+        category_type = t.get("category_type", "SECTOR")
+        pair = (category, category_type)
+        if pair in seen_pairs:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Duplicate target found for category '{category}' with type '{category_type}'"
+            )
+        seen_pairs.add(pair)
+
     # Delete existing targets for this user/portfolio
     existing = session.exec(
         select(AllocationTarget).where(
@@ -567,15 +739,15 @@ def upsert_allocation_targets(
     saved: List[AllocationTarget] = []
     from datetime import datetime as _dt
     now = _dt.utcnow()
-    for t in targets:
+    for t in targets_list:
         row = AllocationTarget(
             user_id=current_user.id,
             portfolio_id=portfolio_id,
-            category=t.category,
-            category_type=t.category_type or "SECTOR",
-            target_percent=t.target_percent,
-            min_percent=t.min_percent,
-            max_percent=t.max_percent,
+            category=t.get("category", ""),
+            category_type=t.get("category_type", "SECTOR"),
+            target_percent=Decimal(str(t.get("target_percent", 0))),
+            min_percent=Decimal(str(t.get("min_percent", 0))) if t.get("min_percent") is not None else None,
+            max_percent=Decimal(str(t.get("max_percent", 100))) if t.get("max_percent") is not None else None,
             created_at=now,
             updated_at=now,
         )

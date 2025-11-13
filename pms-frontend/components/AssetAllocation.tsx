@@ -17,7 +17,9 @@ import {
   Settings,
   RefreshCw,
   ArrowRight,
-  Info
+  Info,
+  Trash2,
+  Plus
 } from 'lucide-react'
 import { OpenAPI, AnalyticsService } from '../src/client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -170,6 +172,27 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 	})
 
 	const [editableTargets, setEditableTargets] = useState<AllocationTargetRow[]>([])
+	const [availableSectors, setAvailableSectors] = useState<string[]>([])
+	const [newSectorSelect, setNewSectorSelect] = useState<string>('')
+
+	// Fetch available sectors
+	const { data: sectorsList = [] } = useQuery<string[]>({
+		queryKey: ['analytics', 'sectors'],
+		queryFn: async () => {
+			const base = (OpenAPI as any).BASE || ''
+			const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/analytics/sectors`, {
+				headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
+				credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+			})
+			if (!res.ok) return []
+			return await res.json()
+		},
+		staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+	})
+
+	useEffect(() => {
+		setAvailableSectors(sectorsList)
+	}, [sectorsList])
 
 	useEffect(() => {
 		const sectors: SectorAlloc[] = ((allocation as any)?.sector_wise_allocation || []).map((s: any) => ({
@@ -205,14 +228,19 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 					max_percent: t.max_percent ?? null,
 				})) }),
 			})
-			if (!res.ok) throw new Error('Failed to save targets')
+			if (!res.ok) {
+				const errorData = await res.json().catch(() => ({ detail: 'Failed to save targets' }))
+				throw new Error(errorData.detail || 'Failed to save targets')
+			}
 			return await res.json()
 		},
 		onSuccess: () => {
 			toast.success('Allocation targets saved')
 			queryClient.invalidateQueries({ queryKey: queryKeys.allocationTargets(portfolioId || 'none') })
 		},
-		onError: () => toast.error('Failed to save targets'),
+		onError: (error: any) => {
+			toast.error(error?.message || 'Failed to save targets')
+		},
 	})
 
 	const sectors: SectorAlloc[] = useMemo(() => {
@@ -235,24 +263,89 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 
 	const driftRows = useMemo(() => {
 		const targetMap = new Map<string, number>()
-		for (const t of editableTargets) {
-			targetMap.set(normalizeSector(t.category), Number(t.target_percent || 0))
+		const sectorMap = new Map<string, SectorAlloc>()
+		
+		// Map current sectors
+		for (const s of sectors) {
+			sectorMap.set(s.sector, s)
 		}
-		return sectors.map(s => ({
-			sector: s.sector,
-			current: Number(s.allocation_percent || 0),
-			target: Number(targetMap.get(s.sector) || 0),
-			drift: Number((Number(s.allocation_percent || 0) - Number(targetMap.get(s.sector) || 0)).toFixed(2)),
-		}))
+		
+		// Map targets
+		for (const t of editableTargets) {
+			const normalized = normalizeSector(t.category)
+			targetMap.set(normalized, Number(t.target_percent || 0))
+		}
+		
+		// Combine sectors with holdings and targets without holdings
+		const result: Array<{ sector: string; current: number; target: number; drift: number }> = []
+		
+		// Add sectors with current holdings
+		for (const s of sectors) {
+			result.push({
+				sector: s.sector,
+				current: Number(s.allocation_percent || 0),
+				target: Number(targetMap.get(s.sector) || 0),
+				drift: Number((Number(s.allocation_percent || 0) - Number(targetMap.get(s.sector) || 0)).toFixed(2)),
+			})
+		}
+		
+		// Add targets that don't have current holdings
+		for (const t of editableTargets) {
+			const normalized = normalizeSector(t.category)
+			if (!sectorMap.has(normalized)) {
+				result.push({
+					sector: normalized,
+					current: 0,
+					target: Number(t.target_percent || 0),
+					drift: Number((0 - Number(t.target_percent || 0)).toFixed(2)),
+				})
+			}
+		}
+		
+		return result
 	}, [JSON.stringify(sectors), JSON.stringify(editableTargets)])
+
+	// Fetch top liquid stocks for empty sectors (for rebalancing suggestions)
+	const emptySectorsWithTargets = useMemo(() => {
+		return driftRows.filter(d => d.current === 0 && d.target > 0).map(d => d.sector);
+	}, [driftRows]);
+
+	// Fetch liquid stocks for first empty sector (we'll fetch others on demand)
+	// For simplicity, we'll fetch all at once using a single query that handles multiple sectors
+	const liquidStocksMap = useQuery<Record<string, any[]>>({
+		queryKey: ['analytics', 'stocks-by-sector', emptySectorsWithTargets.join(',')],
+		queryFn: async () => {
+			const base = (OpenAPI as any).BASE || ''
+			const map: Record<string, any[]> = {}
+			
+			// Fetch liquid stocks for each empty sector
+			await Promise.all(emptySectorsWithTargets.map(async (sector) => {
+				try {
+					const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/analytics/stocks/by-sector?sector=${encodeURIComponent(sector)}&limit=3`, {
+						headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
+						credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+					})
+					if (res.ok) {
+						map[sector] = await res.json()
+					} else {
+						map[sector] = []
+					}
+				} catch {
+					map[sector] = []
+				}
+			}))
+			
+			return map
+		},
+		enabled: emptySectorsWithTargets.length > 0,
+		staleTime: 5 * 60 * 1000,
+	})
 
 	// Calculate rebalancing suggestions
 	const rebalancingSuggestions = useMemo(() => {
-		if (!editableTargets.length || !stocks.length) return [];
+		if (!editableTargets.length) return [];
 		
 		const totalValue = allocation.total_value || 0;
-		if (totalValue <= 0) return [];
-
 		const suggestions: RebalancingSuggestion[] = [];
 		
 		// Group stocks by sector
@@ -267,40 +360,73 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 
 		// Calculate rebalancing for each sector
 		driftRows.forEach(drift => {
-			if (Math.abs(drift.drift) > 1) { // Only suggest if drift > 1%
+			// For empty sectors with targets, always suggest (drift will be negative)
+			// For sectors with holdings, only suggest if drift > 1%
+			const shouldSuggest = drift.current === 0 && drift.target > 0 ? true : Math.abs(drift.drift) > 1;
+			
+			if (shouldSuggest) {
 				const sectorStocks = stocksBySector.get(drift.sector) || [];
-				const targetValue = (drift.target / 100) * totalValue;
-				const currentValue = (drift.current / 100) * totalValue;
+				// Use a minimum portfolio value for empty sectors if totalValue is 0
+				const effectiveTotalValue = totalValue > 0 ? totalValue : 10000; // Default $10k for empty portfolio
+				const targetValue = (drift.target / 100) * effectiveTotalValue;
+				const currentValue = (drift.current / 100) * effectiveTotalValue;
 				const difference = targetValue - currentValue;
 
-				// Distribute the difference across stocks in the sector
-				sectorStocks.forEach(stock => {
-					const stockValue = stock.current_value;
-					const stockProportion = sectorStocks.length > 0 
-						? stockValue / sectorStocks.reduce((sum, s) => sum + s.current_value, 0)
-						: 1;
+				// Handle sectors with no holdings - recommend top liquid stocks
+				if (sectorStocks.length === 0 && drift.current === 0 && drift.target > 0) {
+					// Find liquid stocks for this sector
+					const liquidStocks = liquidStocksMap.data?.[drift.sector] || [];
 					
-					const suggestedValueChange = difference * stockProportion;
-					const currentPrice = stock.current_value / stock.quantity;
-					const suggestedShares = Math.round(suggestedValueChange / currentPrice);
-
-					if (Math.abs(suggestedShares) > 0) {
-						suggestions.push({
-							symbol: stock.symbol,
-							action: suggestedShares > 0 ? 'BUY' : 'SELL',
-							currentAllocation: stock.allocation_percent,
-							targetAllocation: drift.target,
-							deviation: drift.drift,
-							suggestedShares: Math.abs(suggestedShares),
-							suggestedValue: Math.abs(suggestedValueChange),
+					if (liquidStocks.length > 0) {
+						// Split target value equally across top 3 stocks
+						const valuePerStock = targetValue / liquidStocks.length;
+						liquidStocks.forEach((stock: any) => {
+							if (stock.current_price > 0) {
+								const suggestedShares = Math.round(valuePerStock / stock.current_price);
+								if (suggestedShares > 0) {
+									suggestions.push({
+										symbol: stock.symbol,
+										action: 'BUY',
+										currentAllocation: 0,
+										targetAllocation: drift.target,
+										deviation: drift.drift,
+										suggestedShares,
+										suggestedValue: valuePerStock,
+									});
+								}
+							}
 						});
 					}
-				});
+				} else if (sectorStocks.length > 0) {
+					// Existing logic for sectors with holdings
+					sectorStocks.forEach(stock => {
+						const stockValue = stock.current_value;
+						const stockProportion = sectorStocks.length > 0 
+							? stockValue / sectorStocks.reduce((sum, s) => sum + s.current_value, 0)
+							: 1;
+						
+						const suggestedValueChange = difference * stockProportion;
+						const currentPrice = stock.current_value / stock.quantity;
+						const suggestedShares = Math.round(suggestedValueChange / currentPrice);
+
+						if (Math.abs(suggestedShares) > 0) {
+							suggestions.push({
+								symbol: stock.symbol,
+								action: suggestedShares > 0 ? 'BUY' : 'SELL',
+								currentAllocation: stock.allocation_percent,
+								targetAllocation: drift.target,
+								deviation: drift.drift,
+								suggestedShares: Math.abs(suggestedShares),
+								suggestedValue: Math.abs(suggestedValueChange),
+							});
+						}
+					});
+				}
 			}
 		});
 
 		return suggestions.sort((a, b) => Math.abs(b.deviation) - Math.abs(a.deviation));
-	}, [stocks, driftRows, editableTargets, allocation.total_value]);
+	}, [stocks, driftRows, editableTargets, allocation.total_value, liquidStocksMap.data]);
 
 	const totalTarget = editableTargets.reduce((sum, t) => sum + Number(t.target_percent || 0), 0)
 
@@ -707,6 +833,50 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 							</div>
 						</CardHeader>
 						<CardContent>
+							{/* Add Sector Control */}
+							<div className="mb-4 flex items-center gap-2">
+								<Select value={newSectorSelect} onValueChange={setNewSectorSelect}>
+									<SelectTrigger className="w-[250px]">
+										<SelectValue placeholder="Select sector to add" />
+									</SelectTrigger>
+									<SelectContent>
+										{availableSectors
+											.filter(s => !editableTargets.some(t => normalizeSector(t.category) === normalizeSector(s)))
+											.map(sector => (
+												<SelectItem key={sector} value={sector}>
+													{sector}
+												</SelectItem>
+											))}
+									</SelectContent>
+								</Select>
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => {
+										if (!newSectorSelect) return
+										const normalized = normalizeSector(newSectorSelect)
+										// Check if already exists
+										if (editableTargets.some(t => normalizeSector(t.category) === normalized)) {
+											toast.error('Sector already added')
+											return
+										}
+										setEditableTargets(prev => [...prev, {
+											category: normalized,
+											category_type: 'SECTOR',
+											target_percent: 0,
+											min_percent: null,
+											max_percent: null,
+										}])
+										setNewSectorSelect('')
+									}}
+									disabled={!newSectorSelect}
+									className="gap-2"
+								>
+									<Plus className="h-4 w-4" />
+									Add Sector
+								</Button>
+							</div>
+
 							<Table>
 								<TableHeader>
 									<TableRow>
@@ -716,11 +886,13 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 										<TableHead className="text-right">Min %</TableHead>
 										<TableHead className="text-right">Max %</TableHead>
 										<TableHead className="text-right">Drift</TableHead>
+										<TableHead className="text-right">Actions</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
 									{driftRows.map((row) => {
 										const target = editableTargets.find(t => normalizeSector(t.category) === row.sector);
+										if (!target) return null
 										return (
 											<TableRow key={row.sector}>
 												<TableCell className="font-medium">{row.sector}</TableCell>
@@ -775,6 +947,18 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 													>
 														{row.drift > 0 ? '+' : ''}{row.drift.toFixed(2)}%
 													</Badge>
+												</TableCell>
+												<TableCell className="text-right">
+													<Button
+														variant="ghost"
+														size="sm"
+														onClick={() => {
+															setEditableTargets(prev => prev.filter(t => normalizeSector(t.category) !== row.sector))
+														}}
+														className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+													>
+														<Trash2 className="h-4 w-4" />
+													</Button>
 												</TableCell>
 											</TableRow>
 										);

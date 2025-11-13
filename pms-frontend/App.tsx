@@ -6,7 +6,7 @@ import {toast} from "sonner";
 import {usePortfolios} from "./hooks/usePortfolios";
 import {useTrading} from "./hooks/useTrading";
 import {useAuth} from "./hooks/useAuth";
-import {Portfolio, Stock} from "./types/portfolio";
+import {Portfolio, PortfolioSummary, Stock} from "./types/portfolio";
 import {Activity, FileText, HelpCircle, Receipt, Settings, ShieldCheck, TrendingUp, User,} from "lucide-react";
 import {MarketService, PortfolioService} from "./src/client";
 import {useQueryClient} from "@tanstack/react-query";
@@ -28,6 +28,7 @@ const StockScreener = lazy(() => import("./components/StockScreener").then(m => 
 const RiskAnalysis = lazy(() => import("./components/RiskAnalysis").then(m => ({default: m.RiskAnalysis})));
 const RebalancingManager = lazy(() => import("./components/RebalancingManager").then(m => ({default: m.RebalancingManager})));
 const RiskManagement = lazy(() => import("./components/RiskManagement").then(m => ({default: m.RiskManagement})));
+const RiskSettings = lazy(() => import("./components/RiskSettings").then(m => ({default: m.RiskSettings})));
 const SignupPage = lazy(() => import("./components/SignupPage").then(m => ({default: m.SignupPage})));
 const LoginPage = lazy(() => import("./components/LoginPage").then(m => ({default: m.LoginPage})));
 const MarketNewsInsights = lazy(() => import("./components/MarketNewsInsights").then(m => ({default: m.default})));
@@ -37,6 +38,7 @@ const WatchlistManager = lazy(() => import("./components/WatchlistManager").then
 const AddToWatchlistDialog = lazy(() => import("./components/AddToWatchlistDialog").then(m => ({default: m.AddToWatchlistDialog})));
 const Fundamentals = lazy(() => import("./components/Fundamentals").then(m => ({default: m.Fundamentals})));
 const TradingViewChart = lazy(() => import("./components/TradingViewChart").then(m => ({default: m.TradingViewChart})));
+const ResearchWorkspace = lazy(() => import("./components/ResearchWorkspace").then(m => ({default: m.ResearchWorkspace})));
 type View =
     | "dashboard"
     | "portfolios"
@@ -143,14 +145,80 @@ export default function App() {
     } = useTrading();
     const queryClient = useQueryClient();
 
+    const marketPriceMap = useMemo(() => {
+        const map = new Map<string, number>();
+        marketData.forEach((quote) => {
+            const symbol = String(quote.symbol || '').toUpperCase();
+            if (!symbol) {
+                return;
+            }
+            const price = Number(quote.currentPrice ?? quote.change ?? 0);
+            if (!Number.isFinite(price)) {
+                return;
+            }
+            map.set(symbol, price);
+        });
+        return map;
+    }, [marketData]);
+
+    const portfoliosWithLivePricing = useMemo<Portfolio[]>(() => {
+        return portfolios.map((portfolio) => {
+            const enrichedStocks = portfolio.stocks.map((stock) => {
+                const symbolKey = String(stock.symbol || '').toUpperCase();
+                const livePrice = marketPriceMap.get(symbolKey) ?? stock.currentPrice;
+                return {
+                    ...stock,
+                    currentPrice: livePrice,
+                };
+            });
+
+            const stocksMarketValue = enrichedStocks.reduce((sum, stock) => sum + stock.quantity * stock.currentPrice, 0);
+            const totalCost = enrichedStocks.reduce((sum, stock) => sum + stock.quantity * stock.purchasePrice, 0);
+            const totalValue = stocksMarketValue + portfolio.cash;
+
+            return {
+                ...portfolio,
+                stocks: enrichedStocks,
+                totalCost,
+                totalValue,
+            };
+        });
+    }, [portfolios, marketPriceMap]);
+
+    const selectedPortfolioDisplay = useMemo(() => {
+        if (!selectedPortfolio) {
+            return null;
+        }
+        return portfoliosWithLivePricing.find((portfolio) => portfolio.id === selectedPortfolio.id) ?? selectedPortfolio;
+    }, [selectedPortfolio, portfoliosWithLivePricing]);
+
+    const portfolioSummaryDisplay = useMemo<PortfolioSummary>(() => {
+        if (!portfoliosWithLivePricing.length) {
+            return portfolioSummary;
+        }
+
+        const totalValue = portfoliosWithLivePricing.reduce((sum, portfolio) => sum + portfolio.totalValue, 0);
+        const totalCost = portfoliosWithLivePricing.reduce((sum, portfolio) => sum + portfolio.totalCost, 0);
+        const totalGainLoss = totalValue - totalCost;
+        const totalGainLossPercent = totalCost > 0 ? (totalGainLoss / totalCost) * 100 : 0;
+
+        return {
+            totalValue,
+            totalGainLoss,
+            totalGainLossPercent,
+            dayChange: portfolioSummary.dayChange,
+            dayChangePercent: portfolioSummary.dayChangePercent,
+        };
+    }, [portfoliosWithLivePricing, portfolioSummary]);
+
     // Compute positions map (must be before any early returns)
     const positionsBySymbol = useMemo(() => {
         const map: Record<string, { quantity: number; averagePrice: number }> = {};
-        (selectedPortfolio?.stocks || []).forEach((s) => {
-            map[s.symbol] = {quantity: s.quantity, averagePrice: s.purchasePrice};
+        (selectedPortfolioDisplay?.stocks || selectedPortfolio?.stocks || []).forEach((s) => {
+            map[s.symbol] = { quantity: s.quantity, averagePrice: s.purchasePrice };
         });
         return map;
-    }, [selectedPortfolio]);
+    }, [selectedPortfolio, selectedPortfolioDisplay]);
 
     // Show loading screen while checking authentication
     if (authLoading) {
@@ -337,23 +405,24 @@ export default function App() {
                             onSelectPortfolio={handleSelectPortfolio}
                             onQuickTrade={handleQuickTrade}
                             onChartStock={handleChartStock}
-                            portfolios={portfolios}
-                            portfolioSummary={portfolioSummary}
+                            portfolios={portfoliosWithLivePricing}
+                            portfolioSummary={portfolioSummaryDisplay}
                         />
                     </Suspense>
                 );
 
             case "portfolio-detail":
-                return selectedPortfolio ? (
+                return selectedPortfolioDisplay ? (
                     <Suspense fallback={<div>Loading Portfolio Detail...</div>}>
                         <PortfolioDetail
-                            portfolio={selectedPortfolio}
+                            portfolio={selectedPortfolioDisplay}
                             onBack={handleBackToPortfolios}
                             onAddStock={handleAddStock}
                             onEditStock={handleEditStock}
                             onDeleteStock={handleDeleteStock}
                             onQuickTrade={handleQuickTrade}
                             onChartStock={handleChartStock}
+                            marketData={marketData}
                         />
                     </Suspense>
                 ) : null;
@@ -388,7 +457,7 @@ export default function App() {
                         <TradingInterface
                             marketData={marketData}
                             onPlaceOrder={handlePlaceOrder}
-                            portfolios={portfolios}
+                            portfolios={portfoliosWithLivePricing}
                             selectedPortfolioId={selectedPortfolio?.id}
                         />
                     </Suspense>
@@ -412,7 +481,7 @@ export default function App() {
                             onRemoveFromWatchlist={removeFromWatchlist}
                             onQuickTrade={handleQuickTrade}
                             onChartStock={handleChartStock}
-                            heldSymbols={new Set((selectedPortfolio?.stocks || []).map(s => s.symbol))}
+                            heldSymbols={new Set(((selectedPortfolioDisplay ?? selectedPortfolio)?.stocks || []).map(s => s.symbol))}
                             onUpdateWatchlistNote={async (watchlistId: string, symbol: string, notes: string) => {
                                 await updateWatchlistItemNote(watchlistId, symbol, notes);
                                 toast.success('Note saved');
@@ -445,40 +514,12 @@ export default function App() {
             case "research":
                 return (
                     <Suspense
-                        fallback={<div className="flex items-center justify-center h-screen">Loading Chart...</div>}>
-                        <div style={{
-                            height: 'calc(100vh - 64px)',
-                            width: '100%',
-                            overflow: 'hidden',
-                            position: 'relative'
-                        }}>
-                            <TradingViewChart
-                                symbol={researchChartSymbol}
-                                interval="1D"
-                                theme="light"
-                                autosize={true}
-                                onPlaceOrder={(symbol, side) => handleQuickTrade(symbol, side)}
-                                onClosePosition={async (portfolioId, positionId) => {
-                                    try {
-                                        // Use the API to close position
-                                        await fetch(`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:8000'}/api/v1/portfolio/${portfolioId}/positions/${positionId}`, {
-                                            method: 'DELETE',
-                                            credentials: 'include',
-                                        });
-                                        // Refresh portfolios
-                                        await queryClient.invalidateQueries({queryKey: ['portfolios']});
-                                        toast.success('Position closed successfully');
-                                    } catch (error) {
-                                        console.error('Error closing position:', error);
-                                        toast.error('Failed to close position');
-                                    }
-                                }}
-                                onPositionUpdate={() => {
-                                    // Refresh portfolios after position updates
-                                    queryClient.invalidateQueries({queryKey: ['portfolios']});
-                                }}
-                            />
-                        </div>
+                        fallback={<div className="flex items-center justify-center h-screen">Loading Charts...</div>}>
+                        <ResearchWorkspace
+                            defaultSymbol={researchChartSymbol}
+                            marketData={marketData}
+                            onQuickTrade={handleQuickTrade}
+                        />
                     </Suspense>
                 );
 
@@ -527,22 +568,9 @@ export default function App() {
 
             case "risk-profile":
                 return (
-                    <div className="space-y-6">
-                        <div className="mb-8">
-                            <h1 className="text-3xl font-semibold text-foreground mb-2">Risk Profile Assessment</h1>
-                            <p className="text-muted-foreground text-lg">Update your risk tolerance and investment
-                                objectives</p>
-                        </div>
-                        <div className="text-center py-12">
-                            <div
-                                className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <ShieldCheck className="h-8 w-8 text-primary"/>
-                            </div>
-                            <p className="text-muted-foreground max-w-md mx-auto">
-                                Interactive risk assessment questionnaire and profile management coming soon.
-                            </p>
-                        </div>
-                    </div>
+                    <Suspense fallback={<div>Loading Risk Settings...</div>}>
+                        <RiskSettings onNavigate={handleViewChange} />
+                    </Suspense>
                 );
 
             case "reports":
@@ -629,7 +657,7 @@ export default function App() {
             case "account":
                 return (
                     <Suspense fallback={<div>Loading Account Manager...</div>}>
-                        <AccountManager user={user} accountBalance={accountBalance} transactions={transactions}
+                        <AccountManager user={user} accountBalance={accountBalance} transactions={transactions} portfolios={portfoliosWithLivePricing}
                                         onDeposit={deposit} onWithdraw={withdraw}
                                         onUpdateCreditLimit={updateCreditLimit}/>
                     </Suspense>

@@ -7,10 +7,20 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "./u
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "./ui/tabs";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "./ui/select";
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "./ui/dialog";
+import {Label} from "./ui/label";
+import {
     BarChart3,
     ChevronLeft,
     ChevronRight,
     Loader2,
+    Plus,
     Search,
     ShoppingCart,
     Star,
@@ -67,6 +77,12 @@ export function MarketData({
         symbol: string;
         companyName: string
     } | null>(null);
+    
+    // Create watchlist dialog state
+    const [createWatchlistDialogOpen, setCreateWatchlistDialogOpen] = useState(false);
+    const [newWatchlistName, setNewWatchlistName] = useState("");
+    const [newWatchlistDescription, setNewWatchlistDescription] = useState("");
+    const [isCreatingWatchlist, setIsCreatingWatchlist] = useState(false);
 
     // Use watchlist hook
     const {
@@ -81,10 +97,17 @@ export function MarketData({
         updateWatchlistItemNotes,
     } = useWatchlist();
 
-    // Fetch paginated stocks for All Stocks tab
+    // Reset pagination when search term changes
+    useEffect(() => {
+        if (searchTerm) {
+            setCurrentPage(1);
+        }
+    }, [searchTerm]);
+
+    // Fetch paginated stocks for All Stocks tab (when not searching)
     const {data: paginatedStocksResponse, isLoading: isLoadingPaginatedStocks} = useQuery({
         queryKey: queryKeys.marketList(pageSize, (currentPage - 1) * pageSize),
-        enabled: !!(OpenAPI as any).TOKEN,
+        enabled: !!(OpenAPI as any).TOKEN && !searchTerm.trim(),
         queryFn: async () => {
             const list = (await MarketService.listStocks({
                 limit: pageSize,
@@ -95,24 +118,78 @@ export function MarketData({
         staleTime: 30 * 1000,
     });
 
+    // Fetch search results (when searching)
+    const {data: searchStocksResponse, isLoading: isLoadingSearchStocks} = useQuery({
+        queryKey: ['marketSearch', searchTerm.trim()],
+        enabled: !!(OpenAPI as any).TOKEN && !!searchTerm.trim(),
+        queryFn: async () => {
+            const list = (await MarketService.listStocks({
+                q: searchTerm.trim(),
+                limit: 500, // Backend max limit is 500
+                offset: 0
+            })) as any[];
+            return list || [];
+        },
+        staleTime: 30 * 1000,
+    });
+
     // Map paginated stocks to MarketData format
-    const paginatedStocks: MarketDataType[] = (paginatedStocksResponse || []).map((it: any) => ({
-        symbol: it.symbol,
-        companyName: it.company_name,
-        currentPrice: Number(it.last || 0),
-        change: Number(it.change || 0),
-        changePercent: Number(it.change_percent || 0),
-        volume: Number(it.volume || 0),
-        high52Week: 0,
-        low52Week: 0,
-        marketCap: Number(it.market_cap || 0),
-        peRatio: undefined,
-        dividend: undefined,
-        dividendYield: undefined,
-        sector: it.sector || 'Unknown',
-        industry: it.industry || 'Unknown',
-        lastUpdated: it.timestamp || new Date().toISOString(),
-    }));
+    const paginatedStocks: MarketDataType[] = (paginatedStocksResponse || []).map((it: any) => {
+        const lastPrice = Number(it.last || 0);
+        const totalSecurities = Number(it.total_outstanding_securities || 0);
+        // Calculate market cap: last_trade_price × total_outstanding_securities (in crores)
+        // 1 crore = 10,000,000
+        const calculatedMarketCap = lastPrice > 0 && totalSecurities > 0 
+            ? (lastPrice * totalSecurities) / 10_000_000 
+            : Number(it.market_cap || 0);
+        
+        return {
+            symbol: it.symbol,
+            companyName: it.company_name,
+            currentPrice: lastPrice,
+            change: Number(it.change || 0),
+            changePercent: Number(it.change_percent || 0),
+            volume: Number(it.volume || 0),
+            high52Week: 0,
+            low52Week: 0,
+            marketCap: calculatedMarketCap,
+            peRatio: undefined,
+            dividend: undefined,
+            dividendYield: undefined,
+            sector: it.sector || 'Unknown',
+            industry: it.industry || 'Unknown',
+            lastUpdated: it.timestamp || new Date().toISOString(),
+        };
+    });
+
+    // Map search results to MarketData format
+    const searchStocks: MarketDataType[] = (searchStocksResponse || []).map((it: any) => {
+        const lastPrice = Number(it.last || 0);
+        const totalSecurities = Number(it.total_outstanding_securities || 0);
+        // Calculate market cap: last_trade_price × total_outstanding_securities (in crores)
+        // 1 crore = 10,000,000
+        const calculatedMarketCap = lastPrice > 0 && totalSecurities > 0 
+            ? (lastPrice * totalSecurities) / 10_000_000 
+            : Number(it.market_cap || 0);
+        
+        return {
+            symbol: it.symbol,
+            companyName: it.company_name,
+            currentPrice: lastPrice,
+            change: Number(it.change || 0),
+            changePercent: Number(it.change_percent || 0),
+            volume: Number(it.volume || 0),
+            high52Week: 0,
+            low52Week: 0,
+            marketCap: calculatedMarketCap,
+            peRatio: undefined,
+            dividend: undefined,
+            dividendYield: undefined,
+            sector: it.sector || 'Unknown',
+            industry: it.industry || 'Unknown',
+            lastUpdated: it.timestamp || new Date().toISOString(),
+        };
+    });
 
     // Set default watchlist when watchlists load
     useEffect(() => {
@@ -135,22 +212,30 @@ export function MarketData({
                     watchlistItems.map(async (item) => {
                         try {
                             const stockData = await MarketService.getStock({symbol: item.stock.symbol});
+                            const lastPrice = Number((stockData as any).data?.last_trade_price || (stockData as any).last || 0);
+                            const totalSecurities = Number((stockData as any).total_outstanding_securities || 0);
+                            // Calculate market cap: last_trade_price × total_outstanding_securities (in crores)
+                            // 1 crore = 10,000,000
+                            const calculatedMarketCap = lastPrice > 0 && totalSecurities > 0 
+                                ? (lastPrice * totalSecurities) / 10_000_000 
+                                : Number((stockData as any).market_cap || 0);
+                            
                             return {
                                 symbol: item.stock.symbol,
                                 companyName: item.stock.company_name,
-                                currentPrice: Number((stockData as any).last || 0),
-                                change: Number((stockData as any).change || 0),
-                                changePercent: Number((stockData as any).change_percent || 0),
-                                volume: Number((stockData as any).volume || 0),
+                                currentPrice: lastPrice,
+                                change: Number((stockData as any).data?.change || (stockData as any).change || 0),
+                                changePercent: Number((stockData as any).data?.change_percent || (stockData as any).change_percent || 0),
+                                volume: Number((stockData as any).data?.volume || (stockData as any).volume || 0),
                                 high52Week: 0,
                                 low52Week: 0,
-                                marketCap: Number((stockData as any).market_cap || 0),
+                                marketCap: calculatedMarketCap,
                                 peRatio: undefined,
                                 dividend: undefined,
                                 dividendYield: undefined,
                                 sector: item.stock.sector || 'Unknown',
                                 industry: item.stock.industry || 'Unknown',
-                                lastUpdated: (stockData as any).timestamp || new Date().toISOString(),
+                                lastUpdated: (stockData as any).data?.timestamp || (stockData as any).timestamp || new Date().toISOString(),
                             } as MarketDataType;
                         } catch (error) {
                             // Return basic data if price fetch fails
@@ -229,6 +314,37 @@ export function MarketData({
         return '';
     };
 
+    const handleCreateWatchlistSubmit = async () => {
+        if (!newWatchlistName.trim()) {
+            toast.error('Please enter a watchlist name');
+            return;
+        }
+
+        setIsCreatingWatchlist(true);
+        try {
+            const result = await createWatchlist({
+                name: newWatchlistName.trim(),
+                description: newWatchlistDescription.trim() || undefined,
+                is_default: watchlistsFromHook.length === 0, // Make first watchlist default
+            });
+
+            if (result) {
+                toast.success(`Watchlist "${newWatchlistName}" created`);
+                setCreateWatchlistDialogOpen(false);
+                setNewWatchlistName("");
+                setNewWatchlistDescription("");
+                // The watchlist will be automatically selected since it's the only one
+            } else {
+                toast.error('Failed to create watchlist');
+            }
+        } catch (error) {
+            console.error('Error creating watchlist:', error);
+            toast.error('Failed to create watchlist');
+        } finally {
+            setIsCreatingWatchlist(false);
+        }
+    };
+
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
@@ -247,12 +363,17 @@ export function MarketData({
         return num.toString();
     };
 
-    // For All Stocks tab, use paginated data; for other tabs use marketData
-    const filteredAndSortedData = paginatedStocks
-        .filter(stock =>
-            stock.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            stock.companyName.toLowerCase().includes(searchTerm.toLowerCase())
-        )
+    const formatMarketCap = (marketCap: number) => {
+        if (marketCap === 0 || !marketCap) return 'N/A';
+        // Market cap is already in crores, format with Cr suffix
+        return `৳${marketCap.toFixed(2)} Cr`;
+    };
+
+    // For All Stocks tab, use search results if searching, otherwise use paginated data
+    const stocksToDisplay = searchTerm.trim() ? searchStocks : paginatedStocks;
+    const isLoadingStocks = searchTerm.trim() ? isLoadingSearchStocks : isLoadingPaginatedStocks;
+    
+    const filteredAndSortedData = stocksToDisplay
         .sort((a, b) => {
             let aVal: number | string, bVal: number | string;
 
@@ -398,12 +519,14 @@ export function MarketData({
                             </div>
                         </CardHeader>
                         <CardContent>
-                            {isLoadingPaginatedStocks ? (
+                            {isLoadingStocks ? (
                                 <div className="flex items-center justify-center py-8">
                                     <div className="text-center">
                                         <div
                                             className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"/>
-                                        <p className="mt-2 text-sm text-muted-foreground">Loading stocks...</p>
+                                        <p className="mt-2 text-sm text-muted-foreground">
+                                            {searchTerm.trim() ? 'Searching stocks...' : 'Loading stocks...'}
+                                        </p>
                                     </div>
                                 </div>
                             ) : (
@@ -477,7 +600,7 @@ export function MarketData({
                                                         <TableCell
                                                             className="text-right">{formatNumber(stock.volume)}</TableCell>
                                                         <TableCell
-                                                            className="text-right">{formatCurrency(stock.marketCap)}</TableCell>
+                                                            className="text-right">{formatMarketCap(stock.marketCap)}</TableCell>
                                                         <TableCell className="text-right">
                                                             <div className="flex items-center justify-end gap-1">
                                                                 <Button
@@ -519,8 +642,9 @@ export function MarketData({
                                         </TableBody>
                                     </Table>
 
-                                    {/* Pagination Controls */}
-                                    <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                                    {/* Pagination Controls - Only show when not searching */}
+                                    {!searchTerm.trim() && (
+                                        <div className="flex items-center justify-between mt-4 pt-4 border-t">
                                         <div className="flex items-center gap-2">
                                             <span className="text-sm text-muted-foreground">Rows per page:</span>
                                             <Select
@@ -566,6 +690,15 @@ export function MarketData({
                                             </div>
                                         </div>
                                     </div>
+                                    )}
+                                    {/* Search Results Summary */}
+                                    {searchTerm.trim() && (
+                                        <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                                            <div className="text-sm text-muted-foreground">
+                                                Found {filteredAndSortedData.length} {filteredAndSortedData.length === 1 ? 'stock' : 'stocks'} matching "{searchTerm}"
+                                            </div>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </CardContent>
@@ -622,6 +755,14 @@ export function MarketData({
                                     <p className="text-muted-foreground">No watchlists available</p>
                                     <p className="text-sm text-muted-foreground mt-2">Create a watchlist to start
                                         tracking stocks</p>
+                                    <Button
+                                        onClick={() => setCreateWatchlistDialogOpen(true)}
+                                        className="mt-4"
+                                        variant="default"
+                                    >
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Create Watchlist
+                                    </Button>
                                 </div>
                             ) : watchlistStocksWithPrices.length > 0 ? (
                                 <Table>
@@ -686,7 +827,7 @@ export function MarketData({
                                                         <TableCell
                                                             className="text-right">{formatNumber(stock.volume)}</TableCell>
                                                         <TableCell
-                                                            className="text-right">{formatCurrency(stock.marketCap)}</TableCell>
+                                                            className="text-right">{formatMarketCap(stock.marketCap)}</TableCell>
                                                         <TableCell className="text-right max-w-[150px]">
                                                             <Input
                                                                 value={item?.notes || ""}
@@ -968,6 +1109,67 @@ export function MarketData({
                     onCreateWatchlist={handleCreateWatchlist}
                 />
             )}
+            
+            {/* Create Watchlist Dialog */}
+            <Dialog open={createWatchlistDialogOpen} onOpenChange={setCreateWatchlistDialogOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Create New Watchlist</DialogTitle>
+                        <DialogDescription>
+                            Create a new watchlist to track your favorite stocks
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="watchlist-name">Watchlist Name *</Label>
+                            <Input
+                                id="watchlist-name"
+                                value={newWatchlistName}
+                                onChange={(e) => setNewWatchlistName(e.target.value)}
+                                placeholder="My Watchlist"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && newWatchlistName.trim()) {
+                                        handleCreateWatchlistSubmit();
+                                    }
+                                }}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="watchlist-description">Description (optional)</Label>
+                            <Input
+                                id="watchlist-description"
+                                value={newWatchlistDescription}
+                                onChange={(e) => setNewWatchlistDescription(e.target.value)}
+                                placeholder="Description..."
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && newWatchlistName.trim()) {
+                                        handleCreateWatchlistSubmit();
+                                    }
+                                }}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setCreateWatchlistDialogOpen(false);
+                                setNewWatchlistName("");
+                                setNewWatchlistDescription("");
+                            }}
+                            disabled={isCreatingWatchlist}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleCreateWatchlistSubmit}
+                            disabled={isCreatingWatchlist || !newWatchlistName.trim()}
+                        >
+                            {isCreatingWatchlist ? 'Creating...' : 'Create Watchlist'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

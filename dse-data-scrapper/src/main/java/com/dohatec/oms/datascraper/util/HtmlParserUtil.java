@@ -134,6 +134,16 @@ public class HtmlParserUtil {
     }
 
     /**
+     * Parse an integer value and return as Long
+     * @param value the string value
+     * @return Long or null if parsing fails
+     */
+    public Long parseIntegerAsLong(String value) {
+        Integer intValue = parseInteger(value);
+        return intValue != null ? intValue.longValue() : null;
+    }
+
+    /**
      * Parse a long value from string
      * @param value the string value
      * @return Long or null if parsing fails

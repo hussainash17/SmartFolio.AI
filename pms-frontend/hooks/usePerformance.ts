@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { OpenAPI } from '../src/client';
+import { OpenAPI, AnalyticsService } from '../src/client';
 import { queryKeys } from './queryKeys';
 
 // ============================================================================
@@ -410,5 +410,81 @@ export function useCashFlows(portfolioId: string | null, period: string = 'YTD')
     ),
     enabled: !!portfolioId && !!(OpenAPI as any).TOKEN,
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+// ============================================================================
+// ANALYTICS API HOOKS (Legacy but still useful)
+// ============================================================================
+
+// Hook for comprehensive portfolio performance (from analytics API)
+export function useAnalyticsPortfolioPerformance(portfolioId: string | null, period: string = '1Y') {
+  return useQuery({
+    queryKey: ['analytics', 'performance', portfolioId || '', period],
+    queryFn: () => AnalyticsService.getPortfolioPerformance({ 
+      portfolioId: portfolioId!, 
+      period 
+    }),
+    enabled: !!portfolioId && !!(OpenAPI as any).TOKEN,
+    staleTime: 5 * 60 * 1000,
+    retry: (failureCount, error: any) => {
+      // Don't retry on 404 (portfolio not found)
+      if (error?.status === 404) return false;
+      return failureCount < 2;
+    },
+  });
+}
+
+// Hook for analytics benchmark comparison
+export function useAnalyticsBenchmarkComparison(
+  portfolioId: string | null, 
+  benchmark: string = 'DSEX', 
+  period: string = '1Y'
+) {
+  return useQuery({
+    queryKey: ['analytics', 'benchmark-comparison', portfolioId || '', benchmark, period],
+    queryFn: () => AnalyticsService.getBenchmarkComparison({ 
+      portfolioId: portfolioId!, 
+      benchmark,
+      period 
+    }),
+    enabled: !!portfolioId && !!(OpenAPI as any).TOKEN,
+    staleTime: 5 * 60 * 1000,
+    retry: (failureCount, error: any) => {
+      if (error?.status === 404) return false;
+      return failureCount < 2;
+    },
+  });
+}
+
+// Hook for dividend analysis
+export function useDividendAnalysis(portfolioId: string | null) {
+  return useQuery({
+    queryKey: ['analytics', 'dividend-analysis', portfolioId || ''],
+    queryFn: () => AnalyticsService.getDividendAnalysis({ 
+      portfolioId: portfolioId! 
+    }),
+    enabled: !!portfolioId && !!(OpenAPI as any).TOKEN,
+    staleTime: 10 * 60 * 1000, // 10 minutes - dividend data doesn't change frequently
+    retry: (failureCount, error: any) => {
+      if (error?.status === 404) return false;
+      return failureCount < 2;
+    },
+  });
+}
+
+// Hook for cost basis analysis
+export function useCostBasisAnalysis(portfolioId: string | null) {
+  return useQuery({
+    queryKey: ['analytics', 'cost-basis', portfolioId || ''],
+    queryFn: () => AnalyticsService.getCostBasisAnalysis({ 
+      portfolioId: portfolioId! 
+    }),
+    enabled: !!portfolioId && !!(OpenAPI as any).TOKEN,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    retry: (failureCount, error: any) => {
+      if (error?.status === 404) return false;
+      return failureCount < 2;
+    },
   });
 }

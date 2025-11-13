@@ -17,23 +17,41 @@ import {
 } from "lucide-react";
 import { AuthUser } from "../hooks/useAuth";
 import { AccountBalance, Transaction } from "../types/trading";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Portfolio } from "../types/portfolio";
 
 interface AccountManagerProps {
   user: AuthUser | null;
   accountBalance: AccountBalance;
   transactions: Transaction[];
+  portfolios: Portfolio[];
   // Optional action props injected from parent
-  onDeposit?: (amount: number) => Promise<void> | void;
-  onWithdraw?: (amount: number) => Promise<void> | void;
+  onDeposit?: (amount: number, portfolioId: string) => Promise<void> | void;
+  onWithdraw?: (amount: number, portfolioId: string) => Promise<void> | void;
   onUpdateCreditLimit?: (amount: number) => Promise<void> | void;
 }
 
-export function AccountManager({ user, accountBalance, transactions, onDeposit, onWithdraw, onUpdateCreditLimit }: AccountManagerProps) {
+export function AccountManager({ user, accountBalance, transactions, portfolios, onDeposit, onWithdraw, onUpdateCreditLimit }: AccountManagerProps) {
   const [depositAmount, setDepositAmount] = useState<string>("");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [creditLimit, setCreditLimit] = useState<string>("");
+  const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(portfolios[0]?.id ?? null);
+
+  useEffect(() => {
+    if (!portfolios.length) {
+      if (selectedPortfolioId !== null) {
+        setSelectedPortfolioId(null);
+      }
+      return;
+    }
+    if (!selectedPortfolioId || !portfolios.some((p) => p.id === selectedPortfolioId)) {
+      setSelectedPortfolioId(portfolios[0].id);
+    }
+  }, [portfolios, selectedPortfolioId]);
+
+  const hasPortfolios = portfolios.length > 0;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -97,22 +115,55 @@ export function AccountManager({ user, accountBalance, transactions, onDeposit, 
   const getFirstName = () => user?.name?.split(' ')[0] || 'First';
   const getLastName = () => user?.name?.split(' ')[1] || 'Last';
 
-  const marginUtilization = (accountBalance.marginUsed / accountBalance.dayTradingBuyingPower) * 100;
+  const marginUtilization = accountBalance.dayTradingBuyingPower
+    ? (accountBalance.marginUsed / accountBalance.dayTradingBuyingPower) * 100
+    : 0;
+
+  const formatPercentage = (value: number) => {
+    const formatted = Number.isFinite(value) ? value.toFixed(2) : "0.00";
+    return `${value >= 0 ? "+" : ""}${formatted}%`;
+  };
 
   const handleDeposit = async () => {
     const amt = Number(depositAmount || 0);
     if (!amt || amt <= 0) return;
-    await onDeposit?.(amt);
-    toast.success('Deposit successful');
-    setDepositAmount('');
+    if (!selectedPortfolioId) {
+      toast.error('Please select a portfolio before making a deposit.');
+      return;
+    }
+    if (!onDeposit) {
+      toast.error('Deposit action is not available right now.');
+      return;
+    }
+    try {
+      await onDeposit(amt, selectedPortfolioId);
+      toast.success('Deposit successful');
+      setDepositAmount('');
+    } catch (error) {
+      console.error(error);
+      toast.error('Deposit failed. Please try again.');
+    }
   };
 
   const handleWithdraw = async () => {
     const amt = Number(withdrawAmount || 0);
     if (!amt || amt <= 0) return;
-    await onWithdraw?.(amt);
-    toast.success('Withdrawal successful');
-    setWithdrawAmount('');
+    if (!selectedPortfolioId) {
+      toast.error('Please select a portfolio before making a withdrawal.');
+      return;
+    }
+    if (!onWithdraw) {
+      toast.error('Withdrawal action is not available right now.');
+      return;
+    }
+    try {
+      await onWithdraw(amt, selectedPortfolioId);
+      toast.success('Withdrawal successful');
+      setWithdrawAmount('');
+    } catch (error) {
+      console.error(error);
+      toast.error('Withdrawal failed. Please try again.');
+    }
   };
 
   const handleUpdateCredit = async () => {
@@ -173,6 +224,30 @@ export function AccountManager({ user, accountBalance, transactions, onDeposit, 
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent className="space-y-3">
+            {hasPortfolios ? (
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Target Portfolio</label>
+                <Select
+                  value={selectedPortfolioId ?? ''}
+                  onValueChange={(value) => setSelectedPortfolioId(value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select portfolio" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {portfolios.map((portfolio) => (
+                      <SelectItem key={portfolio.id} value={portfolio.id}>
+                        {portfolio.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Create a portfolio to enable deposits and withdrawals.
+              </p>
+            )}
             <div className="flex gap-2">
               <input
                 className="flex-1 border rounded px-2 py-1 text-sm"
@@ -181,8 +256,11 @@ export function AccountManager({ user, accountBalance, transactions, onDeposit, 
                 onChange={(e) => setDepositAmount(e.target.value)}
                 type="number"
                 min={0}
+                disabled={!hasPortfolios}
               />
-              <Button size="sm" onClick={handleDeposit}>Deposit</Button>
+              <Button size="sm" onClick={handleDeposit} disabled={!hasPortfolios}>
+                Deposit
+              </Button>
             </div>
             <div className="flex gap-2">
               <input
@@ -192,8 +270,11 @@ export function AccountManager({ user, accountBalance, transactions, onDeposit, 
                 onChange={(e) => setWithdrawAmount(e.target.value)}
                 type="number"
                 min={0}
+                disabled={!hasPortfolios}
               />
-              <Button size="sm" variant="outline" onClick={handleWithdraw}>Withdraw</Button>
+              <Button size="sm" variant="outline" onClick={handleWithdraw} disabled={!hasPortfolios}>
+                Withdraw
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -242,33 +323,66 @@ export function AccountManager({ user, accountBalance, transactions, onDeposit, 
                 <CardTitle>Balance Breakdown</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+              {hasPortfolios ? (
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Cash Balance</span>
-                    <span className="font-medium">{formatCurrency(accountBalance.cashBalance)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Stock Value</span>
-                    <span className="font-medium">{formatCurrency(accountBalance.stockValue)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Margin Used</span>
-                    <span className="font-medium">{formatCurrency(accountBalance.marginUsed)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Maintenance Margin</span>
-                    <span className="font-medium">{formatCurrency(accountBalance.maintenanceMargin)}</span>
-                  </div>
-                  <hr className="my-2" />
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Buying Power</span>
-                    <span className="font-medium">{formatCurrency(accountBalance.buyingPower)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">Total Account Value</span>
-                    <span className="font-bold text-lg">{formatCurrency(accountBalance.totalValue)}</span>
-                  </div>
+                  {portfolios.map((portfolio) => {
+                    const stockValue = Math.max(portfolio.totalValue - portfolio.cash, 0);
+                    const gainLoss = portfolio.totalValue - portfolio.totalCost;
+                    const gainLossPercent = portfolio.totalCost > 0 ? (gainLoss / portfolio.totalCost) * 100 : 0;
+                    return (
+                      <div
+                        key={portfolio.id}
+                        className="rounded-lg border bg-muted/20 p-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium">{portfolio.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Created {new Date(portfolio.createdDate).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-muted-foreground">Total Value</p>
+                            <p className="text-sm font-semibold">
+                              {formatCurrency(portfolio.totalValue)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Cash Balance</p>
+                            <p className="font-medium">
+                              {formatCurrency(portfolio.cash)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Stock Value</p>
+                            <p className="font-medium">
+                              {formatCurrency(stockValue)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Invested Capital</p>
+                            <p className="font-medium">
+                              {formatCurrency(portfolio.totalCost)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Unrealized P/L</p>
+                            <p className={`font-medium ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {formatCurrency(gainLoss)} ({formatPercentage(gainLossPercent)})
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No portfolios available yet. Create a portfolio to see detailed breakdowns.
+                </p>
+              )}
               </CardContent>
             </Card>
           </div>

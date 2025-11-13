@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -6,6 +6,7 @@ import { Progress } from "./ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { 
   Shield, 
   AlertTriangle, 
@@ -19,8 +20,22 @@ import {
   Calculator,
   Eye,
   Gauge,
-  Zap
+  Zap,
+  Loader2,
+  Briefcase
 } from "lucide-react";
+import { usePortfolios } from "../hooks/usePortfolios";
+import { 
+  useRiskOverview, 
+  useRiskMetrics, 
+  useRiskMetricsTimeseries,
+  useSectorConcentration,
+  useCorrelationAnalysis,
+  useStressTests,
+  useRiskAlerts,
+  useUserRiskProfile
+} from "../hooks/useRisk";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface RiskAnalysisProps {
   onNavigate: (view: string) => void;
@@ -33,19 +48,68 @@ interface RiskMetric {
   target: number;
   status: 'low' | 'medium' | 'high';
   description: string;
-  change: number;
-}
-
-interface CorrelationData {
-  asset1: string;
-  asset2: string;
-  correlation: number;
-  risk: 'low' | 'medium' | 'high';
+  change?: number;
 }
 
 export function RiskAnalysis({ onNavigate, onQuickTrade }: RiskAnalysisProps) {
   const [selectedTimeframe, setSelectedTimeframe] = useState('1Y');
-  const [selectedRiskType, setSelectedRiskType] = useState('overall');
+  const queryClient = useQueryClient();
+  
+  // Get portfolios list
+  const { portfolios, loading: portfoliosLoading } = usePortfolios();
+  
+  // Manage selected portfolio internally - default to first portfolio or default portfolio
+  const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(null);
+  
+  // Initialize with default portfolio or first portfolio when portfolios load
+  useEffect(() => {
+    if (!selectedPortfolioId && portfolios.length > 0) {
+      // Try to find default portfolio first
+      const defaultPortfolio = portfolios.find(p => p.isDefault);
+      if (defaultPortfolio) {
+        setSelectedPortfolioId(defaultPortfolio.id);
+      } else {
+        // Otherwise use first portfolio
+        setSelectedPortfolioId(portfolios[0].id);
+      }
+    }
+  }, [portfolios, selectedPortfolioId]);
+  
+  // Use selected portfolio for queries
+  const portfolioId = selectedPortfolioId;
+  
+  // Get selected portfolio details
+  const selectedPortfolio = portfolios.find(p => p.id === portfolioId);
+
+  // Fetch risk data
+  const { data: riskOverview, isLoading: overviewLoading, refetch: refetchOverview } = useRiskOverview(
+    portfolioId,
+    selectedTimeframe
+  );
+  
+  const { data: riskMetrics, isLoading: metricsLoading } = useRiskMetrics(
+    portfolioId,
+    selectedTimeframe
+  );
+  
+  const { data: sectorData, isLoading: sectorLoading } = useSectorConcentration(
+    portfolioId,
+    selectedTimeframe
+  );
+  
+  const { data: correlationData, isLoading: correlationLoading } = useCorrelationAnalysis(
+    portfolioId,
+    selectedTimeframe,
+    10
+  );
+  
+  const { data: stressTests, isLoading: stressLoading } = useStressTests(
+    portfolioId
+  );
+  
+  const { data: riskAlertsData, isLoading: alertsLoading } = useRiskAlerts(portfolioId, true);
+  
+  const { data: riskProfile } = useUserRiskProfile();
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -60,106 +124,75 @@ export function RiskAnalysis({ onNavigate, onQuickTrade }: RiskAnalysisProps) {
     return `${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`;
   };
 
-  // Enhanced risk metrics with trend data
-  const riskMetrics: RiskMetric[] = [
-    {
-      name: 'Portfolio Volatility',
-      value: 16.2,
-      target: 15.0,
-      status: 'medium',
-      description: 'Annual volatility of your portfolio',
-      change: +1.3
-    },
-    {
-      name: 'Value at Risk (95%)',
-      value: 12450,
-      target: 10000,
-      status: 'medium',
-      description: 'Maximum expected loss in a day (95% confidence)',
-      change: +850
-    },
-    {
-      name: 'Maximum Drawdown',
-      value: -8.3,
-      target: -10.0,
-      status: 'low',
-      description: 'Largest peak-to-trough decline',
-      change: -0.7
-    },
-    {
-      name: 'Sharpe Ratio',
-      value: 1.34,
-      target: 1.20,
-      status: 'low',
-      description: 'Risk-adjusted return measure',
-      change: +0.08
-    },
-    {
-      name: 'Beta',
-      value: 1.08,
-      target: 1.00,
-      status: 'low',
-      description: 'Sensitivity to market movements',
-      change: +0.03
-    },
-    {
-      name: 'Tracking Error',
-      value: 3.2,
-      target: 2.5,
-      status: 'medium',
-      description: 'Deviation from benchmark returns',
-      change: +0.4
+  // Determine risk status based on value vs target
+  const getRiskStatus = (value: number, target: number, lowerIsBetter: boolean = false): 'low' | 'medium' | 'high' => {
+    const deviation = Math.abs(value - target);
+    const percentDeviation = target !== 0 ? (deviation / Math.abs(target)) * 100 : 0;
+    
+    if (lowerIsBetter) {
+      // For metrics where lower is better (like drawdown)
+      if (value <= target) return 'low';
+      if (percentDeviation < 20) return 'medium';
+      return 'high';
+    } else {
+      // For metrics where higher is better (like Sharpe)
+      if (value >= target) return 'low';
+      if (percentDeviation < 20) return 'medium';
+      return 'high';
     }
-  ];
+  };
 
-  // Sector concentration data
-  const sectorConcentration = [
-    { sector: 'Technology', weight: 35.2, risk: 'high', benchmark: 25.0, trend: +2.1 },
-    { sector: 'Healthcare', weight: 18.5, risk: 'medium', benchmark: 15.0, trend: -0.8 },
-    { sector: 'Financial Services', weight: 15.3, risk: 'medium', benchmark: 20.0, trend: -1.2 },
-    { sector: 'Consumer Discretionary', weight: 12.8, risk: 'low', benchmark: 12.0, trend: +0.3 },
-    { sector: 'Industrials', weight: 8.7, risk: 'low', benchmark: 10.0, trend: -0.5 },
-    { sector: 'Energy', weight: 5.2, risk: 'low', benchmark: 8.0, trend: +1.1 },
-    { sector: 'Others', weight: 4.3, risk: 'low', benchmark: 10.0, trend: -0.9 }
-  ];
-
-  // Correlation data
-  const correlationData: CorrelationData[] = [
-    { asset1: 'AAPL', asset2: 'MSFT', correlation: 0.78, risk: 'high' },
-    { asset1: 'AAPL', asset2: 'GOOGL', correlation: 0.74, risk: 'high' },
-    { asset1: 'MSFT', asset2: 'GOOGL', correlation: 0.71, risk: 'high' },
-    { asset1: 'AAPL', asset2: 'TSLA', correlation: 0.45, risk: 'medium' },
-    { asset1: 'JPM', asset2: 'BAC', correlation: 0.82, risk: 'high' },
-    { asset1: 'AAPL', asset2: 'JPM', correlation: 0.23, risk: 'low' }
-  ];
-
-  // Risk alerts
-  const riskAlerts = [
-    {
-      id: 1,
-      type: 'high',
-      title: 'High Tech Concentration',
-      message: 'Technology sector allocation is 10.2% above benchmark',
-      action: 'Rebalance',
-      actionType: 'rebalancing' as const
-    },
-    {
-      id: 2,
-      type: 'medium',
-      title: 'Correlation Risk',
-      message: 'High correlation detected between major holdings (AAPL, MSFT)',
-      action: 'Diversify',
-      actionType: 'portfolio' as const
-    },
-    {
-      id: 3,
-      type: 'medium',
-      title: 'Volatility Spike',
-      message: 'Portfolio volatility increased 1.3% this month',
-      action: 'Monitor',
-      actionType: 'risk' as const
-    }
-  ];
+  // Build risk metrics from API data
+  const riskMetricsList: RiskMetric[] = useMemo(() => {
+    if (!riskMetrics || !riskProfile) return [];
+    
+    const profile = riskProfile;
+    
+    return [
+      {
+        name: 'Portfolio Volatility',
+        value: riskMetrics.volatilityPct,
+        target: Number(profile.max_portfolio_volatility || 15.0),
+        status: getRiskStatus(riskMetrics.volatilityPct, Number(profile.max_portfolio_volatility || 15.0), true),
+        description: 'Annual volatility of your portfolio'
+      },
+      {
+        name: 'Value at Risk (95%)',
+        value: riskMetrics.var95Amt,
+        target: 10000, // Default target
+        status: riskMetrics.var95Amt > 15000 ? 'high' : riskMetrics.var95Amt > 10000 ? 'medium' : 'low',
+        description: 'Maximum expected loss in a day (95% confidence)'
+      },
+      {
+        name: 'Maximum Drawdown',
+        value: riskMetrics.maxDrawdownPct,
+        target: Number(profile.max_drawdown_tolerance || 20.0),
+        status: getRiskStatus(riskMetrics.maxDrawdownPct, Number(profile.max_drawdown_tolerance || 20.0), true),
+        description: 'Largest peak-to-trough decline'
+      },
+      {
+        name: 'Sharpe Ratio',
+        value: riskMetrics.sharpeRatio,
+        target: Number(profile.target_sharpe_ratio || 1.2),
+        status: getRiskStatus(riskMetrics.sharpeRatio, Number(profile.target_sharpe_ratio || 1.2), false),
+        description: 'Risk-adjusted return measure'
+      },
+      {
+        name: 'Beta',
+        value: riskMetrics.beta,
+        target: 1.0,
+        status: Math.abs(riskMetrics.beta - 1.0) > 0.3 ? 'high' : Math.abs(riskMetrics.beta - 1.0) > 0.15 ? 'medium' : 'low',
+        description: 'Sensitivity to market movements'
+      },
+      {
+        name: 'Tracking Error',
+        value: riskMetrics.trackingErrorPct,
+        target: 2.5,
+        status: getRiskStatus(riskMetrics.trackingErrorPct, 2.5, true),
+        description: 'Deviation from benchmark returns'
+      }
+    ];
+  }, [riskMetrics, riskProfile]);
 
   const getRiskColor = (status: string) => {
     switch (status) {
@@ -170,32 +203,107 @@ export function RiskAnalysis({ onNavigate, onQuickTrade }: RiskAnalysisProps) {
     }
   };
 
-  const getAlertColor = (type: string) => {
-    switch (type) {
-      case 'high': return 'border-red-200 bg-red-50';
+  const getAlertColor = (severity: string) => {
+    switch (severity?.toLowerCase()) {
+      case 'high':
+      case 'critical': return 'border-red-200 bg-red-50';
       case 'medium': return 'border-yellow-200 bg-yellow-50';
       case 'low': return 'border-blue-200 bg-blue-50';
       default: return 'border-gray-200 bg-gray-50';
     }
   };
 
-  const handleAlertAction = (alert: typeof riskAlerts[0]) => {
-    if (alert.actionType === 'rebalancing') {
+  const handleAlertAction = (alert: any) => {
+    if (alert.alert_type?.toLowerCase().includes('rebalance')) {
       onNavigate('rebalancing');
-    } else if (alert.actionType === 'portfolio') {
+    } else if (alert.alert_type?.toLowerCase().includes('concentration')) {
       onNavigate('portfolios');
     }
   };
 
-  const highConcentrationSectors = sectorConcentration.filter(sector => 
-    sector.weight > sector.benchmark + 5
-  );
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['risk'] });
+    refetchOverview();
+  };
+
+  const highConcentrationSectors = useMemo(() => {
+    return sectorData?.items.filter(sector => 
+      Math.abs(sector.deviationPct) > 5
+    ) || [];
+  }, [sectorData]);
+
+  const isLoading = overviewLoading || metricsLoading || sectorLoading || correlationLoading || stressLoading || alertsLoading;
+
+  // Show loading state while portfolios are loading
+  if (portfoliosLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading portfolios...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty state if no portfolios
+  if (portfolios.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <h3 className="text-lg font-medium mb-2">No Portfolios Found</h3>
+        <p className="text-muted-foreground mb-4">Create a portfolio to view risk analysis.</p>
+        <Button onClick={() => onNavigate('portfolios')}>
+          Create Portfolio
+        </Button>
+      </div>
+    );
+  }
+
+  // Show message if portfolio is selected but still loading
+  if (!portfolioId) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-2" />
+          <p className="text-muted-foreground">Loading portfolio data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex gap-2">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-semibold text-foreground mb-2">Risk Analysis</h1>
+          <p className="text-muted-foreground text-lg">
+            Comprehensive risk assessment and monitoring for your portfolio
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Portfolio Selector */}
+          <div className="flex items-center gap-2">
+            <Briefcase className="h-4 w-4 text-muted-foreground" />
+            <Select 
+              value={selectedPortfolioId || ''} 
+              onValueChange={setSelectedPortfolioId}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Select Portfolio" />
+              </SelectTrigger>
+              <SelectContent>
+                {portfolios.map((portfolio) => (
+                  <SelectItem key={portfolio.id} value={portfolio.id}>
+                    {portfolio.name}
+                    {portfolio.isDefault && ' (Default)'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
           <Button variant="outline" onClick={() => onNavigate('risk-profile')}>
             <Settings className="h-4 w-4 mr-2" />
             Risk Settings
@@ -204,374 +312,406 @@ export function RiskAnalysis({ onNavigate, onQuickTrade }: RiskAnalysisProps) {
             <Download className="h-4 w-4 mr-2" />
             Risk Report
           </Button>
-          <Button>
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button onClick={handleRefresh} disabled={isLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh Analysis
           </Button>
         </div>
       </div>
 
-      {/* Risk Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm">Risk Score</CardTitle>
-              <Gauge className="h-4 w-4 text-orange-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-orange-600">7.2</div>
-            <div className="flex items-center gap-2 mt-2">
-              <Badge variant="outline" className="text-orange-600 border-orange-200">
-                Moderate
-              </Badge>
-              <span className="text-xs text-green-600">↓ 0.3</span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Improved from last month
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm">Active Alerts</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-red-600">{riskAlerts.length}</div>
-            <div className="flex items-center gap-2 mt-2">
-              <Badge variant="outline" className="text-red-600 border-red-200">
-                Attention Needed
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              {riskAlerts.filter(a => a.type === 'high').length} high priority
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm">Portfolio VaR</CardTitle>
-              <TrendingDown className="h-4 w-4 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-blue-600">$12.4K</div>
-            <div className="flex items-center gap-2 mt-2">
-              <Badge variant="outline" className="text-blue-600 border-blue-200">
-                95% Confidence
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Daily maximum loss
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm">Volatility</CardTitle>
-              <Activity className="h-4 w-4 text-purple-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-purple-600">16.2%</div>
-            <div className="flex items-center gap-2 mt-2">
-              <Badge variant="outline" className="text-purple-600 border-purple-200">
-                Annualized
-              </Badge>
-              <span className="text-xs text-red-600">↑ 1.3%</span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Above target of 15%
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Risk Alerts Section */}
-      {riskAlerts.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Risk Alerts</h3>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {riskAlerts.map((alert) => (
-              <Card key={alert.id} className={`border-l-4 ${getAlertColor(alert.type)}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className={`h-4 w-4 ${
-                          alert.type === 'high' ? 'text-red-600' : 
-                          alert.type === 'medium' ? 'text-yellow-600' : 'text-blue-600'
-                        }`} />
-                        <h4 className="font-medium">{alert.title}</h4>
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">{alert.message}</p>
-                    </div>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => handleAlertAction(alert)}
-                    >
-                      {alert.action}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      )}
-
-      {/* Main Content Tabs */}
-      <Tabs defaultValue="metrics" className="space-y-6">
-        <TabsList className="grid grid-cols-4 w-full max-w-xl">
-          <TabsTrigger value="metrics">Risk Metrics</TabsTrigger>
-          <TabsTrigger value="concentration">Concentration</TabsTrigger>
-          <TabsTrigger value="correlation">Correlation</TabsTrigger>
-          <TabsTrigger value="scenarios">Stress Tests</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="metrics" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      ) : (
+        <>
+          {/* Risk Overview Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card>
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle>Risk Metrics Tracking</CardTitle>
-                  <div className="flex gap-2">
-                    {['1M', '3M', '6M', '1Y'].map((period) => (
-                      <Button
-                        key={period}
-                        variant={selectedTimeframe === period ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setSelectedTimeframe(period)}
-                      >
-                        {period}
-                      </Button>
-                    ))}
-                  </div>
+                  <CardTitle className="text-sm">Risk Score</CardTitle>
+                  <Gauge className="h-4 w-4 text-orange-600" />
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {riskMetrics.map((metric) => (
-                  <div key={metric.name} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{metric.name}</span>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs ${metric.change >= 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          {metric.change >= 0 ? '↑' : '↓'} {Math.abs(metric.change)}
-                        </span>
-                        <Badge variant="outline" className={getRiskColor(metric.status)}>
-                          {metric.status}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span>
-                        Current: {metric.name.includes('$') ? formatCurrency(metric.value) : 
-                               metric.name.includes('%') || metric.name.includes('Ratio') ? 
-                               formatPercent(metric.value) : metric.value}
-                      </span>
-                      <span className="text-muted-foreground">
-                        Target: {metric.name.includes('$') ? formatCurrency(metric.target) :
-                               metric.name.includes('%') || metric.name.includes('Ratio') ?
-                               formatPercent(metric.target) : metric.target}
-                      </span>
-                    </div>
-                    <Progress 
-                      value={Math.min(100, (Math.abs(metric.value) / Math.abs(metric.target)) * 100)} 
-                      className="h-2" 
-                    />
-                    <p className="text-xs text-muted-foreground">{metric.description}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Risk Timeline Visualization</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-80 bg-muted rounded-lg flex items-center justify-center">
-                  <div className="text-center">
-                    <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                    <p className="text-sm text-muted-foreground">Risk Timeline Chart</p>
-                    <p className="text-xs text-muted-foreground">
-                      Historical risk metrics analysis for {selectedTimeframe}
-                    </p>
-                  </div>
+                <div className="text-3xl font-bold text-orange-600">
+                  {riskOverview?.riskScore?.toFixed(1) || '0.0'}
                 </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="outline" className="text-orange-600 border-orange-200">
+                    {riskOverview?.riskScore && riskOverview.riskScore < 5 ? 'Low' : 
+                     riskOverview?.riskScore && riskOverview.riskScore < 7.5 ? 'Moderate' : 'High'}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Based on volatility, concentration, and correlation
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm">Active Alerts</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-red-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-red-600">
+                  {riskOverview?.activeAlerts || riskAlertsData?.length || 0}
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="outline" className="text-red-600 border-red-200">
+                    Attention Needed
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {riskAlertsData?.filter((a: any) => a.severity?.toLowerCase() === 'high').length || 0} high priority
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm">Portfolio VaR</CardTitle>
+                  <TrendingDown className="h-4 w-4 text-blue-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-blue-600">
+                  {riskOverview?.var95 ? formatCurrency(riskOverview.var95) : '$0'}
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="outline" className="text-blue-600 border-blue-200">
+                    95% Confidence
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Daily maximum loss
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm">Volatility</CardTitle>
+                  <Activity className="h-4 w-4 text-purple-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-purple-600">
+                  {riskOverview?.volatility?.toFixed(1) || '0.0'}%
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="outline" className="text-purple-600 border-purple-200">
+                    Annualized
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {riskProfile && riskOverview?.volatility ? 
+                    (riskOverview.volatility > Number(riskProfile.max_portfolio_volatility) ? 
+                      `Above target of ${riskProfile.max_portfolio_volatility}%` : 
+                      `Within target of ${riskProfile.max_portfolio_volatility}%`) : 
+                    'Portfolio volatility'}
+                </p>
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
 
-        <TabsContent value="concentration" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Sector Concentration Analysis</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Monitor sector allocation vs benchmark to identify concentration risks
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {sectorConcentration.map((sector) => (
-                  <div key={sector.sector} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">{sector.sector}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">{sector.weight.toFixed(1)}%</span>
-                        <span className={`text-xs ${sector.trend >= 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          {sector.trend >= 0 ? '↑' : '↓'} {Math.abs(sector.trend)}%
-                        </span>
-                        <Badge variant="outline" className={getRiskColor(sector.risk)}>
-                          {sector.risk}
-                        </Badge>
+          {/* Risk Alerts Section */}
+          {riskAlertsData && riskAlertsData.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Risk Alerts</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {riskAlertsData.map((alert: any) => (
+                  <Card key={alert.id} className={`border-l-4 ${getAlertColor(alert.severity)}`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className={`h-4 w-4 ${
+                              alert.severity?.toLowerCase() === 'high' || alert.severity?.toLowerCase() === 'critical' ? 'text-red-600' : 
+                              alert.severity?.toLowerCase() === 'medium' ? 'text-yellow-600' : 'text-blue-600'
+                            }`} />
+                            <h4 className="font-medium">{alert.alert_type || 'Risk Alert'}</h4>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">{alert.message}</p>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleAlertAction(alert)}
+                        >
+                          View
+                        </Button>
                       </div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Your allocation</span>
-                        <span>Benchmark: {sector.benchmark}%</span>
-                      </div>
-                      <Progress value={sector.weight} className="h-2" />
-                      <div className="text-xs text-muted-foreground">
-                        Deviation: {(sector.weight - sector.benchmark) >= 0 ? '+' : ''}
-                        {(sector.weight - sector.benchmark).toFixed(1)}% vs benchmark
-                      </div>
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          )}
 
-          {highConcentrationSectors.map((sector) => (
-            <Alert key={sector.sector}>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>High Concentration Warning</AlertTitle>
-              <AlertDescription>
-                Your {sector.sector} allocation ({sector.weight.toFixed(1)}%) is significantly above 
-                the benchmark ({sector.benchmark}%). Consider diversifying to reduce concentration risk.
-              </AlertDescription>
-            </Alert>
-          ))}
-        </TabsContent>
+          {/* Main Content Tabs */}
+          <Tabs defaultValue="metrics" className="space-y-6">
+            <TabsList className="grid grid-cols-4 w-full max-w-xl">
+              <TabsTrigger value="metrics">Risk Metrics</TabsTrigger>
+              <TabsTrigger value="concentration">Concentration</TabsTrigger>
+              <TabsTrigger value="correlation">Correlation</TabsTrigger>
+              <TabsTrigger value="scenarios">Stress Tests</TabsTrigger>
+            </TabsList>
 
-        <TabsContent value="correlation" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Asset Correlation Matrix</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                High correlations between holdings can increase portfolio risk during market stress
-              </p>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Asset 1</TableHead>
-                    <TableHead>Asset 2</TableHead>
-                    <TableHead className="text-right">Correlation</TableHead>
-                    <TableHead>Risk Level</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {correlationData.map((item, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{item.asset1}</TableCell>
-                      <TableCell className="font-medium">{item.asset2}</TableCell>
-                      <TableCell className="text-right font-mono">
-                        {item.correlation.toFixed(2)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={getRiskColor(item.risk)}>
-                          {item.risk} correlation
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {item.risk === 'high' && (
-                          <Button 
-                            variant="outline" 
+            <TabsContent value="metrics" className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Risk Metrics Tracking</CardTitle>
+                      <div className="flex gap-2">
+                        {['1M', '3M', '6M', '1Y'].map((period) => (
+                          <Button
+                            key={period}
+                            variant={selectedTimeframe === period ? "default" : "outline"}
                             size="sm"
-                            onClick={() => onNavigate('rebalancing')}
+                            onClick={() => setSelectedTimeframe(period)}
                           >
-                            Diversify
+                            {period}
                           </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                        ))}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {riskMetricsList.map((metric) => (
+                      <div key={metric.name} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">{metric.name}</span>
+                          <Badge variant="outline" className={getRiskColor(metric.status)}>
+                            {metric.status}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span>
+                            Current: {metric.name.includes('VaR') || metric.name.includes('$') ? 
+                              formatCurrency(metric.value) : 
+                              metric.name.includes('%') || metric.name.includes('Ratio') ? 
+                              formatPercent(metric.value) : metric.value.toFixed(2)}
+                          </span>
+                          <span className="text-muted-foreground">
+                            Target: {metric.name.includes('VaR') || metric.name.includes('$') ? 
+                              formatCurrency(metric.target) :
+                              metric.name.includes('%') || metric.name.includes('Ratio') ?
+                              formatPercent(metric.target) : metric.target.toFixed(2)}
+                          </span>
+                        </div>
+                        <Progress 
+                          value={Math.min(100, (Math.abs(metric.value) / Math.abs(metric.target || 1)) * 100)} 
+                          className="h-2" 
+                        />
+                        <p className="text-xs text-muted-foreground">{metric.description}</p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
 
-        <TabsContent value="scenarios" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Stress Test Scenarios</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Analyze how your portfolio might perform under different market conditions
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <h4 className="font-medium text-red-800">2008 Financial Crisis</h4>
-                  <p className="text-sm text-red-600 mt-1">Market down 37%</p>
-                  <p className="text-2xl font-bold text-red-800 mt-2">-28.4%</p>
-                  <p className="text-xs text-red-600">Estimated portfolio impact</p>
-                  <Button variant="outline" size="sm" className="mt-2 w-full">
-                    View Details
-                  </Button>
-                </div>
-                
-                <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                  <h4 className="font-medium text-orange-800">COVID-19 Crash</h4>
-                  <p className="text-sm text-orange-600 mt-1">Market down 34%</p>
-                  <p className="text-2xl font-bold text-orange-800 mt-2">-24.1%</p>
-                  <p className="text-xs text-orange-600">Estimated portfolio impact</p>
-                  <Button variant="outline" size="sm" className="mt-2 w-full">
-                    View Details
-                  </Button>
-                </div>
-                
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h4 className="font-medium text-blue-800">Rising Interest Rates</h4>
-                  <p className="text-sm text-blue-600 mt-1">+200 basis points</p>
-                  <p className="text-2xl font-bold text-blue-800 mt-2">-12.7%</p>
-                  <p className="text-xs text-blue-600">Estimated portfolio impact</p>
-                  <Button variant="outline" size="sm" className="mt-2 w-full">
-                    View Details
-                  </Button>
-                </div>
-                
-                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                  <h4 className="font-medium text-purple-800">Tech Sector Correction</h4>
-                  <p className="text-sm text-purple-600 mt-1">Tech down 50%</p>
-                  <p className="text-2xl font-bold text-purple-800 mt-2">-17.6%</p>
-                  <p className="text-xs text-purple-600">Estimated portfolio impact</p>
-                  <Button variant="outline" size="sm" className="mt-2 w-full">
-                    View Details
-                  </Button>
-                </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Risk Timeline Visualization</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-80 bg-muted rounded-lg flex items-center justify-center">
+                      <div className="text-center">
+                        <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">Risk Timeline Chart</p>
+                        <p className="text-xs text-muted-foreground">
+                          Historical risk metrics analysis for {selectedTimeframe}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Chart visualization coming soon
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </TabsContent>
+
+            <TabsContent value="concentration" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Sector Concentration Analysis</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Monitor sector allocation vs benchmark to identify concentration risks
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  {sectorLoading ? (
+                    <div className="flex items-center justify-center h-32">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </div>
+                  ) : sectorData?.items && sectorData.items.length > 0 ? (
+                    <div className="space-y-4">
+                      {sectorData.items.map((sector) => (
+                        <div key={sector.sector} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{sector.sector}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm">{sector.weightPct.toFixed(1)}%</span>
+                              {sector.trendPct !== 0 && (
+                                <span className={`text-xs ${sector.trendPct >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                  {sector.trendPct >= 0 ? '↑' : '↓'} {Math.abs(sector.trendPct).toFixed(1)}%
+                                </span>
+                              )}
+                              <Badge variant="outline" className={getRiskColor(sector.risk)}>
+                                {sector.risk}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>Your allocation</span>
+                              <span>Benchmark: {sector.benchmarkWeightPct.toFixed(1)}%</span>
+                            </div>
+                            <Progress value={sector.weightPct} className="h-2" />
+                            <div className="text-xs text-muted-foreground">
+                              Deviation: {sector.deviationPct >= 0 ? '+' : ''}
+                              {sector.deviationPct.toFixed(1)}% vs benchmark
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      No sector data available
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {highConcentrationSectors.map((sector) => (
+                <Alert key={sector.sector}>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>High Concentration Warning</AlertTitle>
+                  <AlertDescription>
+                    Your {sector.sector} allocation ({sector.weightPct.toFixed(1)}%) is significantly different 
+                    from the benchmark ({sector.benchmarkWeightPct.toFixed(1)}%). Consider diversifying to reduce concentration risk.
+                  </AlertDescription>
+                </Alert>
+              ))}
+            </TabsContent>
+
+            <TabsContent value="correlation" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Asset Correlation Matrix</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    High correlations between holdings can increase portfolio risk during market stress
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  {correlationLoading ? (
+                    <div className="flex items-center justify-center h-32">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </div>
+                  ) : correlationData?.pairs && correlationData.pairs.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Asset 1</TableHead>
+                          <TableHead>Asset 2</TableHead>
+                          <TableHead className="text-right">Correlation</TableHead>
+                          <TableHead>Risk Level</TableHead>
+                          <TableHead className="text-right">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {correlationData.pairs.map((item, index) => (
+                          <TableRow key={index}>
+                            <TableCell className="font-medium">{item.asset1}</TableCell>
+                            <TableCell className="font-medium">{item.asset2}</TableCell>
+                            <TableCell className="text-right font-mono">
+                              {item.correlation.toFixed(2)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={getRiskColor(item.risk)}>
+                                {item.risk} correlation
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {item.risk === 'high' && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => onNavigate('rebalancing')}
+                                >
+                                  Diversify
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      No correlation data available
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scenarios" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Stress Test Scenarios</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Analyze how your portfolio might perform under different market conditions
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  {stressLoading ? (
+                    <div className="flex items-center justify-center h-32">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </div>
+                  ) : stressTests?.scenarios && stressTests.scenarios.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {stressTests.scenarios.map((scenario) => {
+                        const isNegative = scenario.portfolioImpactPct < 0;
+                        const colorClass = isNegative ? 'red' : 'green';
+                        const bgClass = isNegative ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200';
+                        const textClass = isNegative ? 'text-red-800' : 'text-green-800';
+                        const textLightClass = isNegative ? 'text-red-600' : 'text-green-600';
+                        
+                        return (
+                          <div key={scenario.key} className={`p-4 ${bgClass} border rounded-lg`}>
+                            <h4 className={`font-medium ${textClass}`}>{scenario.label}</h4>
+                            <p className={`text-sm ${textLightClass} mt-1`}>
+                              {scenario.details.description || scenario.details.method}
+                            </p>
+                            <p className={`text-2xl font-bold ${textClass} mt-2`}>
+                              {scenario.portfolioImpactPct >= 0 ? '+' : ''}{scenario.portfolioImpactPct.toFixed(1)}%
+                            </p>
+                            <p className={`text-xs ${textLightClass}`}>Estimated portfolio impact</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      No stress test data available
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </>
+      )}
     </div>
   );
 }

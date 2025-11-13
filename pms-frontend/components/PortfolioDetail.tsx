@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -7,6 +7,7 @@ import { ArrowLeft, Plus, Trash2, Edit, TrendingUp, TrendingDown, BarChart3, Sho
 import { Portfolio, Stock } from "../types/portfolio";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { UploadPortfolioDialog } from "./UploadPortfolioDialog";
+import { MarketData } from "../types/trading";
 
 interface PortfolioDetailProps {
   portfolio: Portfolio;
@@ -16,6 +17,7 @@ interface PortfolioDetailProps {
   onDeleteStock: (stockId: string) => void;
   onQuickTrade: (symbol?: string, side?: 'buy' | 'sell') => void;
   onChartStock: (symbol: string) => void;
+  marketData?: MarketData[];
 }
 
 export function PortfolioDetail({ 
@@ -25,7 +27,8 @@ export function PortfolioDetail({
   onEditStock, 
   onDeleteStock,
   onQuickTrade,
-  onChartStock
+  onChartStock,
+  marketData = []
 }: PortfolioDetailProps) {
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
 
@@ -37,22 +40,51 @@ export function PortfolioDetail({
   };
 
   const formatPercent = (percent: number) => {
-    return `${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`;
+    const safePercent = Number.isFinite(percent) ? percent : 0;
+    return `${safePercent >= 0 ? '+' : ''}${safePercent.toFixed(2)}%`;
   };
 
-  const totalGainLoss = portfolio.totalValue - portfolio.totalCost;
-  const totalGainLossPercent = portfolio.totalCost > 0 ? (totalGainLoss / portfolio.totalCost) * 100 : 0;
+  const priceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    marketData.forEach((quote) => {
+      const symbol = String(quote.symbol || '').toUpperCase();
+      if (!symbol) return;
+      const price = Number(quote.currentPrice ?? quote.change ?? 0);
+      if (!Number.isFinite(price)) return;
+      map.set(symbol, price);
+    });
+    return map;
+  }, [marketData]);
+
+  const resolvePrice = (stock: Stock) => {
+    const symbolKey = String(stock.symbol || '').toUpperCase();
+    return priceMap.get(symbolKey) ?? stock.currentPrice;
+  };
+
+  const enhancedStocks = useMemo(() => {
+    return portfolio.stocks.map((stock) => {
+      const currentPrice = resolvePrice(stock);
+      return {
+        ...stock,
+        livePrice: currentPrice,
+      };
+    });
+  }, [portfolio.stocks, priceMap]);
+
+  const totalCost = enhancedStocks.reduce((sum, stock) => sum + (stock.quantity * stock.purchasePrice), 0);
+  const totalStockValue = enhancedStocks.reduce((sum, stock) => sum + (stock.quantity * stock.livePrice), 0);
+  const totalValue = totalStockValue + portfolio.cash;
+  const totalGainLoss = totalValue - totalCost;
+  const totalGainLossPercent = totalCost > 0 ? (totalGainLoss / totalCost) * 100 : 0;
 
   // Calculate sector allocation
-  const sectorAllocation = portfolio.stocks.reduce((acc, stock) => {
+  const sectorAllocation = enhancedStocks.reduce((acc, stock) => {
     const rawSector = stock.sector;
     const sector = !rawSector || /^\d+$/.test(String(rawSector)) ? 'Unknown' : rawSector;
-    const value = stock.quantity * stock.currentPrice;
+    const value = stock.quantity * stock.livePrice;
     acc[sector] = (acc[sector] || 0) + value;
     return acc;
   }, {} as Record<string, number>);
-
-  const totalStockValue = portfolio.stocks.reduce((sum, stock) => sum + (stock.quantity * stock.currentPrice), 0);
 
   // Color palette for pie chart
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
@@ -108,7 +140,7 @@ export function PortfolioDetail({
             <CardTitle className="text-sm">Total Value</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{formatCurrency(portfolio.totalValue)}</div>
+            <div className="text-2xl">{formatCurrency(totalValue)}</div>
           </CardContent>
         </Card>
 
@@ -133,7 +165,7 @@ export function PortfolioDetail({
           <CardContent>
             <div className="text-2xl">{formatCurrency(portfolio.cash)}</div>
             <p className="text-xs text-muted-foreground">
-              {((portfolio.totalValue > 0 ? (portfolio.cash / portfolio.totalValue) * 100 : 0).toFixed(1))}% of portfolio
+              {((totalValue > 0 ? (portfolio.cash / totalValue) * 100 : 0).toFixed(1))}% of portfolio
             </p>
           </CardContent>
         </Card>
@@ -170,8 +202,8 @@ export function PortfolioDetail({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {portfolio.stocks.map((stock) => {
-                const marketValue = stock.quantity * stock.currentPrice;
+              {enhancedStocks.map((stock) => {
+                const marketValue = stock.quantity * stock.livePrice;
                 const costBasis = stock.quantity * stock.purchasePrice;
                 const gainLoss = marketValue - costBasis;
                 const gainLossPercent = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
@@ -192,7 +224,7 @@ export function PortfolioDetail({
                     <TableCell className="text-sm">{stock.companyName}</TableCell>
                     <TableCell className="text-right">{stock.quantity}</TableCell>
                     <TableCell className="text-right">{formatCurrency(stock.purchasePrice)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(stock.currentPrice)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(stock.livePrice)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(marketValue)}</TableCell>
                     <TableCell className={`text-right ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       <div className="flex items-center justify-end gap-1">

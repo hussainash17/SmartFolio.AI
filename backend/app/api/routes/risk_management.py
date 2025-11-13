@@ -1,7 +1,7 @@
-from typing import List, Optional
+from typing import List, Optional, Dict
 from uuid import UUID
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from sqlmodel import select, Session
 from app.api.deps import get_current_user, get_session_dep
 from app.model.risk_management import (
@@ -11,8 +11,10 @@ from app.model.risk_management import (
     StockScreener, StockScreenerCreate, StockScreenerUpdate, StockScreenerPublic,
     RiskSummary, RiskProfile
 )
-from app.model.portfolio import Portfolio
+from app.model.portfolio import Portfolio, AllocationTarget
 from app.model.user import User
+from app.services.risk_service import RiskService
+from app.api.routes.performance import verify_portfolio_access
 
 router = APIRouter(prefix="/risk", tags=["risk-management"])
 
@@ -116,4 +118,218 @@ def get_stock_screeners(
         query = query.where(StockScreener.is_active == is_active)
     
     screeners = session.exec(query.order_by(StockScreener.created_at.desc())).all()
-    return screeners 
+    return screeners
+
+
+# ============================================================================
+# NEW RISK ANALYSIS ENDPOINTS
+# ============================================================================
+
+@router.get("/portfolios/{portfolio_id}/overview")
+def get_risk_overview(
+    portfolio_id: UUID,
+    period: str = Query("1Y", regex="^(1M|3M|6M|1Y|3Y|5Y|ALL)$"),
+    benchmark_id: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Get comprehensive risk overview for a portfolio"""
+    verify_portfolio_access(session, str(portfolio_id), current_user)
+    
+    risk_service = RiskService(session)
+    return risk_service.get_risk_overview(str(portfolio_id), period, benchmark_id)
+
+
+@router.get("/portfolios/{portfolio_id}/metrics")
+def get_risk_metrics(
+    portfolio_id: UUID,
+    period: str = Query("1Y", regex="^(1M|3M|6M|1Y|3Y|5Y|ALL)$"),
+    benchmark_id: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Get detailed risk metrics for a portfolio"""
+    verify_portfolio_access(session, str(portfolio_id), current_user)
+    
+    risk_service = RiskService(session)
+    return risk_service.get_risk_metrics(str(portfolio_id), period, benchmark_id)
+
+
+@router.get("/portfolios/{portfolio_id}/metrics/timeseries")
+def get_risk_metrics_timeseries(
+    portfolio_id: UUID,
+    period: str = Query("1Y", regex="^(1M|3M|6M|1Y|3Y|5Y|ALL)$"),
+    benchmark_id: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Get risk metrics as time series"""
+    verify_portfolio_access(session, str(portfolio_id), current_user)
+    
+    risk_service = RiskService(session)
+    return risk_service.get_risk_metrics_timeseries(str(portfolio_id), period, benchmark_id)
+
+
+@router.get("/portfolios/{portfolio_id}/concentration/sector")
+def get_sector_concentration(
+    portfolio_id: UUID,
+    period: str = Query("1Y", regex="^(1M|3M|6M|1Y|3Y|5Y|ALL)$"),
+    benchmark_id: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Get sector concentration analysis"""
+    verify_portfolio_access(session, str(portfolio_id), current_user)
+    
+    risk_service = RiskService(session)
+    return risk_service.get_sector_concentration(str(portfolio_id), period, benchmark_id)
+
+
+@router.get("/portfolios/{portfolio_id}/correlation")
+def get_correlation_analysis(
+    portfolio_id: UUID,
+    period: str = Query("1Y", regex="^(1M|3M|6M|1Y|3Y|5Y|ALL)$"),
+    top: int = Query(10, ge=1, le=30),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Get correlation analysis for portfolio holdings"""
+    verify_portfolio_access(session, str(portfolio_id), current_user)
+    
+    risk_service = RiskService(session)
+    return risk_service.get_correlation_analysis(str(portfolio_id), period, top)
+
+
+@router.get("/portfolios/{portfolio_id}/stress-tests")
+def get_stress_tests(
+    portfolio_id: UUID,
+    scenarios: Optional[str] = Query(None, description="Comma-separated scenario keys: 2008,covid,rate_hike,tech_crash"),
+    benchmark_id: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Get stress test results for various scenarios"""
+    verify_portfolio_access(session, str(portfolio_id), current_user)
+    
+    scenario_list = None
+    if scenarios:
+        scenario_list = [s.strip() for s in scenarios.split(',')]
+    
+    risk_service = RiskService(session)
+    return risk_service.get_stress_tests(str(portfolio_id), scenario_list, benchmark_id)
+
+
+@router.post("/alerts", response_model=RiskAlertPublic)
+def create_risk_alert(
+    alert: RiskAlertCreate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Create a new risk alert"""
+    # Verify portfolio access if portfolio_id is provided
+    if alert.portfolio_id:
+        verify_portfolio_access(session, str(alert.portfolio_id), current_user)
+    
+    db_alert = RiskAlert(
+        user_id=current_user.id,
+        **alert.dict()
+    )
+    session.add(db_alert)
+    session.commit()
+    session.refresh(db_alert)
+    return db_alert
+
+
+@router.patch("/alerts/{alert_id}", response_model=RiskAlertPublic)
+def update_risk_alert(
+    alert_id: UUID,
+    is_active: Optional[bool] = Body(None),
+    resolved_at: Optional[datetime] = Body(None),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Update a risk alert (acknowledge/resolve)"""
+    alert = session.get(RiskAlert, alert_id)
+    
+    if not alert:
+        raise HTTPException(status_code=404, detail="Risk alert not found")
+    
+    if alert.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this alert")
+    
+    if is_active is not None:
+        alert.is_active = is_active
+    
+    if resolved_at is not None:
+        alert.resolved_at = resolved_at
+    elif is_active is False and alert.resolved_at is None:
+        # Auto-set resolved_at when deactivating
+        alert.resolved_at = datetime.utcnow()
+    
+    session.add(alert)
+    session.commit()
+    session.refresh(alert)
+    return alert
+
+
+@router.post("/portfolios/{portfolio_id}/rebalancing/recommendations")
+def get_rebalancing_recommendations(
+    portfolio_id: UUID,
+    targets: Optional[Dict[str, float]] = Body(None, description="Optional custom target weights by sector/asset"),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session_dep)
+):
+    """Get rebalancing recommendations for a portfolio"""
+    portfolio = verify_portfolio_access(session, str(portfolio_id), current_user)
+    
+    # Get current holdings
+    from app.services.performance_calculator import PerformanceCalculator
+    from datetime import date
+    
+    calculator = PerformanceCalculator(session)
+    current_holdings = calculator._get_holdings_on_date(str(portfolio_id), date.today())
+    
+    # Get allocation targets if not provided
+    if targets is None:
+        statement = select(AllocationTarget).where(
+            AllocationTarget.portfolio_id == portfolio_id
+        )
+        allocation_targets = session.exec(statement).all()
+        
+        # Build targets dict from allocation_targets
+        targets = {}
+        for target in allocation_targets:
+            if target.category_type == "SECTOR":
+                targets[target.category] = float(target.target_percent)
+    
+    # Calculate current sector weights
+    sector_weights = calculator.compute_sector_weights(str(portfolio_id), date.today())
+    
+    # Get portfolio value
+    portfolio_value = calculator._get_portfolio_value_on_date(str(portfolio_id), date.today())
+    
+    # Generate recommendations
+    suggestions = []
+    
+    # Process sector-level recommendations
+    for sector, current_weight in sector_weights.items():
+        target_weight = targets.get(sector, current_weight)
+        difference = target_weight - current_weight
+        
+        # Only suggest if difference is significant (> 1%)
+        if abs(difference) > 1.0:
+            amount = (difference / 100.0) * portfolio_value
+            
+            suggestions.append({
+                'asset': sector,
+                'currentWeight': round(current_weight, 2),
+                'targetWeight': round(target_weight, 2),
+                'differencePct': round(difference, 2),
+                'action': 'buy' if difference > 0 else 'sell',
+                'amount': round(abs(amount), 2)
+            })
+    
+    # Sort by absolute difference
+    suggestions.sort(key=lambda x: abs(x['differencePct']), reverse=True)
+    
+    return {'suggestions': suggestions}

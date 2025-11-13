@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -72,6 +72,10 @@ export function WatchlistManager({ onQuickTrade, onChartStock }: WatchlistManage
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  
+  // Local state for notes to prevent refresh on every keystroke
+  const [localNotes, setLocalNotes] = useState<Record<string, string>>({});
+  const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // Search for stocks
   useEffect(() => {
@@ -169,10 +173,44 @@ export function WatchlistManager({ onQuickTrade, onChartStock }: WatchlistManage
     await removeStockFromWatchlist(currentWatchlist.id, itemId);
   };
 
-  const handleUpdateNotes = async (itemId: string, notes: string) => {
-    if (!currentWatchlist) return;
-    await updateWatchlistItemNotes(currentWatchlist.id, itemId, notes);
+  // Initialize local notes from watchlistItems when they change
+  useEffect(() => {
+    const notesMap: Record<string, string> = {};
+    watchlistItems.forEach((item) => {
+      notesMap[item.id] = item.notes || "";
+    });
+    setLocalNotes(notesMap);
+  }, [watchlistItems]);
+
+  const handleUpdateNotes = (itemId: string, notes: string) => {
+    // Update local state immediately for responsive UI
+    setLocalNotes((prev) => ({
+      ...prev,
+      [itemId]: notes,
+    }));
+
+    // Clear existing timer for this item
+    if (debounceTimers.current[itemId]) {
+      clearTimeout(debounceTimers.current[itemId]);
+    }
+
+    // Set new timer to save after user stops typing (500ms)
+    debounceTimers.current[itemId] = setTimeout(async () => {
+      if (!currentWatchlist) return;
+      await updateWatchlistItemNotes(currentWatchlist.id, itemId, notes);
+      // Clean up timer reference
+      delete debounceTimers.current[itemId];
+    }, 500);
   };
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(debounceTimers.current).forEach((timer) => {
+        clearTimeout(timer);
+      });
+    };
+  }, []);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -358,8 +396,18 @@ export function WatchlistManager({ onQuickTrade, onChartStock }: WatchlistManage
                       </TableCell>
                       <TableCell>
                         <Input
-                          value={item.notes || ""}
+                          value={localNotes[item.id] ?? item.notes ?? ""}
                           onChange={(e) => handleUpdateNotes(item.id, e.target.value)}
+                          onBlur={(e) => {
+                            // Save immediately on blur if there's a pending timer
+                            if (debounceTimers.current[item.id]) {
+                              clearTimeout(debounceTimers.current[item.id]);
+                              if (currentWatchlist) {
+                                updateWatchlistItemNotes(currentWatchlist.id, item.id, e.target.value);
+                              }
+                              delete debounceTimers.current[item.id];
+                            }
+                          }}
                           placeholder="Add notes..."
                           className="h-8"
                         />

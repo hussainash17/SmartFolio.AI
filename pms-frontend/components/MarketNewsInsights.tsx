@@ -4,6 +4,8 @@ import { queryKeys } from '../hooks/queryKeys'
 import { OpenAPI } from '../src/client'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
+import { Input } from './ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from './ui/table'
 import { Progress } from './ui/progress'
@@ -11,6 +13,17 @@ import { Separator } from './ui/separator'
 import { TrendingUp, TrendingDown, Activity, Gauge, Calendar, Newspaper, BarChart3 } from 'lucide-react'
 import { ResponsiveContainer, LineChart, Line } from 'recharts'
 import { HoverCard, HoverCardTrigger, HoverCardContent } from './ui/hover-card'
+
+const NEWS_CATEGORY_OPTIONS = [
+	{ label: 'All', value: 'all' },
+	{ label: 'Market', value: 'market' },
+	{ label: 'Company', value: 'company' },
+	{ label: 'Economy', value: 'economy' },
+	{ label: 'Sector', value: 'sector' },
+]
+
+const NEWS_DAYS_OPTIONS = [1, 3, 7, 14, 30]
+const NEWS_LIMIT_OPTIONS = [10, 20, 30, 50]
 
 function useApi<T>(path: string, key: any, enabled = true) {
 	return useQuery({
@@ -40,7 +53,27 @@ export default function MarketNewsInsights() {
 	const { data: sector } = useApi<any>(`/api/v1/research/market/sectors`, queryKeys.sectorAnalysis)
 
 	// News & sentiment
-	const { data: newsList } = useApi<any[]>(`/api/v1/news/?limit=30`, queryKeys.newsList(30, 0))
+	const [newsCategory, setNewsCategory] = useState<string>('all')
+	const [newsSymbol, setNewsSymbol] = useState<string>('')
+	const [newsDays, setNewsDays] = useState<number>(7)
+	const [newsLimit, setNewsLimit] = useState<number>(30)
+
+	const newsQueryKey = useMemo(
+		() => queryKeys.newsList(newsLimit, 0, newsCategory === 'all' ? undefined : newsCategory, newsSymbol || undefined, newsDays),
+		[newsLimit, newsCategory, newsSymbol, newsDays],
+	)
+	const newsQueryPath = useMemo(() => {
+		const params = new URLSearchParams({
+			limit: String(newsLimit),
+			days: String(newsDays),
+		})
+		if (newsCategory !== 'all') params.set('category', newsCategory)
+		const trimmedSymbol = newsSymbol.trim()
+		if (trimmedSymbol) params.set('symbol', trimmedSymbol.toUpperCase())
+		return `/api/v1/news?${params.toString()}`
+	}, [newsLimit, newsDays, newsCategory, newsSymbol])
+
+	const { data: newsList } = useApi<any[]>(newsQueryPath, newsQueryKey)
 	const { data: sentiment } = useApi<any>(`/api/v1/analytics/sentiment/market`, queryKeys.marketSentiment)
 
 	// Insights
@@ -70,7 +103,7 @@ export default function MarketNewsInsights() {
 					queryClient.invalidateQueries({ queryKey: queryKeys.mostActive })
 					queryClient.invalidateQueries({ queryKey: queryKeys.turnoverCompare })
 					queryClient.invalidateQueries({ queryKey: queryKeys.sectorAnalysis })
-					queryClient.invalidateQueries({ queryKey: queryKeys.newsList(30, 0) })
+					queryClient.invalidateQueries({ queryKey: newsQueryKey })
 					queryClient.invalidateQueries({ queryKey: queryKeys.marketSentiment })
 					queryClient.invalidateQueries({ queryKey: queryKeys.stockOfTheDay })
 					queryClient.invalidateQueries({ queryKey: queryKeys.analystPicks })
@@ -85,7 +118,7 @@ export default function MarketNewsInsights() {
 		const onStorage = (e: StorageEvent) => { if (e.key === 'auto_refresh_minutes') setup() }
 		window.addEventListener('storage', onStorage)
 		return () => { if (timer) clearInterval(timer); window.removeEventListener('storage', onStorage) }
-	}, [queryClient])
+	}, [queryClient, newsQueryKey])
 
 	const formatPct = (v?: number) => v == null ? '—' : `${v >= 0 ? '+' : ''}${Number(v).toFixed(2)}%`
 	const formatNum = (n?: number) => n == null ? '—' : n >= 1e9 ? `${(n/1e9).toFixed(1)}B` : n >= 1e6 ? `${(n/1e6).toFixed(1)}M` : n >= 1e3 ? `${(n/1e3).toFixed(1)}K` : `${n}`
@@ -273,6 +306,53 @@ export default function MarketNewsInsights() {
 							<CardTitle className="text-sm">Live News</CardTitle>
 						</CardHeader>
 						<CardContent>
+							<div className="flex flex-wrap gap-2 mb-3 items-center">
+								<Select value={newsCategory} onValueChange={(value) => setNewsCategory(value)}>
+									<SelectTrigger className="w-[140px]">
+										<SelectValue placeholder="Category" />
+									</SelectTrigger>
+									<SelectContent>
+										{NEWS_CATEGORY_OPTIONS.map((option) => (
+											<SelectItem key={option.value} value={option.value}>
+												{option.label}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								<Input
+									value={newsSymbol}
+									onChange={(e) => {
+										const nextValue = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')
+										setNewsSymbol(nextValue)
+									}}
+									placeholder="Symbol"
+									className="w-[110px]"
+								/>
+								<Select value={String(newsDays)} onValueChange={(value) => setNewsDays(Number(value))}>
+									<SelectTrigger className="w-[110px]">
+										<SelectValue placeholder="Days" />
+									</SelectTrigger>
+									<SelectContent>
+										{NEWS_DAYS_OPTIONS.map((daysOption) => (
+											<SelectItem key={daysOption} value={String(daysOption)}>
+												{daysOption} day{daysOption > 1 ? 's' : ''}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								<Select value={String(newsLimit)} onValueChange={(value) => setNewsLimit(Number(value))}>
+									<SelectTrigger className="w-[110px]">
+										<SelectValue placeholder="Limit" />
+									</SelectTrigger>
+									<SelectContent>
+										{NEWS_LIMIT_OPTIONS.map((limitOption) => (
+											<SelectItem key={limitOption} value={String(limitOption)}>
+												Top {limitOption}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</div>
 							<div className="space-y-2">
 								{(newsList || []).map((n: any) => (
 									<div key={n.id} className="p-2 rounded hover:bg-accent">
@@ -284,6 +364,15 @@ export default function MarketNewsInsights() {
 											<span>{n.source}</span>
 											{n.sentiment && <Badge variant="outline" className="text-xs">{String(n.sentiment)}</Badge>}
 										</div>
+										{Array.isArray(n.symbols) && n.symbols.length > 0 && (
+											<div className="flex flex-wrap gap-1 mt-1">
+												{n.symbols.map((sym: string) => (
+													<Badge key={`${n.id}-${sym}`} variant="outline" className="text-xs">
+														{sym}
+													</Badge>
+												))}
+											</div>
+										)}
 									</div>
 								))}
 							</div>

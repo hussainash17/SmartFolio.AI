@@ -121,18 +121,33 @@ export function ComprehensiveDashboard({
   const { data: bestWorstYTD } = useBestWorstPeriods(selectedPortfolioId, 'YTD');
   const { data: cashFlowsYTD } = useCashFlows(selectedPortfolioId, 'YTD');
 
+  const { data: benchmarkYTD } = useQuery({
+    queryKey: queryKeys.benchmarkComparison(selectedPortfolioId, 'dsex'),
+    enabled: !!selectedPortfolioId,
+    queryFn: () =>
+      PerformanceService.getBenchmarkComparison({
+        portfolioId: selectedPortfolioId!,
+        benchmarkId: 'dsex',
+      }),
+  });
+
   // Aggregate performance data from split APIs
-  const portfolioPerformance = useMemo(() => ({
-    totalReturn: returnsAll?.time_weighted_return || 0,
-    yearToDate: returnsYTD?.time_weighted_return || 0,
-    oneYear: returns1Y?.annualized_return || 0,
-    threeYear: returns3Y?.annualized_return || 0,
-    sharpeRatio: riskMetrics1Y?.sharpe_ratio || 0,
-    volatility: riskMetrics1Y?.volatility || 0,
-    maxDrawdown: riskMetrics1Y?.max_drawdown || 0,
-    alpha: 0, // TODO: Add benchmark comparison API
-    beta: 0,  // TODO: Add benchmark comparison API
-  }), [returnsAll, returnsYTD, returns1Y, returns3Y, riskMetrics1Y]);
+  const portfolioPerformance = useMemo(() => {
+    const ytdData = benchmarkYTD?.comparison?.find(c => c.period === 'YTD');
+
+    return {
+      totalReturn: returnsAll?.time_weighted_return || 0,
+      yearToDate: returnsYTD?.time_weighted_return || 0,
+      oneYear: returns1Y?.annualized_return || 0,
+      threeYear: returns3Y?.annualized_return || 0,
+      sharpeRatio: riskMetrics1Y?.sharpe_ratio || 0,
+      volatility: riskMetrics1Y?.volatility || 0,
+      maxDrawdown: riskMetrics1Y?.max_drawdown || 0,
+      alpha: ytdData?.alpha || 0,
+      beta: ytdData?.beta || 0,
+      benchmarkYTD: ytdData?.benchmark_return || 0,
+    };
+  }, [returnsAll, returnsYTD, returns1Y, returns3Y, riskMetrics1Y, benchmarkYTD]);
 
   const { data: assetAllocation = [] } = useQuery({
     queryKey: queryKeys.portfolioAllocation(selectedPortfolioId || 'none'),
@@ -163,16 +178,7 @@ export function ComprehensiveDashboard({
     },
   });
 
-  const { data: investmentGoals = [] } = useQuery<Array<{
-    id: string;
-    name: string;
-    target: number;
-    current: number;
-    progress: number;
-    timeframe: string;
-    priority: string;
-    status: string;
-  }>>({
+  const { data: investmentGoals = [] } = useQuery({
     queryKey: queryKeys.investmentGoals,
     queryFn: async () => {
       try {
@@ -328,10 +334,12 @@ export function ComprehensiveDashboard({
             <div className={`text-2xl font-bold ${dashboardSummaryMemo.ytd_return_percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {formatPercent(dashboardSummaryMemo.ytd_return_percent || 0)}
             </div>
-            <div className="flex items-center gap-1 mt-1">
-              <span className="text-sm text-muted-foreground">vs S&P 500:</span>
-              <span className="text-sm text-green-600">{/* Placeholder or integrate benchmark */}+0.0%</span>
-            </div>
+              <div className="flex items-center gap-1 mt-1">
+                <span className="text-sm text-muted-foreground">vs DSEX:</span>
+                <span className={`text-sm font-medium ${portfolioPerformance.benchmarkYTD >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatPercent(portfolioPerformance.benchmarkYTD)}
+                </span>
+              </div>
           </CardContent>
         </Card>
 
@@ -551,6 +559,9 @@ export function ComprehensiveDashboard({
                   <div>
                     <div className="text-sm text-muted-foreground">Alpha / Beta</div>
                     <div className="text-xl font-semibold">{portfolioPerformance.alpha.toFixed(2)} / {portfolioPerformance.beta.toFixed(2)}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      vs Market
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -898,7 +909,7 @@ export function ComprehensiveDashboard({
                   <div className="text-sm text-muted-foreground mb-1">Beta</div>
                   <div className="text-2xl font-bold">{(portfolioPerformance?.beta || 0).toFixed(2)}</div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    vs Market
+                    vs DSEX: {formatPercent(portfolioPerformance.benchmarkYTD)}
                   </div>
                 </div>
               </div>

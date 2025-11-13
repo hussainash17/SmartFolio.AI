@@ -61,7 +61,7 @@ class News(SQLModel, table=True):
     source_url: Optional[str] = Field(default=None, max_length=500)
     author: Optional[str] = Field(default=None, max_length=100)
     category: str = Field(max_length=50)  # market, company, economy, etc.
-    tags: list[str] = Field(default=[], sa_column=Column(JSON))  # JSON field for tags
+    tags: list[str] = Field(default_factory=list, sa_column=Column(JSON))  # JSON field for tags
     sentiment: Optional[str] = Field(default=None, max_length=20)  # positive, negative, neutral
     sentiment_score: Optional[Decimal] = Field(default=None, max_digits=3, decimal_places=2)
     published_at: datetime = Field(default_factory=datetime.utcnow)
@@ -174,7 +174,7 @@ class NewsBase(SQLModel):
     source_url: Optional[str] = None
     author: Optional[str] = None
     category: str
-    tags: list[str] = []
+    tags: list[str] = Field(default_factory=list)
     sentiment: Optional[str] = None
     sentiment_score: Optional[Decimal] = None
     published_at: datetime
@@ -204,6 +204,10 @@ class NewsPublic(NewsBase):
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+
+
+class NewsPublicWithSymbols(NewsPublic):
+    symbols: list[str] = Field(default_factory=list)
 
 
 class StockNewsBase(SQLModel):
