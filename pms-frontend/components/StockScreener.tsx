@@ -366,6 +366,14 @@ export function StockScreener({ onQuickTrade, onChartStock, onAddToWatchlist }: 
     return `${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`;
   };
 
+  const formatMarketCap = (marketCap?: number | null) => {
+    if (marketCap === null || marketCap === undefined || Number.isNaN(marketCap) || marketCap === 0) {
+      return 'N/A';
+    }
+    // Market cap is already in crores, format with Cr suffix
+    return `৳${marketCap.toFixed(2)} Cr`;
+  };
+
   const getRatingColor = (rating: string) => {
     switch (rating) {
       case 'Strong Buy': return 'text-green-700 bg-green-100 border-green-200';
@@ -454,7 +462,7 @@ export function StockScreener({ onQuickTrade, onChartStock, onAddToWatchlist }: 
 
                   {/* Market Cap */}
                   <div className="space-y-2">
-                    <Label>Market Cap (M)</Label>
+                    <Label>Market Cap (Cr)</Label>
                     <div className="px-2">
                       <Slider
                         value={filters.marketCap}
@@ -464,8 +472,8 @@ export function StockScreener({ onQuickTrade, onChartStock, onAddToWatchlist }: 
                         className="w-full"
                       />
                       <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                        <span>${formatNumber(filters.marketCap[0] * 1e6)}</span>
-                        <span>${formatNumber(filters.marketCap[1] * 1e6)}</span>
+                        <span>৳{formatNumber(filters.marketCap[0] / 10)} Cr</span>
+                        <span>৳{formatNumber(filters.marketCap[1] / 10)} Cr</span>
                       </div>
                     </div>
                   </div>
@@ -739,9 +747,7 @@ export function StockScreener({ onQuickTrade, onChartStock, onAddToWatchlist }: 
                               )}
                             </TableCell>
                             <TableCell className="text-right">
-                              {stock.marketCap !== null && stock.marketCap !== undefined
-                                ? `$${formatNumber(stock.marketCap)}`
-                                : '-' }
+                              {formatMarketCap(stock.marketCap)}
                             </TableCell>
                             <TableCell className="text-right">
                               {stock.peRatio !== null && stock.peRatio !== undefined ? stock.peRatio.toFixed(1) : '-'}

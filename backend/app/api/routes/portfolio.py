@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import List, Optional
+from typing import Dict, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
@@ -14,6 +14,7 @@ from app.model.portfolio import (
     PortfolioSummary
 )
 from app.model.company import Company
+from app.model.stock import StockData
 from app.model.trade import Trade, TradeCreate, TradeUpdate, TradePublic, TradeWithDetails
 from app.model.user import User
 from app.model.portfolio_statement import (
@@ -381,27 +382,57 @@ def get_portfolio_positions_with_details(
         .where(PortfolioPosition.portfolio_id == portfolio_id)
     ).all()
 
+    stock_ids = [position.stock_id for position, _ in rows]
+    latest_prices: Dict[UUID, StockData] = {}
+    if stock_ids:
+        stock_data_rows = session.exec(
+            select(StockData)
+            .where(StockData.company_id.in_(stock_ids))
+            .order_by(StockData.company_id, StockData.timestamp.desc())
+        ).all() or []
+        seen = set()
+        for data in stock_data_rows:
+            if data.company_id not in seen:
+                latest_prices[data.company_id] = data
+                seen.add(data.company_id)
+
     result = []
     for position, stock in rows:
-        current_price = None
-        if position.quantity and position.quantity > 0 and position.current_value is not None:
+        latest_data = latest_prices.get(position.stock_id)
+        current_price_decimal = None
+        if latest_data:
+            current_price_decimal = latest_data.last_trade_price
+        elif position.quantity and position.quantity > 0 and position.current_value is not None:
             try:
-                current_price = float(position.current_value) / float(position.quantity)
+                current_price_decimal = Decimal(position.current_value) / Decimal(position.quantity)
             except Exception:
-                current_price = None
+                current_price_decimal = None
+
+        quantity_decimal = Decimal(position.quantity or 0)
+        total_investment_decimal = Decimal(position.total_investment or 0)
+        if current_price_decimal is not None:
+            current_value_decimal = current_price_decimal * quantity_decimal
+        else:
+            current_value_decimal = Decimal(position.current_value or 0)
+
+        unrealized_pnl_decimal = current_value_decimal - total_investment_decimal
+        unrealized_pct_decimal = (
+            (unrealized_pnl_decimal / total_investment_decimal * Decimal(100))
+            if total_investment_decimal > 0 else Decimal(0)
+        )
+
         result.append({
             "id": position.id,
             "portfolio_id": position.portfolio_id,
             "stock_id": position.stock_id,
             "quantity": position.quantity,
             "average_price": float(position.average_price),
-            "total_investment": float(position.total_investment),
-            "current_value": float(position.current_value) if position.current_value is not None else None,
-            "unrealized_pnl": float(position.unrealized_pnl) if position.unrealized_pnl is not None else None,
-            "unrealized_pnl_percent": float(
-                position.unrealized_pnl_percent) if position.unrealized_pnl_percent is not None else None,
+            "total_investment": float(total_investment_decimal),
+            "current_value": float(current_value_decimal),
+            "unrealized_pnl": float(unrealized_pnl_decimal),
+            "unrealized_pnl_percent": float(unrealized_pct_decimal),
             "last_updated": position.last_updated,
-            "current_price": current_price,
+            "current_price": float(current_price_decimal) if current_price_decimal is not None else None,
             "stock": {
                 "id": stock.id,
                 "symbol": stock.trading_code,
@@ -783,13 +814,39 @@ def get_portfolio_summary(
         )
     ).all()
 
-    total_investment = sum(pos.total_investment for pos in positions)
-    current_value = sum(pos.current_value for pos in positions)
-    unrealized_pnl = sum(pos.unrealized_pnl for pos in positions)
+    stock_ids = [pos.stock_id for pos in positions]
+    latest_prices: Dict[UUID, StockData] = {}
+    if stock_ids:
+        price_rows = session.exec(
+            select(StockData)
+            .where(StockData.company_id.in_(stock_ids))
+            .order_by(StockData.company_id, StockData.timestamp.desc())
+        ).all() or []
+        seen: set[UUID] = set()
+        for row in price_rows:
+            if row.company_id not in seen:
+                latest_prices[row.company_id] = row
+                seen.add(row.company_id)
+
+    total_investment_positions = sum(Decimal(pos.total_investment or 0) for pos in positions)
+    current_value_positions = Decimal(0)
+    for pos in positions:
+        price_row = latest_prices.get(pos.stock_id)
+        if price_row:
+            current_price = Decimal(price_row.last_trade_price or 0)
+            current_value_positions += current_price * Decimal(pos.quantity or 0)
+        else:
+            current_value_positions += Decimal(pos.current_value or 0)
+
+    cash_balance = Decimal(portfolio.cash_balance or 0)
+
+    total_investment = total_investment_positions + cash_balance
+    current_value = current_value_positions + cash_balance
+    unrealized_pnl = current_value - total_investment
 
     # Calculate overall PnL percentage
     unrealized_pnl_percent = (
-        (unrealized_pnl / total_investment * 100) if total_investment > 0 else 0
+        (unrealized_pnl / total_investment * 100) if total_investment > 0 else Decimal(0)
     )
 
     return PortfolioSummary(

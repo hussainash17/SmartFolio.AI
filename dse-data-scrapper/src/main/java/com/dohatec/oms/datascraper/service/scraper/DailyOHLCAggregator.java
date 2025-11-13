@@ -93,9 +93,13 @@ public class DailyOHLCAggregator {
             return;
         }
 
-        // Check if OHLC already exists for today
-        if (dailyOHLCRepository.existsByCompanyIdAndDate(companyId, startTime)) {
-            log.debug("Daily OHLC already exists for company: {}", companyId);
+        // Check if OHLC already exists for today (using date range to handle time component differences)
+        LocalDate today = startTime.toLocalDate();
+        LocalDateTime dayStart = today.atStartOfDay();
+        LocalDateTime dayEnd = today.atTime(23, 59, 59);
+        List<DailyOHLC> existingOHLC = dailyOHLCRepository.findByCompanyIdAndDateBetween(companyId, dayStart, dayEnd);
+        if (!existingOHLC.isEmpty()) {
+            log.debug("Daily OHLC already exists for company: {} on date: {}", companyId, today);
             return;
         }
 
@@ -124,10 +128,13 @@ public class DailyOHLCAggregator {
                     .multiply(BigDecimal.valueOf(100));
         }
 
-        // Create DailyOHLC
+        // Create DailyOHLC - use start of day for date to ensure consistency
+        LocalDateTime dateForOHLC = today.atStartOfDay();
+        
         DailyOHLC dailyOHLC = DailyOHLC.builder()
+                .id(UUID.randomUUID()) // Explicitly set ID
                 .companyId(companyId)
-                .date(startTime)
+                .date(dateForOHLC)
                 .openPrice(open)
                 .high(high)
                 .low(low)

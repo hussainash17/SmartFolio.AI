@@ -363,7 +363,7 @@ export const TradingViewChart = memo(({
           ],
           fullscreen: false,
           autosize: autosize,
-          height: height,
+          height: autosize ? undefined : height,
           theme: theme,
           timezone: 'Asia/Dhaka',
           toolbar_bg: theme === 'dark' ? '#1e1e1e' : '#ffffff',
@@ -595,8 +595,8 @@ export const TradingViewChart = memo(({
     <div
       className="relative w-full tradingview-chart"
       style={{
-        height: autosize ? '100vh' : `${height}px`,
-        minHeight: autosize ? '520px' : `${Math.max(height, 520)}px`,
+        height: autosize ? '100%' : `${height}px`,
+        minHeight: autosize ? '360px' : `${Math.max(height, 360)}px`,
       }}
     >
       <div 

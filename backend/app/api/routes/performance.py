@@ -683,6 +683,57 @@ def get_available_benchmarks(
     }
 
 
+@router.get("/benchmarks/{benchmark_id}/timeseries")
+def get_benchmark_timeseries(
+    benchmark_id: str,
+    period: str = Query("1Y", regex="^(1M|3M|6M|1Y|3Y|5Y|ALL)$"),
+    session: Session = Depends(get_session_dep)
+):
+    """
+    Get benchmark timeseries data for a date range.
+    
+    Returns:
+        Dictionary with dates, close values, and daily returns
+    """
+    start_date, end_date = get_date_range_from_period(period)
+    
+    benchmark_service = BenchmarkService(session)
+    benchmark_data = benchmark_service.get_benchmark_returns(
+        benchmark_id, start_date, end_date, frequency='daily'
+    )
+    
+    if not benchmark_data:
+        return {
+            "benchmark_id": benchmark_id,
+            "period": period,
+            "dates": [],
+            "close": [],
+            "daily_return": []
+        }
+    
+    dates = []
+    close_values = []
+    daily_returns = []
+    
+    for data in benchmark_data:
+        if 'date' in data:
+            dates.append(data['date'])
+        if 'close_value' in data:
+            close_values.append(float(data['close_value']))
+        if 'daily_return' in data and data['daily_return'] is not None:
+            daily_returns.append(float(data['daily_return']))
+        else:
+            daily_returns.append(0.0)
+    
+    return {
+        "benchmark_id": benchmark_id,
+        "period": period,
+        "dates": dates,
+        "close": close_values,
+        "daily_return": daily_returns
+    }
+
+
 # ============================================================================
 # API #5: MONTHLY RETURNS
 # ============================================================================

@@ -16,9 +16,25 @@ export const queryKeys = {
   goalProductRecommendations: (goalId: string) => ['kyc', 'goals', goalId, 'recommendations'] as const,
   goalAlerts: (goalId: string) => ['kyc', 'goals', goalId, 'alerts'] as const,
   riskAlerts: (portfolioId?: string) => ['risk', 'alerts', portfolioId ?? 'none'] as const,
+  riskOverview: (portfolioId: string, period: string, benchmarkId?: string) => 
+    ['risk', 'overview', portfolioId, period, benchmarkId ?? 'none'] as const,
+  riskMetricsDetailed: (portfolioId: string, period: string, benchmarkId?: string) => 
+    ['risk', 'metrics', portfolioId, period, benchmarkId ?? 'none'] as const,
+  riskMetricsTimeseries: (portfolioId: string, period: string, benchmarkId?: string) => 
+    ['risk', 'metrics', 'timeseries', portfolioId, period, benchmarkId ?? 'none'] as const,
+  sectorConcentration: (portfolioId: string, period: string, benchmarkId?: string) => 
+    ['risk', 'concentration', 'sector', portfolioId, period, benchmarkId ?? 'none'] as const,
+  correlationAnalysis: (portfolioId: string, period: string, top: number) => 
+    ['risk', 'correlation', portfolioId, period, top] as const,
+  stressTests: (portfolioId: string, scenarios?: string[], benchmarkId?: string) => 
+    ['risk', 'stress-tests', portfolioId, scenarios?.join(',') ?? 'all', benchmarkId ?? 'none'] as const,
+  rebalancingRecommendations: (portfolioId: string, targets?: Record<string, number>) => 
+    ['risk', 'rebalancing', 'recommendations', portfolioId, targets ? JSON.stringify(targets) : 'default'] as const,
+  userRiskProfile: ['risk', 'profile'] as const,
 
   marketList: (limit = 50, offset = 0, q?: string) => ['market', 'list', { limit, offset, q: q || '' }] as const,
-  newsList: (limit = 20, offset = 0, symbol?: string) => ['news', 'list', { limit, offset, symbol: symbol || '' }] as const,
+  newsList: (limit = 20, offset = 0, category?: string, symbol?: string, days?: number) =>
+    ['news', 'list', { limit, offset, category: category || '', symbol: symbol || '', days: days ?? 7 }] as const,
   ordersList: ['orders', 'list'] as const,
   fundsSummary: ['funds', 'summary'] as const,
   transactions: ['funds', 'transactions'] as const,

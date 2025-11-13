@@ -861,7 +861,7 @@ def get_analyst_picks(
         rating, target, recommendation = service._generate_analyst_recommendation(stock, fin, tech)
         picks.append({
             "symbol": stock.trading_code,
-            "name": stock.company_name,
+            "name": stock.company_name or stock.name,
             "sector": stock.sector,
             "rating": rating,
             "target_price": round(target, 2),
@@ -891,16 +891,17 @@ def get_earnings_highlights(
     table = []
     seen = set()
     for ohlc, sc in rows:
-        if sc.symbol in seen:
+        symbol = sc.trading_code
+        if not symbol or symbol in seen:
             continue
-        seen.add(sc.symbol)
+        seen.add(symbol)
         yoy = float(ohlc.change_percent)
         table.append({
-            "symbol": sc.symbol,
-            "name": sc.company_name,
-            "revenue_yoy": round(2.0 + (hash(sc.symbol) % 150) / 10.0, 2),
-            "eps_yoy": round(-5.0 + (hash(sc.symbol + 'e') % 200) / 10.0, 2),
-            "margin": round(10.0 + (hash(sc.symbol + 'm') % 200) / 10.0, 2),
+            "symbol": symbol,
+            "name": sc.company_name or sc.name,
+            "revenue_yoy": round(2.0 + (hash(symbol) % 150) / 10.0, 2),
+            "eps_yoy": round(-5.0 + (hash(symbol + 'e') % 200) / 10.0, 2),
+            "margin": round(10.0 + (hash(symbol + 'm') % 200) / 10.0, 2),
             "price_change_day": round(yoy, 2),
         })
     return table[:limit]
@@ -912,14 +913,18 @@ def get_thematic_ideas(
     session: Session = Depends(get_session_dep)
 ):
     """Return thematic investment ideas with example tickers."""
-    sectors = [row[0] for row in session.exec(select(Company.sector).distinct()).all()]
+    sectors = [row[0] for row in session.exec(select(Company.sector).where(Company.sector.is_not(None)).distinct()).all()]
     themes = [
         {"name": "Export Boosters", "description": "Export-oriented companies benefiting from FX incentives", "tags": ["Export", "FX"], "tickers": []},
         {"name": "Dividend Champions", "description": "High-yield, stable dividend payers", "tags": ["Dividend"], "tickers": []},
         {"name": "Infrastructure Play", "description": "Beneficiaries of public and private infrastructure spend", "tags": ["Infra"], "tickers": []},
     ]
     # Simple mapping of first few symbols per sector to each theme
-    all_symbols = [row.symbol for row in session.exec(select(Company).limit(200)).all()]
+    all_symbols = [
+        row.trading_code
+        for row in session.exec(select(Company).limit(200)).all()
+        if row.trading_code
+    ]
     for i, theme in enumerate(themes):
         theme["tickers"] = all_symbols[i::3][:8]
     return {"themes": themes, "sectors": sectors}

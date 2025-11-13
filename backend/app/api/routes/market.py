@@ -51,7 +51,7 @@ def get_market_summary(session: Session = Depends(get_session_dep)) -> Dict[str,
 def list_stocks(
     q: Optional[str] = Query(None, description="Search by symbol or company name"),
     sector: Optional[str] = None,
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
     session: Session = Depends(get_session_dep),
 ) -> List[Dict[str, Any]]:
@@ -74,6 +74,15 @@ def list_stocks(
             .order_by(StockData.timestamp.desc())
             .limit(1)
         ).first()
+        # Calculate market cap: last_trade_price × total_outstanding_securities (in crores)
+        market_cap = None
+        if latest_data and company.total_outstanding_securities:
+            try:
+                # Market cap in crores (1 crore = 10,000,000)
+                market_cap = (float(latest_data.last_trade_price) * company.total_outstanding_securities) / 10_000_000
+            except (ValueError, TypeError):
+                market_cap = None
+        
         result.append(
             {
                 "id": str(company.id),
@@ -87,6 +96,8 @@ def list_stocks(
                 "volume": latest_data.volume if latest_data else None,
                 "turnover": str(latest_data.turnover) if latest_data else None,
                 "timestamp": latest_data.timestamp if latest_data else None,
+                "total_outstanding_securities": company.total_outstanding_securities,
+                "market_cap": str(market_cap) if market_cap is not None else None,
             }
         )
     return result
@@ -105,12 +116,23 @@ def get_stock(symbol: str, session: Session = Depends(get_session_dep)) -> Dict[
         .limit(1)
     ).first()
 
+    # Calculate market cap: last_trade_price × total_outstanding_securities (in crores)
+    market_cap = None
+    if latest_data and company.total_outstanding_securities:
+        try:
+            # Market cap in crores (1 crore = 10,000,000)
+            market_cap = (float(latest_data.last_trade_price) * company.total_outstanding_securities) / 10_000_000
+        except (ValueError, TypeError):
+            market_cap = None
+    
     return {
         "id": str(company.id),
         "symbol": company.trading_code,
         "company_name": company.company_name,
         "sector": company.sector,
         "industry": company.industry,
+        "total_outstanding_securities": company.total_outstanding_securities,
+        "market_cap": str(market_cap) if market_cap is not None else None,
         "data": {
             "last_trade_price": str(latest_data.last_trade_price) if latest_data else None,
             "change": str(latest_data.change) if latest_data else None,
@@ -204,11 +226,12 @@ def get_top_movers(
     session: Session = Depends(get_session_dep),
 ) -> Dict[str, List[Dict[str, Any]]]:
     # Determine latest timestamp across StockData
-    latest_ts = session.exec(select(func.max(StockData.timestamp))).one()
-    if not latest_ts or not latest_ts[0]:
+    latest_time_row = session.exec(
+        select(func.max(StockData.timestamp))
+    ).first()
+    if not latest_time_row or latest_time_row[0] is None:
         return {"gainers": [], "losers": []}
-
-    latest_time = latest_ts[0]
+    latest_time = latest_time_row[0]
 
     # Top gainers
     gainers = session.exec(
@@ -252,10 +275,12 @@ def get_most_active(
     session: Session = Depends(get_session_dep),
 ) -> List[Dict[str, Any]]:
     # Determine latest timestamp across StockData
-    latest_ts = session.exec(select(func.max(StockData.timestamp))).one()
-    if not latest_ts or not latest_ts[0]:
+    latest_time_row = session.exec(
+        select(func.max(StockData.timestamp))
+    ).first()
+    if not latest_time_row or latest_time_row[0] is None:
         return []
-    latest_time = latest_ts[0]
+    latest_time = latest_time_row[0]
 
     rows = session.exec(
         select(StockData, Company)

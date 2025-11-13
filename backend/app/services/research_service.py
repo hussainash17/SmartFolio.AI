@@ -15,7 +15,8 @@ from dataclasses import dataclass
 import math
 
 from app.services.base import BaseService, ServiceException
-from app.model.stock import StockCompany, StockData, DailyOHLC
+from app.model.stock import StockData, DailyOHLC
+from app.model.company import Company
 from app.model.alert import News, StockNews
 from app.model.portfolio import Portfolio, PortfolioPosition
 from app.model.trade import Trade
@@ -72,7 +73,7 @@ class TechnicalIndicators:
 @dataclass
 class StockAnalysis:
     """Comprehensive stock analysis data."""
-    stock: StockCompany
+    stock: Company
     financial_metrics: FinancialMetrics
     technical_indicators: TechnicalIndicators
     price_history: List[Dict[str, Any]]
@@ -82,11 +83,59 @@ class StockAnalysis:
     recommendation: str
 
 
-class ResearchService(BaseService[StockCompany, None, None]):
+class ResearchService(BaseService[Company, None, None]):
     """Service for stock research and analysis operations."""
     
     def __init__(self, session: Optional[Session] = None):
-        super().__init__(StockCompany, session)
+        super().__init__(Company, session)
+        self._latest_data_cache: dict[UUID, Optional[StockData]] = {}
+
+    # ------------------------------------------------------------------
+    # Internal helpers for symbol/price lookups
+    # ------------------------------------------------------------------
+    def _symbol(self, stock: Company) -> str:
+        return (stock.trading_code or stock.name or "").upper()
+
+    def _company_name(self, stock: Company) -> str:
+        return stock.company_name or stock.name
+
+    def _latest_stock_data(self, stock: Company) -> Optional[StockData]:
+        if stock.id in self._latest_data_cache:
+            return self._latest_data_cache[stock.id]
+        latest = self.session.exec(
+            select(StockData)
+            .where(StockData.company_id == stock.id)
+            .order_by(StockData.timestamp.desc())
+            .limit(1)
+        ).first()
+        self._latest_data_cache[stock.id] = latest
+        return latest
+
+    def _current_price(self, stock: Company) -> float:
+        latest = self._latest_stock_data(stock)
+        if latest and latest.last_trade_price is not None:
+            return float(latest.last_trade_price)
+        # Fallback: derive from market cap / shares if available
+        if stock.market_cap and stock.total_shares:
+            try:
+                return float(stock.market_cap) / max(stock.total_shares, 1)
+            except Exception:
+                pass
+        # Final fallback: deterministic synthetic price based on symbol
+        symbol_hash = hash(self._symbol(stock)) % 1000
+        return round(50 + (symbol_hash % 300) / 3, 2)
+
+    def _latest_change_percent(self, stock: Company) -> float:
+        latest = self._latest_stock_data(stock)
+        if latest and latest.change_percent is not None:
+            return float(latest.change_percent)
+        return self._calculate_price_change(stock)
+
+    def _latest_volume(self, stock: Company) -> int:
+        latest = self._latest_stock_data(stock)
+        if latest and latest.volume is not None:
+            return int(latest.volume)
+        return int(self._get_average_volume(stock))
     
     def stock_screener(
         self,
@@ -114,18 +163,12 @@ class ResearchService(BaseService[StockCompany, None, None]):
         """
         try:
             # Build the query
-            query = select(StockCompany)
+            query = select(Company)
             conditions = []
             
             # Apply basic filters
             if sector:
-                conditions.append(StockCompany.sector == sector)
-            
-            if min_price is not None:
-                conditions.append(StockCompany.current_price >= min_price)
-            
-            if max_price is not None:
-                conditions.append(StockCompany.current_price <= max_price)
+                conditions.append(Company.sector == sector)
             
             if conditions:
                 query = query.where(and_(*conditions))
@@ -137,6 +180,13 @@ class ResearchService(BaseService[StockCompany, None, None]):
             screener_results = []
             for stock in stocks:
                 try:
+                    current_price = self._current_price(stock)
+                    # Apply price filters post-fetch using proxy price
+                    if min_price is not None and current_price < min_price:
+                        continue
+                    if max_price is not None and current_price > max_price:
+                        continue
+
                     metrics = self._calculate_financial_metrics(stock)
                     technical = self._calculate_technical_indicators(stock)
                     
@@ -165,21 +215,21 @@ class ResearchService(BaseService[StockCompany, None, None]):
                     
                     screener_results.append(StockScreenerResult(
                         stock_id=str(stock.id),
-                        symbol=stock.symbol,
-                        name=stock.company_name,
+                        symbol=self._symbol(stock),
+                        name=self._company_name(stock),
                         sector=stock.sector or "Unknown",
-                        current_price=float(stock.current_price or 0),
+                        current_price=current_price,
                         market_cap=metrics.market_cap,
                         pe_ratio=metrics.pe_ratio,
                         dividend_yield=metrics.dividend_yield,
-                        avg_volume=int(self._get_average_volume(stock)),
+                        avg_volume=self._latest_volume(stock),
                         score=score,
                         change_percent=change_percent,
                         technical_score=technical_score
                     ))
                     
                 except Exception as e:
-                    logger.warning(f"Error processing stock {stock.symbol}: {e}")
+                    logger.warning(f"Error processing stock {self._symbol(stock)}: {e}")
                     continue
             
             # Sort by score and limit results
@@ -248,8 +298,8 @@ class ResearchService(BaseService[StockCompany, None, None]):
         try:
             # Get stocks with recent activity
             stocks = self.session.exec(
-                select(StockCompany)
-                .where(StockCompany.current_price.is_not(None))
+                select(Company)
+                .where(Company.is_active == True)  # noqa: E712
                 .limit(limit * 3)
             ).all()
             
@@ -262,16 +312,16 @@ class ResearchService(BaseService[StockCompany, None, None]):
                     
                     trending.append({
                         "stock_id": str(stock.id),
-                        "symbol": stock.symbol,
-                        "name": stock.company_name,
-                        "current_price": float(stock.current_price or 0),
+                        "symbol": self._symbol(stock),
+                        "name": self._company_name(stock),
+                        "current_price": self._current_price(stock),
                         "change_percent": change_percent,
                         "volume_ratio": volume_ratio,
                         "trend_score": trend_score,
                         "sector": stock.sector
                     })
                 except Exception as e:
-                    logger.warning(f"Error processing trending stock {stock.symbol}: {e}")
+                    logger.warning(f"Error processing trending stock {self._symbol(stock)}: {e}")
                     continue
             
             # Sort by trend score
@@ -294,7 +344,7 @@ class ResearchService(BaseService[StockCompany, None, None]):
         """
         try:
             stocks = self.session.exec(
-                select(StockCompany).where(StockCompany.sector == sector)
+                select(Company).where(Company.sector == sector)
             ).all()
             
             if not stocks:
@@ -325,10 +375,10 @@ class ResearchService(BaseService[StockCompany, None, None]):
                 try:
                     change = self._calculate_price_change(stock)
                     top_performers.append({
-                        "symbol": stock.symbol,
-                        "name": stock.company_name,
+                        "symbol": self._symbol(stock),
+                        "name": self._company_name(stock),
                         "change_percent": change,
-                        "current_price": float(stock.current_price or 0)
+                        "current_price": self._current_price(stock)
                     })
                 except Exception:
                     continue
@@ -364,10 +414,11 @@ class ResearchService(BaseService[StockCompany, None, None]):
         try:
             # Search by symbol and name
             stocks = self.session.exec(
-                select(StockCompany).where(
+                select(Company).where(
                     or_(
-                        StockCompany.symbol.ilike(f"%{query}%"),
-                        StockCompany.company_name.ilike(f"%{query}%")
+                        Company.trading_code.ilike(f"%{query}%"),
+                        Company.name.ilike(f"%{query}%"),
+                        Company.company_name.ilike(f"%{query}%")
                     )
                 ).limit(limit)
             ).all()
@@ -376,10 +427,10 @@ class ResearchService(BaseService[StockCompany, None, None]):
             for stock in stocks:
                 results.append({
                     "stock_id": str(stock.id),
-                    "symbol": stock.symbol,
-                    "name": stock.company_name,
+                    "symbol": self._symbol(stock),
+                    "name": self._company_name(stock),
                     "sector": stock.sector,
-                    "current_price": float(stock.current_price or 0),
+                    "current_price": self._current_price(stock),
                     "change_percent": self._calculate_price_change(stock)
                 })
             
@@ -390,15 +441,16 @@ class ResearchService(BaseService[StockCompany, None, None]):
             raise ServiceException(f"Stock search failed: {str(e)}")
     
     # Private helper methods
-    def _calculate_financial_metrics(self, stock: StockCompany) -> FinancialMetrics:
+    def _calculate_financial_metrics(self, stock: Company) -> FinancialMetrics:
         """Calculate financial metrics for a stock (with mock data)."""
-        # In a real implementation, these would be calculated from actual financial data
-        symbol_hash = hash(stock.symbol) % 1000
+        symbol = self._symbol(stock)
+        symbol_hash = hash(symbol) % 1000
+        current_price = self._current_price(stock)
         
         return FinancialMetrics(
             pe_ratio=15.0 + (symbol_hash % 20),  # 15-35
             pb_ratio=1.0 + (symbol_hash % 5),    # 1-6
-            market_cap=float(stock.current_price or 100) * 1000000 * (1 + symbol_hash % 100),
+            market_cap=current_price * 1000000 * (1 + symbol_hash % 100),
             dividend_yield=2.0 + (symbol_hash % 50) / 10,  # 2-7%
             roe=10.0 + (symbol_hash % 25),       # 10-35%
             debt_to_equity=0.3 + (symbol_hash % 70) / 100,  # 0.3-1.0
@@ -407,10 +459,10 @@ class ResearchService(BaseService[StockCompany, None, None]):
             free_cash_flow=1000000 + (symbol_hash * 10000)
         )
     
-    def _calculate_technical_indicators(self, stock: StockCompany) -> TechnicalIndicators:
+    def _calculate_technical_indicators(self, stock: Company) -> TechnicalIndicators:
         """Calculate technical indicators (with mock data)."""
-        current_price = float(stock.current_price or 100)
-        symbol_hash = hash(stock.symbol) % 1000
+        current_price = self._current_price(stock)
+        symbol_hash = hash(self._symbol(stock)) % 1000
         
         return TechnicalIndicators(
             rsi=30 + (symbol_hash % 40),  # 30-70
@@ -469,31 +521,32 @@ class ResearchService(BaseService[StockCompany, None, None]):
         
         return max(0, min(score, 5))  # 0-5 range
     
-    def _calculate_price_change(self, stock: StockCompany) -> float:
+    def _calculate_price_change(self, stock: Company) -> float:
         """Calculate price change percentage (mock)."""
-        symbol_hash = hash(stock.symbol) % 1000
+        symbol_hash = hash(self._symbol(stock)) % 1000
         return -10.0 + (symbol_hash % 200) / 10  # -10% to +10%
     
-    def _get_average_volume(self, stock: StockCompany) -> float:
+    def _get_average_volume(self, stock: Company) -> float:
         """Get average trading volume (mock)."""
-        symbol_hash = hash(stock.symbol) % 1000
+        symbol_hash = hash(self._symbol(stock)) % 1000
         return 500000 + (symbol_hash * 1000)
     
-    def _calculate_volume_ratio(self, stock: StockCompany) -> float:
+    def _calculate_volume_ratio(self, stock: Company) -> float:
         """Calculate volume ratio vs average (mock)."""
-        symbol_hash = hash(stock.symbol) % 1000
+        symbol_hash = hash(self._symbol(stock)) % 1000
         return 0.5 + (symbol_hash % 200) / 100  # 0.5 to 2.5
     
-    def _get_price_history(self, stock: StockCompany, days: int = 90) -> List[Dict[str, Any]]:
+    def _get_price_history(self, stock: Company, days: int = 90) -> List[Dict[str, Any]]:
         """Get historical price data."""
         # In real implementation, query DailyOHLC table
         history = []
-        current_price = float(stock.current_price or 100)
+        current_price = self._current_price(stock)
+        symbol = self._symbol(stock)
         
         for i in range(days):
             date = datetime.now() - timedelta(days=i)
             # Mock price with some volatility
-            price_change = (-0.05 + (hash(f"{stock.symbol}{i}") % 100) / 1000)
+            price_change = (-0.05 + (hash(f"{symbol}{i}") % 100) / 1000)
             price = current_price * (1 + price_change)
             
             history.append({
@@ -507,20 +560,22 @@ class ResearchService(BaseService[StockCompany, None, None]):
         
         return history[::-1]  # Reverse to chronological order
     
-    def _get_stock_news(self, stock: StockCompany, limit: int = 10) -> List[Dict[str, Any]]:
+    def _get_stock_news(self, stock: Company, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent news for a stock."""
         # In real implementation, query news tables
+        symbol = self._symbol(stock)
+        company_name = self._company_name(stock)
         return [
             {
-                "title": f"Market Analysis: {stock.symbol} Shows Strong Performance",
-                "summary": f"Recent developments in {stock.company_name} indicate positive market trends...",
+                "title": f"Market Analysis: {symbol} Shows Strong Performance",
+                "summary": f"Recent developments in {company_name} indicate positive market trends...",
                 "published_date": (datetime.now() - timedelta(days=1)).isoformat(),
                 "source": "Financial Times",
                 "sentiment": "positive"
             },
             {
-                "title": f"{stock.symbol} Quarterly Earnings Report",
-                "summary": f"{stock.company_name} releases quarterly results with key financial metrics...",
+                "title": f"{symbol} Quarterly Earnings Report",
+                "summary": f"{company_name} releases quarterly results with key financial metrics...",
                 "published_date": (datetime.now() - timedelta(days=3)).isoformat(),
                 "source": "Bloomberg",
                 "sentiment": "neutral"
@@ -529,12 +584,12 @@ class ResearchService(BaseService[StockCompany, None, None]):
     
     def _generate_analyst_recommendation(
         self, 
-        stock: StockCompany, 
+        stock: Company, 
         financial: FinancialMetrics, 
         technical: TechnicalIndicators
     ) -> Tuple[str, float, str]:
         """Generate analyst rating, price target, and recommendation."""
-        current_price = float(stock.current_price or 100)
+        current_price = self._current_price(stock)
         
         # Calculate recommendation based on metrics
         score = self._calculate_stock_score(financial, technical)

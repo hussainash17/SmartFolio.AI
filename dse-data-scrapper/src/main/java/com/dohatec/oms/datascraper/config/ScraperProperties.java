@@ -73,6 +73,9 @@ public class ScraperProperties {
         
         // DSE news scraper runs every 30 seconds
         private String newsCron = "0/30 * * * * *";
+
+        // Index instrument scraper runs every 30 seconds
+        private String indexCron = "0/30 * * * * *";
     }
 
     @Data

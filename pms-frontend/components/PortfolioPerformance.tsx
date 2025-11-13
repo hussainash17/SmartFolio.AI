@@ -24,7 +24,10 @@ import {
   PieChart as PieChartIcon,
   Activity,
   FileText,
-  Briefcase
+  Briefcase,
+  Receipt,
+  TrendingUp as TrendingUpIcon,
+  AlertCircle
 } from "lucide-react";
 import { 
   LineChart, 
@@ -58,6 +61,8 @@ import {
   useMonthlyReturns,
   useSecurityAttribution,
   useSectorAttribution,
+  useDividendAnalysis,
+  useCostBasisAnalysis,
 } from "../hooks/usePerformance";
 
 interface PortfolioPerformanceProps {
@@ -124,6 +129,10 @@ export function PortfolioPerformance({ portfolioId: initialPortfolioId, portfoli
   const { data: monthlyReturns, isLoading: monthlyLoading } = useMonthlyReturns(selectedPortfolioId);
   const { data: securityAttribution, isLoading: securityLoading } = useSecurityAttribution(selectedPortfolioId, selectedPeriod, 10);
   const { data: sectorAttribution, isLoading: sectorLoading } = useSectorAttribution(selectedPortfolioId, selectedPeriod, selectedBenchmark);
+  
+  // Analytics APIs for Dividend and Cost Basis
+  const { data: dividendAnalysis, isLoading: dividendLoading, error: dividendError } = useDividendAnalysis(selectedPortfolioId);
+  const { data: costBasisAnalysis, isLoading: costBasisLoading, error: costBasisError } = useCostBasisAnalysis(selectedPortfolioId);
 
   // Check if any critical data is loading (for initial page load)
   const isLoadingCriticalData = valueLoading || returnsLoading;
@@ -364,11 +373,13 @@ export function PortfolioPerformance({ portfolioId: initialPortfolioId, portfoli
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="benchmark">Benchmarking</TabsTrigger>
           <TabsTrigger value="attribution">Attribution</TabsTrigger>
           <TabsTrigger value="decomposition">Decomposition</TabsTrigger>
+          <TabsTrigger value="dividends">Dividends</TabsTrigger>
+          <TabsTrigger value="cost-basis">Cost Basis</TabsTrigger>
           <TabsTrigger value="periods">Periods</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
@@ -1132,6 +1143,367 @@ export function PortfolioPerformance({ portfolioId: initialPortfolioId, portfoli
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Dividends Tab */}
+        <TabsContent value="dividends" className="space-y-6">
+          {/* Dividend Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <TrendingUpIcon className="h-4 w-4 text-green-600" />
+                  Annual Dividends
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {dividendLoading ? (
+                    <Activity className="h-5 w-5 animate-pulse" />
+                  ) : dividendError ? (
+                    <span className="text-muted-foreground">N/A</span>
+                  ) : (
+                    formatCurrency(dividendAnalysis?.total_annual_dividends || 0)
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Total annual income</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Percent className="h-4 w-4 text-blue-600" />
+                  Dividend Yield
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {dividendLoading ? (
+                    <Activity className="h-5 w-5 animate-pulse" />
+                  ) : dividendError ? (
+                    <span className="text-muted-foreground">N/A</span>
+                  ) : (
+                    formatPercent(dividendAnalysis?.portfolio_dividend_yield || 0)
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Portfolio yield</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-purple-600" />
+                  Quarterly Income
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {dividendLoading ? (
+                    <Activity className="h-5 w-5 animate-pulse" />
+                  ) : dividendError ? (
+                    <span className="text-muted-foreground">N/A</span>
+                  ) : (
+                    formatCurrency(dividendAnalysis?.quarterly_income || 0)
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Expected per quarter</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-orange-600" />
+                  Monthly Income
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {dividendLoading ? (
+                    <Activity className="h-5 w-5 animate-pulse" />
+                  ) : dividendError ? (
+                    <span className="text-muted-foreground">N/A</span>
+                  ) : (
+                    formatCurrency(dividendAnalysis?.monthly_income || 0)
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Expected per month</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Dividend Stocks Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Dividend-Paying Holdings</CardTitle>
+              <CardDescription>Stocks in your portfolio that pay dividends</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {dividendLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Activity className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : dividendError ? (
+                <div className="text-center py-12">
+                  <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">
+                    {dividendError?.status === 404 
+                      ? "Portfolio not found. Please select a valid portfolio."
+                      : "Unable to load dividend analysis. Please try again."}
+                  </p>
+                </div>
+              ) : dividendAnalysis?.dividend_stocks && dividendAnalysis.dividend_stocks.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Symbol</TableHead>
+                      <TableHead>Company</TableHead>
+                      <TableHead>Sector</TableHead>
+                      <TableHead className="text-right">Position Value</TableHead>
+                      <TableHead className="text-right">Dividend Yield</TableHead>
+                      <TableHead className="text-right">Annual Dividend</TableHead>
+                      <TableHead className="text-right">Quarterly</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {dividendAnalysis.dividend_stocks.map((stock: any) => (
+                      <TableRow key={stock.stock_id}>
+                        <TableCell className="font-medium">{stock.symbol}</TableCell>
+                        <TableCell>{stock.name}</TableCell>
+                        <TableCell>{stock.sector || 'N/A'}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(stock.position_value)}</TableCell>
+                        <TableCell className="text-right">{formatPercent(stock.dividend_yield)}</TableCell>
+                        <TableCell className="text-right font-medium text-green-600">
+                          {formatCurrency(stock.annual_dividend)}
+                        </TableCell>
+                        <TableCell className="text-right">{formatCurrency(stock.quarterly_dividend)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-12">
+                  <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">No dividend-paying stocks in this portfolio</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Dividend Growth Estimate */}
+          {dividendAnalysis && !dividendError && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Dividend Growth Estimate</CardTitle>
+                <CardDescription>Projected annual dividend growth rate</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4">
+                  <div className="text-3xl font-bold text-green-600">
+                    {formatPercent(dividendAnalysis.dividend_growth_estimate || 0)}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">
+                      Estimated annual dividend growth rate based on historical trends and sector analysis
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Cost Basis Tab */}
+        <TabsContent value="cost-basis" className="space-y-6">
+          {/* Cost Basis Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-blue-600" />
+                  Total Cost Basis
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {costBasisLoading ? (
+                    <Activity className="h-5 w-5 animate-pulse" />
+                  ) : costBasisError ? (
+                    <span className="text-muted-foreground">N/A</span>
+                  ) : (
+                    formatCurrency(costBasisAnalysis?.total_cost_basis || 0)
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Total invested</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <TrendingUpIcon className="h-4 w-4 text-green-600" />
+                  Current Value
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {costBasisLoading ? (
+                    <Activity className="h-5 w-5 animate-pulse" />
+                  ) : costBasisError ? (
+                    <span className="text-muted-foreground">N/A</span>
+                  ) : (
+                    formatCurrency(costBasisAnalysis?.total_current_value || 0)
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Current market value</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-purple-600" />
+                  Unrealized Gains
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${(costBasisAnalysis?.total_unrealized_gains || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {costBasisLoading ? (
+                    <Activity className="h-5 w-5 animate-pulse" />
+                  ) : costBasisError ? (
+                    <span className="text-muted-foreground">N/A</span>
+                  ) : (
+                    formatCurrency(costBasisAnalysis?.total_unrealized_gains || 0)
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Unrealized P&L</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Receipt className="h-4 w-4 text-orange-600" />
+                  Tax Liability
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600">
+                  {costBasisLoading ? (
+                    <Activity className="h-5 w-5 animate-pulse" />
+                  ) : costBasisError ? (
+                    <span className="text-muted-foreground">N/A</span>
+                  ) : (
+                    formatCurrency(costBasisAnalysis?.estimated_tax_liability || 0)
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Estimated (20% rate)</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Stock Analysis Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Cost Basis by Stock</CardTitle>
+              <CardDescription>Detailed cost basis analysis for each holding</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {costBasisLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Activity className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : costBasisError ? (
+                <div className="text-center py-12">
+                  <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">
+                    {costBasisError?.status === 404 
+                      ? "Portfolio not found. Please select a valid portfolio."
+                      : "Unable to load cost basis analysis. Please try again."}
+                  </p>
+                </div>
+              ) : costBasisAnalysis?.stock_analysis && Object.keys(costBasisAnalysis.stock_analysis).length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Symbol</TableHead>
+                      <TableHead>Company</TableHead>
+                      <TableHead className="text-right">Quantity</TableHead>
+                      <TableHead className="text-right">Avg Cost</TableHead>
+                      <TableHead className="text-right">Total Cost</TableHead>
+                      <TableHead className="text-right">Current Value</TableHead>
+                      <TableHead className="text-right">Unrealized P&L</TableHead>
+                      <TableHead className="text-right">P&L %</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Object.values(costBasisAnalysis.stock_analysis).map((stock: any) => (
+                      <TableRow key={stock.symbol}>
+                        <TableCell className="font-medium">{stock.symbol}</TableCell>
+                        <TableCell>{stock.name}</TableCell>
+                        <TableCell className="text-right">{stock.current_quantity}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(stock.average_cost)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(stock.total_cost)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(stock.current_value)}</TableCell>
+                        <TableCell className={`text-right font-medium ${stock.unrealized_pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatCurrency(stock.unrealized_pnl)}
+                        </TableCell>
+                        <TableCell className={`text-right ${stock.unrealized_pnl_percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatPercent(stock.unrealized_pnl_percent)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-12">
+                  <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">No cost basis data available</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Tax Loss Harvesting Opportunities */}
+          {costBasisAnalysis?.tax_loss_opportunities && costBasisAnalysis.tax_loss_opportunities.length > 0 && (
+            <Card className="border-orange-200 bg-orange-50/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Receipt className="h-5 w-5 text-orange-600" />
+                  Tax Loss Harvesting Opportunities
+                </CardTitle>
+                <CardDescription>Stocks with significant unrealized losses that could offset gains</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Symbol</TableHead>
+                      <TableHead className="text-right">Unrealized Loss</TableHead>
+                      <TableHead className="text-right">Current Value</TableHead>
+                      <TableHead className="text-right">Tax Savings Estimate</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {costBasisAnalysis.tax_loss_opportunities.map((opp: any) => (
+                      <TableRow key={opp.symbol}>
+                        <TableCell className="font-medium">{opp.symbol}</TableCell>
+                        <TableCell className="text-right text-red-600 font-medium">
+                          {formatCurrency(opp.unrealized_loss)}
+                        </TableCell>
+                        <TableCell className="text-right">{formatCurrency(opp.current_value)}</TableCell>
+                        <TableCell className="text-right font-medium text-green-600">
+                          {formatCurrency(opp.tax_savings_estimate)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Periods Tab */}
