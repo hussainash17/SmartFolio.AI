@@ -2,14 +2,16 @@
 TradingView UDF-compatible API endpoints
 Provides historical OHLC data and symbol information for TradingView charts
 """
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, Query
-from sqlmodel import Session, select, func
-from app.api.deps import get_session_dep
+
+from fastapi import APIRouter, Query
+from sqlmodel import select
+
+from app.api.deps import SessionDep
 from app.model.company import Company
-from app.model.stock import DailyOHLC, StockData
 from app.model.portfolio import Portfolio, PortfolioPosition
+from app.model.stock import DailyOHLC, StockData
 
 router = APIRouter(prefix="/tradingview", tags=["tradingview"])
 
@@ -31,12 +33,12 @@ def get_config() -> Dict[str, Any]:
 
 @router.get("/symbols")
 def search_symbols(
-    symbol: Optional[str] = Query(None, description="Symbol name for individual symbol resolution"),
-    query: Optional[str] = Query(None, description="Search query for symbol or company name"),
-    type: Optional[str] = Query(None, description="Type filter (stock, index, etc)"),
-    exchange: Optional[str] = Query(None, description="Exchange filter"),
-    limit: int = Query(30, ge=1, le=100, description="Maximum number of results"),
-    session: Session = Depends(get_session_dep),
+        session: SessionDep,
+        symbol: Optional[str] = Query(None, description="Symbol name for individual symbol resolution"),
+        query: Optional[str] = Query(None, description="Search query for symbol or company name"),
+        type: Optional[str] = Query(None, description="Type filter (stock, index, etc)"),
+        exchange: Optional[str] = Query(None, description="Exchange filter"),
+        limit: int = Query(30, ge=1, le=100, description="Maximum number of results"),
 ) -> Dict[str, Any] | List[Dict[str, Any]]:
     """
     Search for symbols or resolve individual symbol.
@@ -52,17 +54,17 @@ def search_symbols(
                 "s": "error",
                 "errmsg": "Symbol cannot be empty"
             }
-        
+
         company = session.exec(
             select(Company).where(Company.trading_code == symbol_upper)
         ).first()
-        
+
         if not company:
             return {
                 "s": "error",
                 "errmsg": f"Symbol {symbol_upper} not found"
             }
-        
+
         # Return single symbol info in UDF format (all required fields)
         return {
             "name": company.trading_code,
@@ -93,20 +95,20 @@ def search_symbols(
             "currency_code": "BDT",
             "format": "price",
         }
-    
+
     # Handle symbol search (when 'query' parameter is provided or for search functionality)
     stmt = select(Company).where(Company.is_active == True)
-    
+
     if query and query.strip():
         search_term = f"%{query.upper()}%"
         stmt = stmt.where(
-            (Company.trading_code.ilike(search_term)) | 
+            (Company.trading_code.ilike(search_term)) |
             (Company.company_name.ilike(search_term))
         )
-    
+
     stmt = stmt.limit(limit)
     companies = session.exec(stmt).all()
-    
+
     results = []
     for company in companies:
         results.append({
@@ -116,51 +118,14 @@ def search_symbols(
             "exchange": "DSE",
             "type": "stock",
         })
-    
-    return results
 
-
-@router.get("/search")
-def search_symbols_search(
-    query: Optional[str] = Query(None, description="Search query for symbol or company name"),
-    type: Optional[str] = Query(None, description="Type filter (stock, index, etc)"),
-    exchange: Optional[str] = Query(None, description="Exchange filter"),
-    limit: int = Query(30, ge=1, le=100, description="Maximum number of results"),
-    session: Session = Depends(get_session_dep),
-) -> List[Dict[str, Any]]:
-    """
-    Search for symbols (TradingView search endpoint).
-    https://www.tradingview.com/charting-library-docs/latest/connecting_data/UDF#search
-    """
-    stmt = select(Company).where(Company.is_active == True)
-    
-    if query and query.strip():
-        search_term = f"%{query.upper()}%"
-        stmt = stmt.where(
-            (Company.trading_code.ilike(search_term)) | 
-            (Company.company_name.ilike(search_term))
-        )
-    
-    stmt = stmt.limit(limit)
-    companies = session.exec(stmt).all()
-    
-    results = []
-    for company in companies:
-        results.append({
-            "symbol": company.trading_code,
-            "full_name": f"DSE:{company.trading_code}",
-            "description": company.company_name or company.name,
-            "exchange": "DSE",
-            "type": "stock",
-        })
-    
     return results
 
 
 @router.get("/symbol_info")
 def get_symbol_info(
-    group: Optional[str] = Query(None, description="Exchange group"),
-    session: Session = Depends(get_session_dep),
+        session: SessionDep,
+        group: Optional[str] = Query(None, description="Exchange group"),
 ) -> Dict[str, Any]:
     """
     Returns symbol info for a group of symbols.
@@ -169,7 +134,7 @@ def get_symbol_info(
     # Get all active companies
     stmt = select(Company).where(Company.is_active == True).limit(200)
     companies = session.exec(stmt).all()
-    
+
     if not companies:
         return {
             "symbol": [],
@@ -187,7 +152,7 @@ def get_symbol_info(
             "supported-resolutions": [],
             "type": [],
         }
-    
+
     # Build response arrays
     symbols = []
     descriptions = []
@@ -202,7 +167,7 @@ def get_symbol_info(
     timezone = []
     supported_resolutions = []
     symbol_type = []
-    
+
     for company in companies:
         symbols.append(company.trading_code)
         descriptions.append(company.company_name or company.name)
@@ -217,7 +182,7 @@ def get_symbol_info(
         timezone.append("Asia/Dhaka")
         supported_resolutions.append(["1D", "1W", "1M"])
         symbol_type.append("stock")
-    
+
     return {
         "symbol": symbols,
         "description": descriptions,
@@ -235,14 +200,51 @@ def get_symbol_info(
     }
 
 
+@router.get("/search")
+def search_symbols_search(
+        session: SessionDep,
+        query: Optional[str] = Query(None, description="Search query for symbol or company name"),
+        type: Optional[str] = Query(None, description="Type filter (stock, index, etc)"),
+        exchange: Optional[str] = Query(None, description="Exchange filter"),
+        limit: int = Query(30, ge=1, le=100, description="Maximum number of results"),
+) -> List[Dict[str, Any]]:
+    """
+    Search for symbols (TradingView search endpoint).
+    https://www.tradingview.com/charting-library-docs/latest/connecting_data/UDF#search
+    """
+    stmt = select(Company).where(Company.is_active == True)
+
+    if query and query.strip():
+        search_term = f"%{query.upper()}%"
+        stmt = stmt.where(
+            (Company.trading_code.ilike(search_term)) |
+            (Company.company_name.ilike(search_term))
+        )
+
+    stmt = stmt.limit(limit)
+    companies = session.exec(stmt).all()
+
+    results = []
+    for company in companies:
+        results.append({
+            "symbol": company.trading_code,
+            "full_name": f"DSE:{company.trading_code}",
+            "description": company.company_name or company.name,
+            "exchange": "DSE",
+            "type": "stock",
+        })
+
+    return results
+
+
 @router.get("/history")
 def get_history(
-    symbol: str = Query(..., description="Symbol name"),
-    resolution: str = Query(..., description="Resolution (1D, 1W, 1M, etc)"),
-    from_ts: int = Query(..., alias="from", description="Unix timestamp (seconds) of the leftmost bar"),
-    to_ts: int = Query(..., alias="to", description="Unix timestamp (seconds) of the rightmost bar"),
-    countback: Optional[int] = Query(None, description="Number of bars to return"),
-    session: Session = Depends(get_session_dep),
+        session: SessionDep,
+        symbol: str = Query(..., description="Symbol name"),
+        resolution: str = Query(..., description="Resolution (1D, 1W, 1M, etc)"),
+        from_ts: int = Query(..., alias="from", description="Unix timestamp (seconds) of the leftmost bar"),
+        to_ts: int = Query(..., alias="to", description="Unix timestamp (seconds) of the rightmost bar"),
+        countback: Optional[int] = Query(None, description="Number of bars to return"),
 ) -> Dict[str, Any]:
     """
     Returns historical bars for a symbol.
@@ -252,21 +254,21 @@ def get_history(
     company = session.exec(
         select(Company).where(Company.trading_code == symbol.upper())
     ).first()
-    
+
     if not company:
         return {
             "s": "error",
             "errmsg": f"Symbol {symbol} not found"
         }
-    
+
     # Convert timestamps to datetime (handle both date and datetime)
     from_date = datetime.fromtimestamp(from_ts)
     to_date = datetime.fromtimestamp(to_ts)
-    
+
     # Convert to date for comparison (since DailyOHLC.date is a date field)
     from_date_only = from_date.date()
     to_date_only = to_date.date()
-    
+
     # When countback is provided, get the last N bars before 'to'
     # This is the standard UDF behavior - countback takes precedence over 'from'
     if countback:
@@ -280,7 +282,7 @@ def get_history(
             .limit(countback)
         )
         bars = session.exec(stmt).all()
-        
+
         # If we got fewer bars than requested, that's fine - we've returned all available data
         # Reverse to get oldest first (chronological order for UDF)
         bars = list(reversed(bars))
@@ -294,13 +296,13 @@ def get_history(
             .order_by(DailyOHLC.date.asc())
         )
         bars = session.exec(stmt).all()
-    
+
     if not bars:
         return {
             "s": "no_data",
             "nextTime": int(to_date.timestamp())
         }
-    
+
     # Convert to UDF format
     times = []
     opens = []
@@ -308,7 +310,7 @@ def get_history(
     lows = []
     closes = []
     volumes = []
-    
+
     for bar in bars:
         # Convert date to Unix timestamp (seconds) - combine date with midnight time
         bar_datetime = datetime.combine(bar.date, datetime.min.time())
@@ -318,7 +320,7 @@ def get_history(
         lows.append(float(bar.low))
         closes.append(float(bar.close_price))
         volumes.append(int(bar.volume) if bar.volume else 0)
-    
+
     return {
         "s": "ok",
         "t": times,
@@ -332,28 +334,28 @@ def get_history(
 
 @router.get("/quotes")
 def get_quotes(
-    symbols: str = Query(..., description="Comma-separated list of symbols"),
-    session: Session = Depends(get_session_dep),
+        session: SessionDep,
+        symbols: str = Query(..., description="Comma-separated list of symbols"),
 ) -> Dict[str, Any]:
     """
     Returns real-time quotes for symbols.
     https://www.tradingview.com/charting-library-docs/latest/connecting_data/UDF#quotes
     """
     symbol_list = [s.strip().upper() for s in symbols.split(",")]
-    
+
     # Look up companies
     companies = session.exec(
         select(Company).where(Company.trading_code.in_(symbol_list))
     ).all()
-    
+
     company_map = {c.trading_code: c for c in companies}
-    
+
     quotes = []
     for symbol in symbol_list:
         company = company_map.get(symbol)
         if not company:
             continue
-        
+
         # Get latest stock data
         latest_data = session.exec(
             select(StockData)
@@ -361,7 +363,7 @@ def get_quotes(
             .order_by(StockData.timestamp.desc())
             .limit(1)
         ).first()
-        
+
         if latest_data:
             quotes.append({
                 "s": "ok",
@@ -382,7 +384,7 @@ def get_quotes(
                     "volume": int(latest_data.volume) if latest_data.volume else 0,
                 }
             })
-    
+
     return {
         "s": "ok",
         "d": quotes
@@ -391,8 +393,8 @@ def get_quotes(
 
 @router.get("/positions/{symbol}")
 def get_positions_for_tradingview(
-    symbol: str,
-    session: Session = Depends(get_session_dep),
+        symbol: str,
+        session: SessionDep,
 ):
     """
     Get positions for a symbol formatted for TradingView marks.
@@ -403,10 +405,10 @@ def get_positions_for_tradingview(
     stock = session.exec(
         select(Company).where(Company.trading_code == symbol.upper())
     ).first()
-    
+
     if not stock:
         return []
-    
+
     # Get all positions for this stock across all portfolios
     # Note: This returns all positions, not filtered by user
     # If you need user-specific positions, you'll need authentication
@@ -416,7 +418,7 @@ def get_positions_for_tradingview(
         .join(Company, PortfolioPosition.stock_id == Company.id)
         .where(PortfolioPosition.stock_id == stock.id)
     ).all()
-    
+
     result = []
     for position, portfolio, company in positions:
         # Format for TradingView position marks
@@ -432,6 +434,5 @@ def get_positions_for_tradingview(
             "unrealized_pnl": float(position.unrealized_pnl) if position.unrealized_pnl else 0,
             "current_value": float(position.current_value) if position.current_value else 0,
         })
-    
-    return result
 
+    return result

@@ -1,8 +1,8 @@
 from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import select, Session
-from app.api.deps import get_current_user, get_session_dep
+from fastapi import APIRouter, HTTPException, status
+from sqlmodel import select
+from app.api.deps import CurrentUser, SessionDep
 from datetime import datetime
 from decimal import Decimal
 from app.model.order import (
@@ -13,7 +13,6 @@ from app.model.order import (
 from app.model.portfolio import Portfolio, PortfolioPosition
 from app.model.stock import StockData
 from app.model.company import Company
-from app.model.user import User
 from app.model.funds import AccountTransaction, TransactionType
 from app.model.trade import Trade
 
@@ -30,8 +29,8 @@ def _safe_decimal(value) -> Decimal:
 @router.post("/", response_model=OrderPublic)
 def create_order(
 	order: OrderCreate,
-	current_user: User = Depends(get_current_user),
-	session: Session = Depends(get_session_dep)
+	current_user: CurrentUser,
+	session: SessionDep
 ):
 	"""Create a new order"""
 	# Validate stock exists
@@ -246,10 +245,10 @@ def create_order(
 
 @router.get("/", response_model=List[OrderPublic])
 def get_user_orders(
+	current_user: CurrentUser,
+	session: SessionDep,
 	portfolio_id: Optional[UUID] = None,
-	status: Optional[OrderStatus] = None,
-	current_user: User = Depends(get_current_user),
-	session: Session = Depends(get_session_dep)
+	status: Optional[OrderStatus] = None
 ):
 	"""Get all orders for the current user"""
 	query = select(Order).where(Order.user_id == current_user.id)
@@ -266,10 +265,10 @@ def get_user_orders(
 
 @router.get("/with-details", response_model=List[OrderWithDetails])
 def get_user_orders_with_details(
+    current_user: CurrentUser,
+    session: SessionDep,
     portfolio_id: Optional[UUID] = None,
     status: Optional[OrderStatus] = None,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep),
 ):
     """Get all orders for the current user including stock symbol and company name"""
     query = select(Order, Company).join(Company, Order.stock_id == Company.id).where(Order.user_id == current_user.id)
@@ -297,8 +296,8 @@ def get_user_orders_with_details(
 @router.get("/{order_id}", response_model=OrderPublic)
 def get_order(
 	order_id: UUID,
-	current_user: User = Depends(get_current_user),
-	session: Session = Depends(get_session_dep)
+	current_user: CurrentUser,
+	session: SessionDep
 ):
 	"""Get a specific order by ID"""
 	order = session.exec(
@@ -321,8 +320,8 @@ def get_order(
 def update_order(
 	order_id: UUID,
 	order_update: OrderUpdate,
-	current_user: User = Depends(get_current_user),
-	session: Session = Depends(get_session_dep)
+	current_user: CurrentUser,
+	session: SessionDep
 ):
 	"""Update an order"""
 	order = session.exec(
@@ -358,8 +357,8 @@ def update_order(
 @router.delete("/{order_id}")
 def cancel_order(
 	order_id: UUID,
-	current_user: User = Depends(get_current_user),
-	session: Session = Depends(get_session_dep)
+	current_user: CurrentUser,
+	session: SessionDep
 ):
 	"""Cancel an order"""
 	order = session.exec(
@@ -394,8 +393,8 @@ def cancel_order(
 @router.get("/{order_id}/executions", response_model=List[OrderExecutionPublic])
 def get_order_executions(
 	order_id: UUID,
-	current_user: User = Depends(get_current_user),
-	session: Session = Depends(get_session_dep)
+	current_user: CurrentUser,
+	session: SessionDep
 ):
 	"""Get executions for a specific order"""
 	order = session.exec(
@@ -421,9 +420,9 @@ def get_order_executions(
 
 @router.get("/summary", response_model=OrderSummary)
 def get_order_summary(
-	portfolio_id: Optional[UUID] = None,
-	current_user: User = Depends(get_current_user),
-	session: Session = Depends(get_session_dep)
+	current_user: CurrentUser,
+	session: SessionDep,
+	portfolio_id: Optional[UUID] = None
 ):
 	"""Get order summary for the user"""
 	query = select(Order).where(Order.user_id == current_user.id)

@@ -1,13 +1,12 @@
 from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import select, Session
-from app.api.deps import get_current_user, get_session_dep
+from fastapi import APIRouter, HTTPException, status
+from sqlmodel import select
+from app.api.deps import CurrentUser, SessionDep
 from app.model.portfolio import (
     Watchlist, WatchlistCreate, WatchlistUpdate, WatchlistPublic,
     WatchlistItem, WatchlistItemCreate, WatchlistItemPublic
 )
-from app.model.user import User
 from app.model.company import Company
 from pydantic import BaseModel
 
@@ -18,8 +17,8 @@ router = APIRouter(prefix="/watchlist", tags=["watchlist"])
 @router.post("/", response_model=WatchlistPublic)
 def create_watchlist(
     watchlist: WatchlistCreate,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    current_user: CurrentUser,
+    session: SessionDep
 ):
     """Create a new watchlist for the current user"""
     # Check if this is the first watchlist (make it default)
@@ -48,8 +47,8 @@ def create_watchlist(
 
 @router.get("/", response_model=List[WatchlistPublic])
 def get_user_watchlists(
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    current_user: CurrentUser,
+    session: SessionDep
 ):
     """Get all watchlists for the current user"""
     watchlists = session.exec(
@@ -61,8 +60,8 @@ def get_user_watchlists(
 @router.get("/{watchlist_id}", response_model=WatchlistPublic)
 def get_watchlist(
     watchlist_id: UUID,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    current_user: CurrentUser,
+    session: SessionDep
 ):
     """Get a specific watchlist by ID"""
     watchlist = session.exec(
@@ -85,8 +84,8 @@ def get_watchlist(
 def update_watchlist(
     watchlist_id: UUID,
     watchlist_update: WatchlistUpdate,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    current_user: CurrentUser,
+    session: SessionDep
 ):
     """Update a watchlist"""
     watchlist = session.exec(
@@ -127,8 +126,8 @@ def update_watchlist(
 @router.delete("/{watchlist_id}")
 def delete_watchlist(
     watchlist_id: UUID,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    current_user: CurrentUser,
+    session: SessionDep
 ):
     """Delete a watchlist"""
     watchlist = session.exec(
@@ -168,8 +167,8 @@ def delete_watchlist(
 def add_watchlist_item(
     watchlist_id: UUID,
     item: WatchlistItemCreate,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    current_user: CurrentUser,
+    session: SessionDep
 ):
     """Add a new stock to a watchlist"""
     # Verify watchlist belongs to user
@@ -226,8 +225,8 @@ def add_watchlist_item(
 @router.get("/{watchlist_id}/items", response_model=List[WatchlistItemPublic])
 def get_watchlist_items(
     watchlist_id: UUID,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    current_user: CurrentUser,
+    session: SessionDep
 ):
     """Get all items in a watchlist"""
     # Verify watchlist belongs to user
@@ -257,9 +256,9 @@ def get_watchlist_items(
 def update_watchlist_item(
     watchlist_id: UUID,
     item_id: UUID,
-    notes: Optional[str] = None,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    current_user: CurrentUser,
+    session: SessionDep,
+    notes: Optional[str] = None
 ):
     """Update a watchlist item (currently only notes can be updated)"""
     # Verify watchlist belongs to user
@@ -302,8 +301,8 @@ def update_watchlist_item(
 def remove_watchlist_item(
     watchlist_id: UUID,
     item_id: UUID,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    current_user: CurrentUser,
+    session: SessionDep
 ):
     """Remove a stock from watchlist"""
     # Verify watchlist belongs to user
@@ -343,8 +342,8 @@ def remove_watchlist_item(
 def add_multiple_stocks(
     watchlist_id: UUID,
     stock_ids: List[UUID],
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    current_user: CurrentUser,
+    session: SessionDep
 ):
     """Add multiple stocks to a watchlist at once"""
     # Verify watchlist belongs to user
@@ -410,8 +409,8 @@ class BulkRemoveRequest(BaseModel):
 def remove_multiple_stocks(
     watchlist_id: UUID,
     payload: BulkRemoveRequest,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    current_user: CurrentUser,
+    session: SessionDep
 ):
     """Remove multiple stocks from a watchlist at once.
     Accepts either explicit watchlist item IDs or stock IDs within the watchlist.
@@ -468,8 +467,8 @@ class BulkSymbolsRequest(BaseModel):
 def add_multiple_by_symbols(
     watchlist_id: UUID,
     payload: BulkSymbolsRequest,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    current_user: CurrentUser,
+    session: SessionDep
 ):
     """Add multiple symbols (tickers) to a watchlist by their symbol string.
     Symbols that do not match any known stock will be skipped.
@@ -519,10 +518,10 @@ def add_multiple_by_symbols(
 # Search stocks to add to watchlist
 @router.get("/search/stocks")
 def search_stocks(
+    current_user: CurrentUser,
+    session: SessionDep,
     query: str,
-    limit: int = 10,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    limit: int = 10
 ):
     """Search for stocks to add to watchlist"""
     if len(query) < 2:
@@ -555,8 +554,8 @@ def search_stocks(
 @router.get("/{watchlist_id}/items/with-details")
 def get_watchlist_items_with_details(
     watchlist_id: UUID,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep)
+    current_user: CurrentUser,
+    session: SessionDep
 ):
     """Get watchlist items with stock details"""
     # Verify watchlist belongs to user

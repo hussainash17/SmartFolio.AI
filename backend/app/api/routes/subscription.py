@@ -1,40 +1,35 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Dict, List
-from uuid import UUID
+from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import Session, select
+from fastapi import APIRouter, HTTPException, status
+from sqlmodel import select
 
-from app.api.deps import get_current_user, get_session_dep
+from app.api.deps import SessionDep, CurrentUser
 from app.model.subscription import (
     Payment,
-    PaymentCreate,
-    PaymentPublic,
     PaymentRequest,
     PaymentResponse,
     SubscriptionPlan,
     SubscriptionPlanCreate,
     SubscriptionPlanPublic,
-    SubscriptionPlanUpdate,
     SubscriptionStatus,
     UserSubscription,
     UserSubscriptionCreate,
     UserSubscriptionPublic,
 )
-from app.model.user import User
 
-router = APIRouter(prefix="/subscriptions", tags=["subscriptions"]) 
+router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
 
 @router.get("/plans", response_model=List[SubscriptionPlanPublic])
-def list_plans(session: Session = Depends(get_session_dep)):
+def list_plans(session: SessionDep):
     return session.exec(select(SubscriptionPlan).where(SubscriptionPlan.is_active == True)).all()  # noqa: E712
 
 
 @router.post("/plans", response_model=SubscriptionPlanPublic)
-def create_plan(plan: SubscriptionPlanCreate, session: Session = Depends(get_session_dep)):
+def create_plan(plan: SubscriptionPlanCreate, session: SessionDep):
     db_plan = SubscriptionPlan(**plan.dict())
     session.add(db_plan)
     session.commit()
@@ -44,9 +39,9 @@ def create_plan(plan: SubscriptionPlanCreate, session: Session = Depends(get_ses
 
 @router.post("/", response_model=UserSubscriptionPublic)
 def subscribe(
-    payload: UserSubscriptionCreate,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep),
+        payload: UserSubscriptionCreate,
+        current_user: CurrentUser,
+        session: SessionDep,
 ):
     plan = session.get(SubscriptionPlan, payload.plan_id)
     if not plan or not plan.is_active:
@@ -67,7 +62,7 @@ def subscribe(
 
 
 @router.get("/status", response_model=SubscriptionStatus)
-def status_check(current_user: User = Depends(get_current_user), session: Session = Depends(get_session_dep)):
+def status_check(current_user: CurrentUser, session: SessionDep):
     sub = session.exec(
         select(UserSubscription)
         .where(UserSubscription.user_id == current_user.id)
@@ -91,9 +86,9 @@ def status_check(current_user: User = Depends(get_current_user), session: Sessio
 
 @router.post("/payments/bkash", response_model=PaymentResponse)
 def bkash_payment(
-    req: PaymentRequest,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep),
+        req: PaymentRequest,
+        current_user: CurrentUser,
+        session: SessionDep,
 ):
     # Placeholder flow: create payment record with pending status and fake transaction id
     payment = Payment(

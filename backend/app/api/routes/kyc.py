@@ -5,16 +5,17 @@ This module provides REST endpoints for KYC (Know Your Customer) functionality
 using the service layer for business logic.
 """
 
-from typing import List, Annotated
+from typing import List
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
 
-from app.api.deps import get_current_user, get_session_dep
+from app.api.deps import CurrentUser, SessionDep
 from app.model.user import (
-    User, 
-    KYCInformationCreate, 
-    KYCInformationUpdate, 
+    User,
+    KYCInformationCreate,
+    KYCInformationUpdate,
     KYCInformationPublic,
     UserInvestmentGoalCreate,
     UserInvestmentGoalUpdate,
@@ -32,25 +33,29 @@ from app.model.user import (
     ProductRecommendationResponse,
     GoalAlertResponse,
 )
-from app.services.kyc_service import KYCService, InvestmentGoalService, UserAccountService, ServiceException
 from app.services.goal_service import EnhancedInvestmentGoalService
+from app.services.kyc_service import KYCService, InvestmentGoalService, UserAccountService, ServiceException
 
 router = APIRouter(prefix="/kyc", tags=["kyc"])
 
+
 # Dependency injection for services
-def get_kyc_service(session: Session = Depends(get_session_dep)) -> KYCService:
+def get_kyc_service(session: SessionDep) -> KYCService:
     """Get KYC service instance with database session."""
     return KYCService(session)
 
-def get_investment_goal_service(session: Session = Depends(get_session_dep)) -> InvestmentGoalService:
+
+def get_investment_goal_service(session: SessionDep) -> InvestmentGoalService:
     """Get Investment Goal service instance with database session."""
     return InvestmentGoalService(session)
 
-def get_enhanced_goal_service(session: Session = Depends(get_session_dep)) -> EnhancedInvestmentGoalService:
+
+def get_enhanced_goal_service(session: SessionDep) -> EnhancedInvestmentGoalService:
     """Get Enhanced Investment Goal service instance with database session."""
     return EnhancedInvestmentGoalService(session)
 
-def get_user_account_service(session: Session = Depends(get_session_dep)) -> UserAccountService:
+
+def get_user_account_service(session: SessionDep) -> UserAccountService:
     """Get User Account service instance with database session."""
     return UserAccountService(session)
 
@@ -58,9 +63,9 @@ def get_user_account_service(session: Session = Depends(get_session_dep)) -> Use
 # KYC Information Management
 @router.post("/information", response_model=KYCInformationPublic)
 def create_kyc_information(
-    kyc_info: KYCInformationCreate,
-    current_user: User = Depends(get_current_user),
-    kyc_service: KYCService = Depends(get_kyc_service)
+        kyc_info: KYCInformationCreate,
+        current_user: CurrentUser,
+        kyc_service: KYCService = Depends(get_kyc_service)
 ):
     """Submit KYC information for verification."""
     try:
@@ -71,8 +76,8 @@ def create_kyc_information(
 
 @router.get("/information", response_model=KYCInformationPublic)
 def get_kyc_information(
-    current_user: User = Depends(get_current_user),
-    kyc_service: KYCService = Depends(get_kyc_service)
+        current_user: CurrentUser,
+        kyc_service: KYCService = Depends(get_kyc_service)
 ):
     """Get user's KYC information."""
     try:
@@ -89,9 +94,9 @@ def get_kyc_information(
 
 @router.put("/information", response_model=KYCInformationPublic)
 def update_kyc_information(
-    kyc_update: KYCInformationUpdate,
-    current_user: User = Depends(get_current_user),
-    kyc_service: KYCService = Depends(get_kyc_service)
+        kyc_update: KYCInformationUpdate,
+        current_user: CurrentUser,
+        kyc_service: KYCService = Depends(get_kyc_service)
 ):
     """Update KYC information."""
     try:
@@ -108,8 +113,8 @@ def update_kyc_information(
 
 @router.get("/status")
 def get_kyc_status(
-    current_user: User = Depends(get_current_user),
-    kyc_service: KYCService = Depends(get_kyc_service)
+        current_user: CurrentUser,
+        kyc_service: KYCService = Depends(get_kyc_service)
 ):
     """Get KYC verification status."""
     try:
@@ -121,9 +126,9 @@ def get_kyc_status(
 # Investment Goals Management
 @router.post("/goals", response_model=UserInvestmentGoalPublic)
 def create_investment_goal(
-    goal: UserInvestmentGoalCreate,
-    current_user: User = Depends(get_current_user),
-    goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
+        goal: UserInvestmentGoalCreate,
+        current_user: CurrentUser,
+        goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
 ):
     """Create a new investment goal with automatic calculations."""
     try:
@@ -134,8 +139,8 @@ def create_investment_goal(
 
 @router.get("/goals", response_model=List[UserInvestmentGoalPublic])
 def get_investment_goals(
-    current_user: User = Depends(get_current_user),
-    goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
+        current_user: CurrentUser,
+        goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
 ):
     """Get user's investment goals with all calculated fields."""
     try:
@@ -146,10 +151,10 @@ def get_investment_goals(
 
 @router.put("/goals/{goal_id}", response_model=UserInvestmentGoalPublic)
 def update_investment_goal(
-    goal_id: UUID,
-    goal_update: UserInvestmentGoalUpdate,
-    current_user: User = Depends(get_current_user),
-    goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
+        goal_id: UUID,
+        goal_update: UserInvestmentGoalUpdate,
+        current_user: CurrentUser,
+        goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
 ):
     """Update an investment goal with automatic recalculations."""
     try:
@@ -166,9 +171,9 @@ def update_investment_goal(
 
 @router.delete("/goals/{goal_id}")
 def delete_investment_goal(
-    goal_id: UUID,
-    current_user: User = Depends(get_current_user),
-    goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
+        goal_id: UUID,
+        current_user: CurrentUser,
+        goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
 ):
     """Delete an investment goal."""
     try:
@@ -186,10 +191,10 @@ def delete_investment_goal(
 # Goal Contributions Management
 @router.post("/goals/{goal_id}/contributions", response_model=UserInvestmentGoalContributionPublic)
 def create_goal_contribution(
-    goal_id: UUID,
-    contribution: UserInvestmentGoalContributionCreate,
-    current_user: User = Depends(get_current_user),
-    goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
+        goal_id: UUID,
+        contribution: UserInvestmentGoalContributionCreate,
+        current_user: CurrentUser,
+        goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
 ):
     """Add a contribution to an investment goal and update progress."""
     try:
@@ -200,9 +205,9 @@ def create_goal_contribution(
 
 @router.get("/goals/{goal_id}/contributions", response_model=List[UserInvestmentGoalContributionPublic])
 def list_goal_contributions(
-    goal_id: UUID,
-    current_user: User = Depends(get_current_user),
-    goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
+        goal_id: UUID,
+        current_user: CurrentUser,
+        goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
 ):
     """List contributions for an investment goal."""
     try:
@@ -213,9 +218,9 @@ def list_goal_contributions(
 
 @router.delete("/goals/contributions/{contribution_id}")
 def delete_goal_contribution(
-    contribution_id: UUID,
-    current_user: User = Depends(get_current_user),
-    goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
+        contribution_id: UUID,
+        current_user: CurrentUser,
+        goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
 ):
     """Delete an investment goal contribution."""
     try:
@@ -234,9 +239,9 @@ def delete_goal_contribution(
 
 @router.post("/goals/{goal_id}/calculate-sip", response_model=SIPCalculationResult)
 def calculate_goal_sip(
-    goal_id: UUID,
-    current_user: User = Depends(get_current_user),
-    goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
+        goal_id: UUID,
+        current_user: CurrentUser,
+        goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
 ):
     """Calculate required monthly SIP for achieving the goal."""
     try:
@@ -247,9 +252,9 @@ def calculate_goal_sip(
 
 @router.get("/goals/{goal_id}/progress", response_model=GoalProgressResponse)
 def get_goal_progress(
-    goal_id: UUID,
-    current_user: User = Depends(get_current_user),
-    goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
+        goal_id: UUID,
+        current_user: CurrentUser,
+        goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
 ):
     """Get detailed progress information for a goal."""
     try:
@@ -260,10 +265,10 @@ def get_goal_progress(
 
 @router.post("/goals/{goal_id}/what-if", response_model=WhatIfScenarioResponse)
 def calculate_what_if_scenario(
-    goal_id: UUID,
-    scenario: WhatIfScenarioRequest,
-    current_user: User = Depends(get_current_user),
-    goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
+        goal_id: UUID,
+        scenario: WhatIfScenarioRequest,
+        current_user: CurrentUser,
+        goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
 ):
     """Calculate what-if scenarios for a goal (e.g., increase SIP, delay goal, change returns)."""
     try:
@@ -274,9 +279,9 @@ def calculate_what_if_scenario(
 
 @router.get("/goals/{goal_id}/asset-allocation", response_model=AssetAllocationRecommendation)
 def get_asset_allocation_recommendation(
-    goal_id: UUID,
-    current_user: User = Depends(get_current_user),
-    goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
+        goal_id: UUID,
+        current_user: CurrentUser,
+        goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
 ):
     """Get asset allocation recommendation based on goal, risk profile, and time horizon."""
     try:
@@ -287,9 +292,9 @@ def get_asset_allocation_recommendation(
 
 @router.get("/goals/{goal_id}/recommendations", response_model=ProductRecommendationResponse)
 def get_product_recommendations(
-    goal_id: UUID,
-    current_user: User = Depends(get_current_user),
-    goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
+        goal_id: UUID,
+        current_user: CurrentUser,
+        goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
 ):
     """Get investment product recommendations (mutual funds, ETFs, stocks, bonds) for a goal."""
     try:
@@ -300,9 +305,9 @@ def get_product_recommendations(
 
 @router.get("/goals/{goal_id}/alerts", response_model=GoalAlertResponse)
 def get_goal_alerts(
-    goal_id: UUID,
-    current_user: User = Depends(get_current_user),
-    goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
+        goal_id: UUID,
+        current_user: CurrentUser,
+        goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
 ):
     """Get alerts for a goal (drift, milestones, rebalancing, review reminders)."""
     try:
@@ -314,9 +319,9 @@ def get_goal_alerts(
 # User Account Management
 @router.post("/accounts", response_model=UserAccountPublic)
 def create_user_account(
-    account: UserAccountCreate,
-    current_user: User = Depends(get_current_user),
-    account_service: UserAccountService = Depends(get_user_account_service)
+        account: UserAccountCreate,
+        current_user: CurrentUser,
+        account_service: UserAccountService = Depends(get_user_account_service)
 ):
     """Create a new user account."""
     try:
@@ -327,8 +332,8 @@ def create_user_account(
 
 @router.get("/accounts", response_model=List[UserAccountPublic])
 def get_user_accounts(
-    current_user: User = Depends(get_current_user),
-    account_service: UserAccountService = Depends(get_user_account_service)
+        current_user: CurrentUser,
+        account_service: UserAccountService = Depends(get_user_account_service)
 ):
     """Get user's accounts."""
     try:
@@ -339,10 +344,10 @@ def get_user_accounts(
 
 @router.put("/accounts/{account_id}", response_model=UserAccountPublic)
 def update_user_account(
-    account_id: UUID,
-    account_update: UserAccountUpdate,
-    current_user: User = Depends(get_current_user),
-    account_service: UserAccountService = Depends(get_user_account_service)
+        account_id: UUID,
+        account_update: UserAccountUpdate,
+        current_user: CurrentUser,
+        account_service: UserAccountService = Depends(get_user_account_service)
 ):
     """Update a user account."""
     try:
@@ -359,9 +364,9 @@ def update_user_account(
 
 @router.delete("/accounts/{account_id}")
 def delete_user_account(
-    account_id: UUID,
-    current_user: User = Depends(get_current_user),
-    account_service: UserAccountService = Depends(get_user_account_service)
+        account_id: UUID,
+        current_user: CurrentUser,
+        account_service: UserAccountService = Depends(get_user_account_service)
 ):
     """Deactivate a user account."""
     try:

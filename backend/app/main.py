@@ -1,15 +1,16 @@
+from contextlib import asynccontextmanager
+
 import sentry_sdk
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
-from starlette.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-
-from app.core.config import settings
-# Import models to ensure they are initialized before any routers
-from app.model import Company, Item, User, MarketInformation
-from app.api.main import api_router
-import app.model as _models  # noqa: F401 - ensure all models are imported and mappers registered
 from sqlalchemy.orm import configure_mappers
+from starlette.middleware.cors import CORSMiddleware
+
+import app.model as _models  # noqa: F401 - ensure all models are imported and mappers registered
+# Import models to ensure they are initialized before any routers
+from app.api.main import api_router
+from app.core.config import settings
+
 configure_mappers()
 
 
@@ -22,12 +23,14 @@ def custom_generate_unique_id(route: APIRoute) -> str:
 if settings.SENTRY_DSN and settings.ENVIRONMENT != "local":
     sentry_sdk.init(dsn=str(settings.SENTRY_DSN), enable_tracing=True)
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup code
     # Application initialization can go here
     yield
     # Shutdown code can go here
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

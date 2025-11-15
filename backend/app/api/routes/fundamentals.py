@@ -5,15 +5,12 @@ This module provides comprehensive fundamental analysis endpoints for stocks.
 All endpoints follow RESTful conventions and return normalized JSON responses.
 """
 
-from typing import List, Optional
 from decimal import Decimal
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlmodel import Session
+from typing import List, Optional
 
-from app.api.deps import get_session_dep, get_current_user
-from app.model.user import User
-from app.services.fundamental_service import FundamentalAnalysisService
-from app.services.base import ServiceException
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from app.api.deps import SessionDep, CurrentUser
 from app.model.fundamental_schemas import (
     CompanyBasicInfo,
     MarketSummary,
@@ -26,11 +23,13 @@ from app.model.fundamental_schemas import (
     CompanySearchResult,
     FundamentalDataAvailability
 )
+from app.services.base import ServiceException
+from app.services.fundamental_service import FundamentalAnalysisService
 
 router = APIRouter(prefix="/fundamentals", tags=["fundamentals"])
 
 
-def get_fundamental_service(session: Session = Depends(get_session_dep)) -> FundamentalAnalysisService:
+def get_fundamental_service(session: SessionDep) -> FundamentalAnalysisService:
     """Dependency to get fundamental analysis service"""
     return FundamentalAnalysisService(session=session)
 
@@ -45,9 +44,9 @@ def get_fundamental_service(session: Session = Depends(get_session_dep)) -> Fund
     description="Fetch all basic company information for the fundamental analysis tab"
 )
 def get_company_info(
-    trading_code: str,
-    current_user: User = Depends(get_current_user),
-    service: FundamentalAnalysisService = Depends(get_fundamental_service)
+        trading_code: str,
+        current_user: CurrentUser,
+        service: FundamentalAnalysisService = Depends(get_fundamental_service)
 ) -> CompanyBasicInfo:
     """
     Get basic company information including:
@@ -76,9 +75,9 @@ def get_company_info(
     description="Provide key market indicators, valuation metrics, and financial highlights"
 )
 def get_market_summary(
-    trading_code: str,
-    current_user: User = Depends(get_current_user),
-    service: FundamentalAnalysisService = Depends(get_fundamental_service)
+        trading_code: str,
+        current_user: CurrentUser,
+        service: FundamentalAnalysisService = Depends(get_fundamental_service)
 ) -> MarketSummary:
     """
     Get market summary including:
@@ -109,9 +108,9 @@ def get_market_summary(
     description="Show detailed shareholding distribution and recent changes"
 )
 def get_shareholding_pattern(
-    trading_code: str,
-    current_user: User = Depends(get_current_user),
-    service: FundamentalAnalysisService = Depends(get_fundamental_service)
+        trading_code: str,
+        current_user: CurrentUser,
+        service: FundamentalAnalysisService = Depends(get_fundamental_service)
 ) -> ShareholdingPattern:
     """
     Get shareholding pattern including:
@@ -140,9 +139,9 @@ def get_shareholding_pattern(
     description="Retrieve EPS and profit trends by quarter and year"
 )
 def get_earnings_profit(
-    trading_code: str,
-    current_user: User = Depends(get_current_user),
-    service: FundamentalAnalysisService = Depends(get_fundamental_service)
+        trading_code: str,
+        current_user: CurrentUser,
+        service: FundamentalAnalysisService = Depends(get_fundamental_service)
 ) -> EarningsProfitResponse:
     """
     Get earnings and profit data including:
@@ -169,9 +168,9 @@ def get_earnings_profit(
     description="Display loan status, reserves, and balance sheet stability indicators"
 )
 def get_financial_health(
-    trading_code: str,
-    current_user: User = Depends(get_current_user),
-    service: FundamentalAnalysisService = Depends(get_fundamental_service)
+        trading_code: str,
+        current_user: CurrentUser,
+        service: FundamentalAnalysisService = Depends(get_fundamental_service)
 ) -> FinancialHealth:
     """
     Get financial health including:
@@ -200,10 +199,9 @@ def get_financial_health(
     description="Provide annual dividend information (cash, stock, yield)"
 )
 def get_dividend_history(
-    trading_code: str,
-    limit: int = Query(10, ge=1, le=20, description="Number of years to retrieve"),
-    current_user: User = Depends(get_current_user),
-    service: FundamentalAnalysisService = Depends(get_fundamental_service)
+        trading_code: str,
+        limit: int = Query(10, ge=1, le=20, description="Number of years to retrieve"),
+        service: FundamentalAnalysisService = Depends(get_fundamental_service)
 ) -> List[DividendHistory]:
     """
     Get dividend history including:
@@ -230,10 +228,9 @@ def get_dividend_history(
     description="Return historical P/E, EPS, NAV, and profit data for charts"
 )
 def get_historical_ratios(
-    trading_code: str,
-    years: int = Query(5, ge=1, le=10, description="Number of years of history"),
-    current_user: User = Depends(get_current_user),
-    service: FundamentalAnalysisService = Depends(get_fundamental_service)
+        trading_code: str,
+        years: int = Query(5, ge=1, le=10, description="Number of years of history"),
+        service: FundamentalAnalysisService = Depends(get_fundamental_service)
 ) -> HistoricalRatios:
     """
     Get historical ratios including:
@@ -261,13 +258,12 @@ def get_historical_ratios(
     description="Compare key financial indicators among multiple companies"
 )
 def compare_companies(
-    codes: str = Query(
-        ..., 
-        description="Comma-separated trading codes (e.g., 'BATBC,SQURPHARMA,OLYMPIC')",
-        example="BATBC,SQURPHARMA,OLYMPIC"
-    ),
-    current_user: User = Depends(get_current_user),
-    service: FundamentalAnalysisService = Depends(get_fundamental_service)
+        codes: str = Query(
+            ...,
+            description="Comma-separated trading codes (e.g., 'BATBC,SQURPHARMA,OLYMPIC')",
+            example="BATBC,SQURPHARMA,OLYMPIC"
+        ),
+        service: FundamentalAnalysisService = Depends(get_fundamental_service)
 ) -> List[CompanyComparison]:
     """
     Compare companies on:
@@ -284,19 +280,19 @@ def compare_companies(
     try:
         # Parse comma-separated codes
         trading_codes = [code.strip().upper() for code in codes.split(',') if code.strip()]
-        
+
         if not trading_codes:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="At least one trading code must be provided"
             )
-        
+
         if len(trading_codes) > 10:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Maximum 10 companies can be compared at once"
             )
-        
+
         return service.compare_companies(trading_codes)
     except ServiceException as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
@@ -312,14 +308,13 @@ def compare_companies(
     description="Filter companies based on category, sector, or performance range"
 )
 def search_companies(
-    sector: Optional[str] = Query(None, description="Filter by sector (e.g., 'Food & Allied')"),
-    category: Optional[str] = Query(None, description="Filter by category (A, B, G, N, Z)"),
-    min_pe: Optional[Decimal] = Query(None, ge=0, description="Minimum P/E ratio"),
-    max_pe: Optional[Decimal] = Query(None, ge=0, description="Maximum P/E ratio"),
-    min_dividend_yield: Optional[Decimal] = Query(None, ge=0, description="Minimum dividend yield %"),
-    limit: int = Query(50, ge=1, le=100, description="Maximum results to return"),
-    current_user: User = Depends(get_current_user),
-    service: FundamentalAnalysisService = Depends(get_fundamental_service)
+        sector: Optional[str] = Query(None, description="Filter by sector (e.g., 'Food & Allied')"),
+        category: Optional[str] = Query(None, description="Filter by category (A, B, G, N, Z)"),
+        min_pe: Optional[Decimal] = Query(None, ge=0, description="Minimum P/E ratio"),
+        max_pe: Optional[Decimal] = Query(None, ge=0, description="Maximum P/E ratio"),
+        min_dividend_yield: Optional[Decimal] = Query(None, ge=0, description="Minimum dividend yield %"),
+        limit: int = Query(50, ge=1, le=100, description="Maximum results to return"),
+        service: FundamentalAnalysisService = Depends(get_fundamental_service)
 ) -> List[CompanySearchResult]:
     """
     Search companies with filters:
@@ -358,9 +353,9 @@ def search_companies(
     description="Check what fundamental data is available for a company"
 )
 def check_data_availability(
-    trading_code: str,
-    current_user: User = Depends(get_current_user),
-    service: FundamentalAnalysisService = Depends(get_fundamental_service)
+        trading_code: str,
+        current_user: CurrentUser,
+        service: FundamentalAnalysisService = Depends(get_fundamental_service)
 ) -> FundamentalDataAvailability:
     """
     Check data availability for a company:
@@ -379,4 +374,3 @@ def check_data_availability(
         return service.check_data_availability(trading_code)
     except ServiceException as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
-

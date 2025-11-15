@@ -2,10 +2,11 @@ from decimal import Decimal
 from typing import Dict, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
-from sqlmodel import select, Session
+from fastapi import APIRouter, HTTPException, status, UploadFile, File
+from sqlmodel import select
 
-from app.api.deps import get_current_user, get_session_dep
+from app.api.deps import CurrentUser, SessionDep
+from app.model.company import Company
 from app.model.funds import AccountTransaction, TransactionType
 from app.model.order import Order, OrderStatus
 from app.model.portfolio import (
@@ -13,15 +14,13 @@ from app.model.portfolio import (
     PortfolioPosition, PortfolioPositionPublic,
     PortfolioSummary
 )
-from app.model.company import Company
-from app.model.stock import StockData
-from app.model.trade import Trade, TradeCreate, TradeUpdate, TradePublic, TradeWithDetails
-from app.model.user import User
 from app.model.portfolio_statement import (
     PortfolioStatementResponse,
     BulkHoldingsSaveRequest,
     BulkHoldingsSaveResponse,
 )
+from app.model.stock import StockData
+from app.model.trade import Trade, TradeCreate, TradeUpdate, TradePublic, TradeWithDetails
 from app.services.holdings_service import HoldingsService
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
@@ -31,8 +30,8 @@ router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 @router.post("/", response_model=PortfolioPublic)
 def create_portfolio(
         portfolio: PortfolioCreate,
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep)
+        session: SessionDep,
+        current_user: CurrentUser
 ):
     """Create a new portfolio for the current user"""
     # Check if this is the first portfolio (make it default)
@@ -61,8 +60,8 @@ def create_portfolio(
 
 @router.get("/", response_model=List[PortfolioPublic])
 def get_user_portfolios(
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep)
+        current_user: CurrentUser,
+        session: SessionDep
 ):
     """Get all portfolios for the current user"""
     portfolios = session.exec(
@@ -74,8 +73,8 @@ def get_user_portfolios(
 @router.get("/{portfolio_id}", response_model=PortfolioPublic)
 def get_portfolio(
         portfolio_id: UUID,
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep)
+        current_user: CurrentUser,
+        session: SessionDep
 ):
     """Get a specific portfolio by ID"""
     portfolio = session.exec(
@@ -98,8 +97,8 @@ def get_portfolio(
 def update_portfolio(
         portfolio_id: UUID,
         portfolio_update: PortfolioUpdate,
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep)
+        current_user: CurrentUser,
+        session: SessionDep
 ):
     """Update a portfolio"""
     portfolio = session.exec(
@@ -144,8 +143,8 @@ def update_portfolio(
 @router.delete("/{portfolio_id}")
 def delete_portfolio(
         portfolio_id: UUID,
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep)
+        current_user: CurrentUser,
+        session: SessionDep
 ):
     """Delete a portfolio"""
     portfolio = session.exec(
@@ -187,8 +186,8 @@ def add_position(
         stock_symbol: str,
         quantity: int,
         average_price: float,
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep)
+        current_user: CurrentUser,
+        session: SessionDep
 ):
     """Add a new position to a portfolio"""
     # Verify portfolio belongs to user
@@ -275,8 +274,8 @@ def add_position(
 @router.get("/{portfolio_id}/positions", response_model=List[PortfolioPositionPublic])
 def get_portfolio_positions(
         portfolio_id: UUID,
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep)
+        current_user: CurrentUser,
+        session: SessionDep
 ):
     """Get all positions in a portfolio"""
     # Verify portfolio belongs to user
@@ -305,25 +304,25 @@ def get_portfolio_positions(
 @router.get("/positions/by-symbol/{symbol}")
 def get_positions_by_symbol(
         symbol: str,
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep)
+        current_user: CurrentUser,
+        session: SessionDep
 ):
     """Get all positions for a specific symbol across all user portfolios"""
     # Find the stock by symbol
     stock = session.exec(
         select(Company).where(Company.trading_code == symbol.upper())
     ).first()
-    
+
     if not stock:
         return []
-    
+
     # Get all portfolios for the user
     portfolios = session.exec(
         select(Portfolio).where(Portfolio.user_id == current_user.id)
     ).all()
-    
+
     portfolio_ids = [p.id for p in portfolios]
-    
+
     # Get positions for this stock across all user portfolios
     positions = session.exec(
         select(PortfolioPosition, Portfolio, Company)
@@ -334,7 +333,7 @@ def get_positions_by_symbol(
             PortfolioPosition.portfolio_id.in_(portfolio_ids)
         )
     ).all()
-    
+
     result = []
     for position, portfolio, company in positions:
         result.append({
@@ -351,15 +350,15 @@ def get_positions_by_symbol(
             "unrealized_pnl": float(position.unrealized_pnl) if position.unrealized_pnl else None,
             "last_updated": position.last_updated,
         })
-    
+
     return result
 
 
 @router.get("/{portfolio_id}/positions/with-details")
 def get_portfolio_positions_with_details(
         portfolio_id: UUID,
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep)
+        current_user: CurrentUser,
+        session: SessionDep
 ):
     """Get all positions in a portfolio with stock details"""
     # Verify portfolio belongs to user
@@ -448,10 +447,10 @@ def get_portfolio_positions_with_details(
 def update_position(
         portfolio_id: UUID,
         position_id: UUID,
+        current_user: CurrentUser,
+        session: SessionDep,
         quantity: Optional[int] = None,
         average_price: Optional[float] = None,
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep)
 ):
     """Update a portfolio position"""
     # Verify portfolio belongs to user
@@ -545,8 +544,8 @@ def update_position(
 def remove_position(
         portfolio_id: UUID,
         position_id: UUID,
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep)
+        current_user: CurrentUser,
+        session: SessionDep
 ):
     """Remove a position from portfolio and return cash"""
     # Verify portfolio belongs to user
@@ -607,8 +606,8 @@ def remove_position(
 def add_trade(
         portfolio_id: UUID,
         trade: TradeCreate,
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep)
+        current_user: CurrentUser,
+        session: SessionDep
 ):
     """Add a new trade to a portfolio and update cash/ledger"""
     # Verify portfolio belongs to user
@@ -675,8 +674,8 @@ def add_trade(
 @router.get("/{portfolio_id}/trades", response_model=List[TradePublic])
 def get_portfolio_trades(
         portfolio_id: UUID,
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep)
+        current_user: CurrentUser,
+        session: SessionDep
 ):
     """Get all trades in a portfolio"""
     # Verify portfolio belongs to user
@@ -705,8 +704,8 @@ def update_trade(
         portfolio_id: UUID,
         trade_id: UUID,
         trade_update: TradeUpdate,
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep)
+        current_user: CurrentUser,
+        session: SessionDep
 ):
     """Update a trade"""
     # Verify portfolio belongs to user
@@ -750,8 +749,8 @@ def update_trade(
 def delete_trade(
         portfolio_id: UUID,
         trade_id: UUID,
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep)
+        current_user: CurrentUser,
+        session: SessionDep
 ):
     """Delete a trade"""
     # Verify portfolio belongs to user
@@ -790,8 +789,8 @@ def delete_trade(
 @router.get("/{portfolio_id}/summary", response_model=PortfolioSummary)
 def get_portfolio_summary(
         portfolio_id: UUID,
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep)
+        current_user: CurrentUser,
+        session: SessionDep
 ):
     """Get portfolio summary with positions and performance metrics"""
     # Verify portfolio belongs to user
@@ -863,9 +862,9 @@ def get_portfolio_summary(
 
 @router.get("/trades/recent", response_model=List[TradeWithDetails])
 def get_recent_trades(
-        limit: int = 20,
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep),
+        current_user: CurrentUser,
+        session: SessionDep,
+        limit: int = 20
 ):
     """Get recent executed trades across all portfolios for current user"""
     # Find user's portfolios
@@ -894,8 +893,8 @@ def get_recent_trades(
 
 @router.get("/orders-trades/summary")
 def get_orders_trades_summary(
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep),
+        current_user: CurrentUser,
+        session: SessionDep,
 ):
     """Summary for Orders & Trades dashboard boxes."""
     # Pending orders
@@ -943,10 +942,10 @@ def get_orders_trades_summary(
 @router.post("/{portfolio_id}/upload-statement", response_model=PortfolioStatementResponse)
 async def upload_portfolio_statement(
         portfolio_id: UUID,
+        current_user: CurrentUser,
+        session: SessionDep,
         file: UploadFile = File(...),
         broker_house: Optional[str] = None,
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep),
 ):
     """
     Upload and parse a portfolio statement PDF file.
@@ -982,13 +981,13 @@ async def upload_portfolio_statement(
             Portfolio.user_id == current_user.id
         )
     ).first()
-    
+
     if not portfolio:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Portfolio not found"
         )
-    
+
     # Validate broker_house parameter if provided
     if broker_house:
         broker_house = broker_house.lower().strip()
@@ -998,7 +997,7 @@ async def upload_portfolio_statement(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Unsupported broker house: '{broker_house}'. Supported values: {', '.join(supported_brokers)}"
             )
-    
+
     # Parse the PDF with specified broker and database session for stock matching
     try:
         # Initialize parser with database session for stock lookup
@@ -1019,8 +1018,8 @@ async def upload_portfolio_statement(
 def save_bulk_holdings(
         portfolio_id: UUID,
         request: BulkHoldingsSaveRequest,
-        current_user: User = Depends(get_current_user),
-        session: Session = Depends(get_session_dep),
+        current_user: CurrentUser,
+        session: SessionDep,
 ):
     """
     Save parsed holdings from portfolio statement to the database.
@@ -1052,7 +1051,7 @@ def save_bulk_holdings(
             request=request,
         )
         return result
-        
+
     except HTTPException:
         raise
     except Exception as e:

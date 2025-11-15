@@ -1,28 +1,25 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from decimal import Decimal
 from typing import Any, Dict, List, Optional
-from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlmodel import Session, select, func, desc
+from fastapi import APIRouter, HTTPException, Query, status
+from sqlmodel import select, func, desc
 
-from app.api.deps import get_session_dep
+from app.api.deps import SessionDep
+from app.model.company import Company
 from app.model.stock import (
     DailyOHLC,
     IntradayTick,
     MarketSummary,
     StockData,
-    StockDataPublic,
 )
-from app.model.company import Company, CompanyPublic
 
-router = APIRouter(prefix="/market", tags=["market"]) 
+router = APIRouter(prefix="/market", tags=["market"])
 
 
 @router.get("/summary")
-def get_market_summary(session: Session = Depends(get_session_dep)) -> Dict[str, Any]:
+def get_market_summary(MarketSummary, session: SessionDep) -> Dict[str, Any]:
     latest = session.exec(
         select(MarketSummary).order_by(MarketSummary.timestamp.desc()).limit(1)
     ).first()
@@ -36,10 +33,12 @@ def get_market_summary(session: Session = Depends(get_session_dep)) -> Dict[str,
         "total_turnover": str(latest.total_turnover),
         "dse_index": str(latest.dse_index) if latest.dse_index is not None else None,
         "dse_index_change": str(latest.dse_index_change) if latest.dse_index_change is not None else None,
-        "dse_index_change_percent": str(latest.dse_index_change_percent) if latest.dse_index_change_percent is not None else None,
+        "dse_index_change_percent": str(
+            latest.dse_index_change_percent) if latest.dse_index_change_percent is not None else None,
         "cse_index": str(latest.cse_index) if latest.cse_index is not None else None,
         "cse_index_change": str(latest.cse_index_change) if latest.cse_index_change is not None else None,
-        "cse_index_change_percent": str(latest.cse_index_change_percent) if latest.cse_index_change_percent is not None else None,
+        "cse_index_change_percent": str(
+            latest.cse_index_change_percent) if latest.cse_index_change_percent is not None else None,
         "advancers": latest.advancers,
         "decliners": latest.decliners,
         "unchanged": latest.unchanged,
@@ -49,11 +48,11 @@ def get_market_summary(session: Session = Depends(get_session_dep)) -> Dict[str,
 
 @router.get("/stocks")
 def list_stocks(
-    q: Optional[str] = Query(None, description="Search by symbol or company name"),
-    sector: Optional[str] = None,
-    limit: int = Query(50, ge=1, le=500),
-    offset: int = Query(0, ge=0),
-    session: Session = Depends(get_session_dep),
+        session: SessionDep,
+        q: Optional[str] = Query(None, description="Search by symbol or company name"),
+        sector: Optional[str] = None,
+        limit: int = Query(50, ge=1, le=500),
+        offset: int = Query(0, ge=0),
 ) -> List[Dict[str, Any]]:
     stmt = select(Company)
     if q:
@@ -82,7 +81,7 @@ def list_stocks(
                 market_cap = (float(latest_data.last_trade_price) * company.total_outstanding_securities) / 10_000_000
             except (ValueError, TypeError):
                 market_cap = None
-        
+
         result.append(
             {
                 "id": str(company.id),
@@ -104,7 +103,7 @@ def list_stocks(
 
 
 @router.get("/stocks/{symbol}")
-def get_stock(symbol: str, session: Session = Depends(get_session_dep)) -> Dict[str, Any]:
+def get_stock(symbol: str, session: SessionDep) -> Dict[str, Any]:
     company = session.exec(select(Company).where(Company.trading_code == symbol.upper())).first()
     if not company:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stock not found")
@@ -124,7 +123,7 @@ def get_stock(symbol: str, session: Session = Depends(get_session_dep)) -> Dict[
             market_cap = (float(latest_data.last_trade_price) * company.total_outstanding_securities) / 10_000_000
         except (ValueError, TypeError):
             market_cap = None
-    
+
     return {
         "id": str(company.id),
         "symbol": company.trading_code,
@@ -153,11 +152,11 @@ def get_stock(symbol: str, session: Session = Depends(get_session_dep)) -> Dict[
 
 @router.get("/stocks/{symbol}/chart")
 def get_chart_data(
-    symbol: str,
-    timeframe: str = Query(
-        "1D", description="1D (intraday ticks), 1W, 1M, 3M, 6M, 1Y, 2Y, 5Y, ALL for daily OHLC"
-    ),
-    session: Session = Depends(get_session_dep),
+        session: SessionDep,
+        symbol: str,
+        timeframe: str = Query(
+            "1D", description="1D (intraday ticks), 1W, 1M, 3M, 6M, 1Y, 2Y, 5Y, ALL for daily OHLC"
+        ),
 ) -> Dict[str, Any]:
     company = session.exec(select(Company).where(Company.trading_code == symbol.upper())).first()
     if not company:
@@ -222,8 +221,8 @@ def get_chart_data(
 
 @router.get("/top-movers")
 def get_top_movers(
-    limit: int = Query(10, ge=1, le=50),
-    session: Session = Depends(get_session_dep),
+        session: SessionDep,
+        limit: int = Query(10, ge=1, le=50),
 ) -> Dict[str, List[Dict[str, Any]]]:
     # Determine latest timestamp across StockData
     latest_time_row = session.exec(
@@ -271,8 +270,8 @@ def get_top_movers(
 
 @router.get("/most-active")
 def get_most_active(
-    limit: int = Query(10, ge=1, le=50),
-    session: Session = Depends(get_session_dep),
+        session: SessionDep,
+        limit: int = Query(10, ge=1, le=50),
 ) -> List[Dict[str, Any]]:
     # Determine latest timestamp across StockData
     latest_time_row = session.exec(
@@ -308,8 +307,8 @@ def get_most_active(
 
 @router.get("/indices")
 def get_indices(
-    days: int = Query(5, ge=1, le=90),
-    session: Session = Depends(get_session_dep),
+        session: SessionDep,
+        days: int = Query(5, ge=1, le=90),
 ) -> Dict[str, Any]:
     """Return index levels and short history for sparklines.
     Currently supports DSEX from MarketSummary; DS30 and DSES are placeholders until scraped.
@@ -338,7 +337,8 @@ def get_indices(
         "DSEX": {
             "level": float(latest.dse_index) if latest and latest.dse_index is not None else None,
             "change": float(latest.dse_index_change) if latest and latest.dse_index_change is not None else None,
-            "change_percent": float(latest.dse_index_change_percent) if latest and latest.dse_index_change_percent is not None else None,
+            "change_percent": float(
+                latest.dse_index_change_percent) if latest and latest.dse_index_change_percent is not None else None,
             "series": dsex_series,
         },
         "DS30": {
@@ -356,14 +356,15 @@ def get_indices(
         "CSE": {
             "level": float(latest.cse_index) if latest and latest.cse_index is not None else None,
             "change": float(latest.cse_index_change) if latest and latest.cse_index_change is not None else None,
-            "change_percent": float(latest.cse_index_change_percent) if latest and latest.cse_index_change_percent is not None else None,
+            "change_percent": float(
+                latest.cse_index_change_percent) if latest and latest.cse_index_change_percent is not None else None,
             "series": cse_series,
         },
     }
 
 
 @router.get("/turnover/compare")
-def get_turnover_compare(session: Session = Depends(get_session_dep)) -> Dict[str, Any]:
+def get_turnover_compare(session: SessionDep) -> Dict[str, Any]:
     """Compare latest total_turnover with previous trading day's total_turnover."""
     latest = session.exec(
         select(MarketSummary).order_by(MarketSummary.timestamp.desc()).limit(1)
@@ -386,7 +387,7 @@ def get_turnover_compare(session: Session = Depends(get_session_dep)) -> Dict[st
 
 
 @router.get("/flows")
-def get_market_flows(session: Session = Depends(get_session_dep)) -> Dict[str, Any]:
+def get_market_flows(session: SessionDep) -> Dict[str, Any]:
     """Return placeholder market flow data: insider/institutional/foreign flows.
     Replace with real data sources when available.
     """
@@ -402,7 +403,7 @@ def get_market_flows(session: Session = Depends(get_session_dep)) -> Dict[str, A
         ],
         "foreign_net_flow": {
             "net_buy_value": 12_500_000.0,
-            "trend": [ -1.2, 0.5, 0.8, -0.3, 1.9, 2.1, 0.4 ],
+            "trend": [-1.2, 0.5, 0.8, -0.3, 1.9, 2.1, 0.4],
         },
     }
 
@@ -431,11 +432,15 @@ def get_upcoming_events(limit: int = Query(20, ge=1, le=100)) -> Dict[str, Any]:
     base_date = datetime.utcnow()
     events: List[Dict[str, Any]] = []
     for i in range(1, min(limit, 20) + 1):
-        events.append({"type": "AGM", "company": f"COMP{i:03d}", "date": base_date + timedelta(days=i), "note": "Annual General Meeting"})
+        events.append({"type": "AGM", "company": f"COMP{i:03d}", "date": base_date + timedelta(days=i),
+                       "note": "Annual General Meeting"})
         if i % 3 == 0:
-            events.append({"type": "EGM", "company": f"COMP{i:03d}", "date": base_date + timedelta(days=i+1), "note": "Extraordinary General Meeting"})
+            events.append({"type": "EGM", "company": f"COMP{i:03d}", "date": base_date + timedelta(days=i + 1),
+                           "note": "Extraordinary General Meeting"})
         if i % 4 == 0:
-            events.append({"type": "RECORD", "company": f"COMP{i:03d}", "date": base_date + timedelta(days=i+2), "note": "Record Date"})
+            events.append({"type": "RECORD", "company": f"COMP{i:03d}", "date": base_date + timedelta(days=i + 2),
+                           "note": "Record Date"})
         if i % 5 == 0:
-            events.append({"type": "IPO", "company": f"IPO{i:03d}", "date": base_date + timedelta(days=i+3), "note": "IPO Listing"})
+            events.append({"type": "IPO", "company": f"IPO{i:03d}", "date": base_date + timedelta(days=i + 3),
+                           "note": "IPO Listing"})
     return {"events": events}

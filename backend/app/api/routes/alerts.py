@@ -2,26 +2,25 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import List, Optional
+from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from sqlmodel import Session, select
 
-from app.api.deps import get_current_user, get_session_dep
+from app.api.deps import CurrentUser, SessionDep
 from app.model.alert import Alert, AlertCreate, AlertPublic, AlertUpdate, News
 from app.model.stock import StockData
-from app.model.company import Company
 from app.model.user import User
 
-router = APIRouter(prefix="/alerts", tags=["alerts"]) 
+router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 
 @router.post("/", response_model=AlertPublic)
 def create_alert(
-    alert_in: AlertCreate,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep),
+        alert_in: AlertCreate,
+        current_user: CurrentUser,
+        session: SessionDep,
 ):
     db_alert = Alert(
         user_id=current_user.id,
@@ -36,8 +35,8 @@ def create_alert(
 
 @router.get("/", response_model=List[AlertPublic])
 def list_alerts(
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep),
+        current_user: CurrentUser,
+        session: SessionDep,
 ):
     alerts = session.exec(select(Alert).where(Alert.user_id == current_user.id)).all()
     return alerts
@@ -45,10 +44,10 @@ def list_alerts(
 
 @router.put("/{alert_id}", response_model=AlertPublic)
 def update_alert(
-    alert_id: UUID,
-    alert_update: AlertUpdate,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep),
+        alert_id: UUID,
+        alert_update: AlertUpdate,
+        current_user: CurrentUser,
+        session: SessionDep,
 ):
     alert = session.get(Alert, alert_id)
     if not alert or alert.user_id != current_user.id:
@@ -67,9 +66,9 @@ def update_alert(
 
 @router.delete("/{alert_id}", status_code=204)
 def delete_alert(
-    alert_id: UUID,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep),
+        alert_id: UUID,
+        current_user: CurrentUser,
+        session: SessionDep,
 ):
     alert = session.get(Alert, alert_id)
     if not alert or alert.user_id != current_user.id:
@@ -80,9 +79,9 @@ def delete_alert(
 
 @router.get("/{alert_id}/evaluate", response_model=AlertPublic)
 def evaluate_alert(
-    alert_id: UUID,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session_dep),
+        alert_id: UUID,
+        current_user: CurrentUser,
+        session: SessionDep,
 ):
     alert = session.get(Alert, alert_id)
     if not alert or alert.user_id != current_user.id:

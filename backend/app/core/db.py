@@ -1,10 +1,28 @@
+from sqlalchemy import QueuePool
 from sqlmodel import Session, create_engine, select
-from contextlib import contextmanager
 
 from app import crud
 from app.core.config import settings
 
-engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI))
+engine = create_engine(
+    str(settings.SQLALCHEMY_DATABASE_URI),
+    # Connection Pool Settings
+    poolclass=QueuePool,
+    pool_size=20,  # Maximum number of permanent connections
+    max_overflow=40,  # Maximum number of temporary connections
+    pool_timeout=30,  # Seconds to wait before timing out
+    pool_recycle=3600,  # Recycle connections after 1 hour (3600 seconds)
+    pool_pre_ping=True,  # Verify connections before using them
+
+    # Additional useful settings
+    echo=True,  # Set to True to log all SQL queries (useful for debugging)
+    echo_pool=False,  # Set to True to log pool checkouts/checkins
+    connect_args={
+        "connect_timeout": 10,  # Connection timeout in seconds
+        # "options": "-c timezone=utc"  # Set timezone if needed
+    }
+)
+
 
 # make sure all SQLModel model are imported (app.model) before initializing DB
 # otherwise, SQLModel might fail to initialize relationships properly
@@ -13,6 +31,7 @@ engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI))
 def get_session():
     with Session(engine) as session:
         yield session
+
 
 def init_db(session: Session) -> None:
     # Import here to avoid circular import at module level
