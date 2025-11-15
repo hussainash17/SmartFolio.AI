@@ -7,6 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Input } from "./ui/input";
+import { Textarea } from "./ui/textarea";
 import { 
   Shield, 
   AlertTriangle, 
@@ -22,7 +24,9 @@ import {
   Gauge,
   Zap,
   Loader2,
-  Briefcase
+  Briefcase,
+  Plus,
+  X
 } from "lucide-react";
 import { usePortfolios } from "../hooks/usePortfolios";
 import { 
@@ -33,13 +37,15 @@ import {
   useCorrelationAnalysis,
   useStressTests,
   useRiskAlerts,
-  useUserRiskProfile
+  useUserRiskProfile,
+  useCreateRiskAlert
 } from "../hooks/useRisk";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface RiskAnalysisProps {
   onNavigate: (view: string) => void;
   onQuickTrade: (symbol?: string, side?: 'buy' | 'sell') => void;
+  selectedPortfolioId?: string;
 }
 
 interface RiskMetric {
@@ -51,21 +57,34 @@ interface RiskMetric {
   change?: number;
 }
 
-export function RiskAnalysis({ onNavigate, onQuickTrade }: RiskAnalysisProps) {
+export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: initialPortfolioId }: RiskAnalysisProps) {
   const [selectedTimeframe, setSelectedTimeframe] = useState('1Y');
   const queryClient = useQueryClient();
+  
+  // Create alert modal state
+  const [showCreateAlert, setShowCreateAlert] = useState(false);
+  const [alertForm, setAlertForm] = useState({
+    alert_type: '',
+    severity: 'medium',
+    message: '',
+    metric_value: '',
+    threshold_value: '',
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Get portfolios list
   const { portfolios, loading: portfoliosLoading } = usePortfolios();
   
-  // Manage selected portfolio internally - default to first portfolio or default portfolio
-  const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(null);
+  // Manage selected portfolio internally - default to passed portfolio or first portfolio
+  const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(initialPortfolioId || null);
   
-  // Initialize with default portfolio or first portfolio when portfolios load
+  // Initialize with passed portfolio, default portfolio, or first portfolio when portfolios load
   useEffect(() => {
-    if (!selectedPortfolioId && portfolios.length > 0) {
+    if (initialPortfolioId) {
+      setSelectedPortfolioId(initialPortfolioId);
+    } else if (!selectedPortfolioId && portfolios.length > 0) {
       // Try to find default portfolio first
-      const defaultPortfolio = portfolios.find(p => p.isDefault);
+      const defaultPortfolio = portfolios.find(p => (p as any).isDefault);
       if (defaultPortfolio) {
         setSelectedPortfolioId(defaultPortfolio.id);
       } else {
@@ -73,7 +92,7 @@ export function RiskAnalysis({ onNavigate, onQuickTrade }: RiskAnalysisProps) {
         setSelectedPortfolioId(portfolios[0].id);
       }
     }
-  }, [portfolios, selectedPortfolioId]);
+  }, [portfolios, initialPortfolioId]);
   
   // Use selected portfolio for queries
   const portfolioId = selectedPortfolioId;
@@ -110,6 +129,46 @@ export function RiskAnalysis({ onNavigate, onQuickTrade }: RiskAnalysisProps) {
   const { data: riskAlertsData, isLoading: alertsLoading } = useRiskAlerts(portfolioId, true);
   
   const { data: riskProfile } = useUserRiskProfile();
+  
+  // Create risk alert mutation
+  const createAlertMutation = useCreateRiskAlert();
+  
+  const handleCreateAlert = async () => {
+    if (!alertForm.alert_type.trim() || !alertForm.message.trim()) {
+      alert('Please fill in Alert Type and Message');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    try {
+      await createAlertMutation.mutateAsync({
+        portfolio_id: portfolioId || undefined,
+        alert_type: alertForm.alert_type,
+        severity: alertForm.severity,
+        message: alertForm.message,
+        metric_value: alertForm.metric_value ? Number(alertForm.metric_value) : undefined,
+        threshold_value: alertForm.threshold_value ? Number(alertForm.threshold_value) : undefined,
+      });
+      
+      // Reset form and close modal
+      setAlertForm({
+        alert_type: '',
+        severity: 'medium',
+        message: '',
+        metric_value: '',
+        threshold_value: '',
+      });
+      setShowCreateAlert(false);
+      
+      // Refresh alerts
+      queryClient.invalidateQueries({ queryKey: ['risk', 'alerts'] });
+    } catch (error) {
+      console.error('Failed to create alert:', error);
+      alert('Failed to create alert. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -311,6 +370,10 @@ export function RiskAnalysis({ onNavigate, onQuickTrade }: RiskAnalysisProps) {
           <Button variant="outline">
             <Download className="h-4 w-4 mr-2" />
             Risk Report
+          </Button>
+          <Button onClick={() => setShowCreateAlert(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Alert
           </Button>
           <Button onClick={handleRefresh} disabled={isLoading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
@@ -711,6 +774,106 @@ export function RiskAnalysis({ onNavigate, onQuickTrade }: RiskAnalysisProps) {
             </TabsContent>
           </Tabs>
         </>
+      )}
+
+      {/* Create Risk Alert Modal */}
+      {showCreateAlert && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle>Create Risk Alert</CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowCreateAlert(false)}
+                disabled={isSubmitting}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Alert Type *</label>
+                <Input
+                  placeholder="e.g., High Volatility, Concentration Risk"
+                  value={alertForm.alert_type}
+                  onChange={(e) => setAlertForm({ ...alertForm, alert_type: e.target.value })}
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Severity *</label>
+                <Select
+                  value={alertForm.severity}
+                  onValueChange={(value) => setAlertForm({ ...alertForm, severity: value })}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Message *</label>
+                <Textarea
+                  placeholder="Describe the alert..."
+                  value={alertForm.message}
+                  onChange={(e) => setAlertForm({ ...alertForm, message: e.target.value })}
+                  disabled={isSubmitting}
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Metric Value</label>
+                  <Input
+                    type="number"
+                    placeholder="e.g., 25.5"
+                    value={alertForm.metric_value}
+                    onChange={(e) => setAlertForm({ ...alertForm, metric_value: e.target.value })}
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Threshold Value</label>
+                  <Input
+                    type="number"
+                    placeholder="e.g., 20.0"
+                    value={alertForm.threshold_value}
+                    onChange={(e) => setAlertForm({ ...alertForm, threshold_value: e.target.value })}
+                    disabled={isSubmitting}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCreateAlert(false)}
+                  disabled={isSubmitting}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateAlert}
+                  disabled={isSubmitting}
+                  className="flex-1"
+                >
+                  {isSubmitting ? 'Creating...' : 'Create Alert'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );

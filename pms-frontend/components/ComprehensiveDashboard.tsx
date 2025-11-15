@@ -21,11 +21,12 @@ import {
 } from "lucide-react";
 import { AccountBalance, Order, Transaction, NewsItem, MarketData as MarketDataType } from "../types/trading";
 import { useEffect, useMemo, useState } from "react";
-import { AnalyticsService, RiskManagementService, KycService, OpenAPI } from "../src/client";
+import { AnalyticsService, RiskManagementService, KycService, OpenAPI, PerformanceService } from "../src/client";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "../hooks/queryKeys";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { usePortfolios } from "../hooks/usePortfolios";
+import { useRiskAlerts, useRiskOverview } from "../hooks/useRisk";
 import {
   useCurrentValue,
   usePerformanceReturns,
@@ -222,19 +223,20 @@ export function ComprehensiveDashboard({
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 
-  const { data: riskAlerts = [] } = useQuery({
-    queryKey: queryKeys.riskAlerts(selectedPortfolioId),
-    enabled: !!selectedPortfolioId,
-    queryFn: async () => {
-      if (!selectedPortfolioId) return [] as Array<{ type: string; message: string; severity: 'low' | 'medium' | 'high' }>;
-      const alerts = await RiskManagementService.getRiskAlerts({ portfolioId: selectedPortfolioId });
-      return (alerts as any[]).map((a) => ({
-        type: String(a.alert_type || 'info'),
-        message: String(a.message || ''),
-        severity: String((a.severity || 'LOW')).toLowerCase() as 'low' | 'medium' | 'high',
-      }));
-    },
-  });
+  // Fetch active risk alerts
+  const { data: riskAlertsData = [], isLoading: riskAlertsLoading } = useRiskAlerts(selectedPortfolioId, true);
+  
+  // Transform raw alerts to display format
+  const riskAlerts = useMemo(() => {
+    return (riskAlertsData as any[]).map((a) => ({
+      type: String(a.alert_type || 'info'),
+      message: String(a.message || ''),
+      severity: String((a.severity || 'LOW')).toLowerCase() as 'low' | 'medium' | 'high',
+    }));
+  }, [riskAlertsData]);
+
+  // Fetch risk overview metrics
+  const { data: riskOverview, isLoading: riskOverviewLoading } = useRiskOverview(selectedPortfolioId, '1M');
 
   // Fetch user risk profile
   const { data: riskProfile } = useQuery({
@@ -438,7 +440,7 @@ export function ComprehensiveDashboard({
               </CardContent>
             </Card>
 
-            {/* Risk Alerts */}
+            {/* Risk Alerts & Recommendations */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -446,23 +448,87 @@ export function ComprehensiveDashboard({
                   Risk Alerts & Recommendations
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {riskAlerts.map((alert, index) => (
-                    <div key={index} className={`p-3 rounded-lg border ${
-                      alert.severity === 'high' ? 'bg-red-50 border-red-200' : alert.severity === 'medium' ? 'bg-yellow-50 border-yellow-200' : 'bg-emerald-50 border-emerald-200'
-                    }`}>
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className={`h-4 w-4 ${alert.severity === 'high' ? 'text-red-600' : alert.severity === 'medium' ? 'text-yellow-600' : 'text-emerald-600'}`} />
-                        <span className="text-sm font-medium">{alert.type.toUpperCase()}</span>
-                      </div>
-                      <p className="text-sm mt-1">{alert.message}</p>
-                    </div>
-                  ))}
+              <CardContent className="space-y-4">
+                {/* Alert Summary Grid */}
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                    <div className="text-xs text-muted-foreground">Total</div>
+                    <div className="text-lg font-bold">{riskAlerts.length}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+                    <div className="text-xs text-red-600">High</div>
+                    <div className="text-lg font-bold text-red-600">{riskAlerts.filter(a => a.severity === 'high').length}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-yellow-50 border border-yellow-200">
+                    <div className="text-xs text-yellow-600">Medium</div>
+                    <div className="text-lg font-bold text-yellow-600">{riskAlerts.filter(a => a.severity === 'medium').length}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+                    <div className="text-xs text-emerald-600">Low</div>
+                    <div className="text-lg font-bold text-emerald-600">{riskAlerts.filter(a => a.severity === 'low').length}</div>
+                  </div>
                 </div>
+
+                {/* Risk Overview Metrics Grid */}
+                {riskOverviewLoading ? (
+                  <div className="grid grid-cols-4 gap-2">
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} className="h-16 bg-muted rounded animate-pulse" />
+                    ))}
+                  </div>
+                ) : riskOverview ? (
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="p-3 rounded-lg border">
+                      <div className="text-xs text-muted-foreground">Risk Score</div>
+                      <div className="text-lg font-bold">{riskOverview.riskScore?.toFixed(1) || '—'}</div>
+                    </div>
+                    <div className="p-3 rounded-lg border">
+                      <div className="text-xs text-muted-foreground">Volatility</div>
+                      <div className="text-lg font-bold">{riskOverview.volatility ? `${(riskOverview.volatility * 100).toFixed(1)}%` : '—'}</div>
+                    </div>
+                    <div className="p-3 rounded-lg border">
+                      <div className="text-xs text-muted-foreground">Sharpe</div>
+                      <div className="text-lg font-bold">{riskOverview.sharpeRatio?.toFixed(2) || '—'}</div>
+                    </div>
+                    <div className="p-3 rounded-lg border">
+                      <div className="text-xs text-muted-foreground">Max DD</div>
+                      <div className="text-lg font-bold text-red-600">{riskOverview.maxDrawdown ? `${(riskOverview.maxDrawdown * 100).toFixed(1)}%` : '—'}</div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Top 2 Alerts */}
+                <div className="space-y-2">
+                  {riskAlertsLoading ? (
+                    <>
+                      <div className="h-12 bg-muted rounded animate-pulse" />
+                      <div className="h-12 bg-muted rounded animate-pulse" />
+                    </>
+                  ) : riskAlerts.length === 0 ? (
+                    <div className="text-center py-4">
+                      <Shield className="h-8 w-8 mx-auto text-green-600 mb-2" />
+                      <p className="text-sm text-muted-foreground">No active alerts</p>
+                    </div>
+                  ) : (
+                    riskAlerts.slice(0, 2).map((alert, index) => (
+                      <div key={index} className={`p-3 rounded-lg border text-sm ${
+                        alert.severity === 'high' ? 'bg-red-50 border-red-200' : alert.severity === 'medium' ? 'bg-yellow-50 border-yellow-200' : 'bg-emerald-50 border-emerald-200'
+                      }`}>
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className={`h-4 w-4 mt-0.5 flex-shrink-0 ${alert.severity === 'high' ? 'text-red-600' : alert.severity === 'medium' ? 'text-yellow-600' : 'text-emerald-600'}`} />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium">{alert.type.toUpperCase()}</div>
+                            <p className="text-xs mt-0.5 line-clamp-1">{alert.message}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
                 <Button 
                   variant="outline" 
-                  className="w-full mt-4"
+                  className="w-full"
                   onClick={() => onNavigate('risk-analysis')}
                 >
                   View Risk Analysis

@@ -540,7 +540,7 @@ export default function App() {
             case "risk-analysis":
                 return (
                     <Suspense fallback={<div>Loading Risk Analysis...</div>}>
-                        <RiskAnalysis onNavigate={handleViewChange} onQuickTrade={handleQuickTrade}/>
+                        <RiskAnalysis onNavigate={handleViewChange} onQuickTrade={handleQuickTrade} selectedPortfolioId={selectedPortfolio?.id}/>
                     </Suspense>
                 );
 
