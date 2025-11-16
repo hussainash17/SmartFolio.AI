@@ -57,7 +57,7 @@ public class ScraperProperties {
         private String timezone = "Asia/Dhaka";
         
         // Real-time scraper runs every 1 minute during market hours
-        private String realtimeCron = "0 */1 10-14 * * MON-THU";
+        private String realtimeCron = "0 */1 10-3 * * SUN-THU";
         
         // Fundamental data scraper runs daily at 4 PM after market close
         private String fundamentalCron = "0 0 16 * * MON-THU";
@@ -75,7 +75,7 @@ public class ScraperProperties {
         private String newsCron = "0/30 * * * * *";
 
         // Index instrument scraper runs every 30 seconds
-        private String indexCron = "0/30 * * * * *";
+        private String indexCron = "0 */1 10-3 * * SUN-THU";
     }
 
     @Data

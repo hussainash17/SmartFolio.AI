@@ -6,7 +6,6 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.UUID;
 
 @Getter
 @Setter
@@ -18,7 +17,7 @@ import java.util.UUID;
         uniqueConstraints = @UniqueConstraint(columnNames = {"benchmark_id", "date"}))
 public class BenchmarkData {
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(nullable = false, updatable = false)
     private Integer id;
 

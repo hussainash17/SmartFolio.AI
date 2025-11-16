@@ -268,7 +268,7 @@ export function useValueHistory(
 }
 
 // Hook for benchmark comparison
-export function useBenchmarkComparison(portfolioId: string | null, benchmarkId: string = 'dsex') {
+export function useBenchmarkComparison(portfolioId: string | null, benchmarkId: string = 'DSEX') {
   return useQuery({
     queryKey: queryKeys.benchmarkComparison(portfolioId || '', benchmarkId),
     queryFn: () => fetchPerformanceAPI<BenchmarkComparisonResponse>(

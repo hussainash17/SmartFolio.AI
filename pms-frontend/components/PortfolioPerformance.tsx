@@ -100,7 +100,7 @@ export function PortfolioPerformance({ portfolioId: initialPortfolioId, portfoli
   const { portfolios, loading: portfoliosLoading } = usePortfolios();
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(initialPortfolioId || null);
   const [selectedPeriod, setSelectedPeriod] = useState("YTD");
-  const [selectedBenchmark, setSelectedBenchmark] = useState("dsex");
+  const [selectedBenchmark, setSelectedBenchmark] = useState("DSEX");
   const [showCustomBenchmark, setShowCustomBenchmark] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
 

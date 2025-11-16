@@ -18,7 +18,7 @@ public class IndexInstrumentScheduler {
 
     private final IndexInstrumentScraper indexInstrumentScraper;
 
-    @Scheduled(cron = "${scraper.schedule.index-cron:0/30 * * * * *}",
+    @Scheduled(cron = "${scraper.schedule.index-cron:0 */1 10-3 * * SUN-THU}",
             zone = "${scraper.schedule.timezone:Asia/Dhaka}")
     public void scrapeIndexes() {
         try {
