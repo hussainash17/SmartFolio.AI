@@ -5,14 +5,16 @@ import { Upload, FileText, X, Loader2 } from "lucide-react";
 import { ParsedPortfolioReviewDialog } from "./ParsedPortfolioReviewDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Label } from "./ui/label";
-import { OpenAPI } from "../src/client";
+import { OpenAPI, PortfolioService } from "../src/client";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "../hooks/queryKeys";
 
 interface UploadPortfolioDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  portfolioId: string;
-  portfolioName: string;
+  portfolioId?: string;
+  portfolioName?: string;
 }
 
 export interface ParsedHolding {
@@ -111,6 +113,9 @@ export function UploadPortfolioDialog({
   const [isUploading, setIsUploading] = useState(false);
   const [parsedData, setParsedData] = useState<ParsedPortfolioData | null>(null);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
+  const [createdPortfolioId, setCreatedPortfolioId] = useState<string | null>(null);
+  const [createdPortfolioName, setCreatedPortfolioName] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -137,13 +142,40 @@ export function UploadPortfolioDialog({
     setIsUploading(true);
     
     try {
+      // If no portfolio provided, create one before parsing
+      let targetPortfolioId = portfolioId;
+      let targetPortfolioName = portfolioName;
+      if (!targetPortfolioId) {
+        const suggestedNameParts: string[] = [];
+        if (selectedBroker) suggestedNameParts.push(selectedBroker.toUpperCase());
+        suggestedNameParts.push("Imported Portfolio");
+        const suggestedName = suggestedNameParts.join(" - ");
+        const created = await PortfolioService.createPortfolio({
+          requestBody: {
+            name: suggestedName,
+            description: "Created from uploaded portfolio PDF",
+            is_default: false,
+            is_active: true,
+          },
+        });
+        targetPortfolioId = String((created as any).id);
+        targetPortfolioName = (created as any).name || suggestedName;
+        setCreatedPortfolioId(targetPortfolioId);
+        setCreatedPortfolioName(targetPortfolioName);
+        try {
+          await PortfolioService.updatePortfolio({
+            portfolioId: targetPortfolioId,
+            requestBody: ({ cash_balance: 0 } as unknown) as any,
+          });
+        } catch {}
+      }
       // Upload and parse PDF
       const formData = new FormData();
       formData.append('file', selectedFile);
       
       const baseUrl = (OpenAPI.BASE || '').replace(/\/$/, '');
       const response = await fetch(
-        `${baseUrl}/api/v1/portfolio/${portfolioId}/upload-statement?broker_house=${selectedBroker}`,
+        `${baseUrl}/api/v1/portfolio/${targetPortfolioId}/upload-statement?broker_house=${selectedBroker}`,
         {
           method: 'POST',
           headers: (OpenAPI as any).TOKEN ? { 
@@ -179,7 +211,7 @@ export function UploadPortfolioDialog({
       setParsedData(parsedData);
       setShowReviewDialog(true);
       onOpenChange(false);
-      toast.success('PDF parsed successfully! Please review the data.');
+      toast.success(`PDF parsed successfully! ${targetPortfolioName ? `Target: ${targetPortfolioName}. ` : ''}Please review the data.`);
       
     } catch (error) {
       setIsUploading(false);
@@ -210,12 +242,17 @@ export function UploadPortfolioDialog({
   const handleReviewApprove = async (data: ParsedPortfolioData) => {
     try {
       const baseUrl = (OpenAPI.BASE || '').replace(/\/$/, '');
+      const targetPortfolioId = portfolioId || createdPortfolioId;
+      if (!targetPortfolioId) {
+        toast.error('No portfolio available to save holdings.');
+        return;
+      }
       
       // Transform camelCase to snake_case for backend
       const snakeCaseData = transformToSnakeCase(data);
       
       const response = await fetch(
-        `${baseUrl}/api/v1/portfolio/${portfolioId}/holdings/bulk`,
+        `${baseUrl}/api/v1/portfolio/${targetPortfolioId}/holdings/bulk`,
         {
           method: 'POST',
           headers: {
@@ -241,9 +278,11 @@ export function UploadPortfolioDialog({
       
       // Close dialog and reset state
       handleReviewClose();
-      
-      // Trigger portfolio data refresh (if you have react-query)
-      // queryClient.invalidateQueries({ queryKey: ['portfolios'] });
+      setCreatedPortfolioId(null);
+      setCreatedPortfolioName(null);
+      // Refresh portfolio lists and summary
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
       
     } catch (error) {
       console.error('Save error:', error);
@@ -258,7 +297,9 @@ export function UploadPortfolioDialog({
           <DialogHeader>
             <DialogTitle>Upload Portfolio Statement</DialogTitle>
             <DialogDescription>
-              Upload a PDF statement for {portfolioName}. We'll automatically parse your holdings.
+              {portfolioName
+                ? <>Upload a PDF statement for {portfolioName}. We'll automatically parse your holdings.</>
+                : <>Upload a PDF portfolio statement. We'll create a new portfolio from it and parse your holdings.</>}
             </DialogDescription>
           </DialogHeader>
 

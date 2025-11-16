@@ -9,7 +9,7 @@ from sqlmodel import select, func, and_
 from app.api.deps import CurrentUser, SessionDep
 from app.model.alert import News, StockNews
 from app.model.company import Company
-from app.model.fundamental import FinancialPerformance
+from app.model.fundamental import FinancialPerformance, DividendInformation, LoanStatus
 from app.model.stock import StockData, DailyOHLC
 from app.services.research_service import ResearchService
 
@@ -418,85 +418,251 @@ def get_fundamental_analysis(
 ):
     """Get fundamental analysis data for a stock"""
 
-    # Get stock information
-    stock = session.exec(
-        select(Company).where(Company.trading_code == symbol.upper())
-    ).first()
+    # OPTIMIZATION 1: Single query with joins for latest tick/ohlc/loan
+    from sqlalchemy import and_
+    from app.model.fundamental import LoanStatus as _LoanStatus, DividendInformation as _DividendInformation
 
-    if not stock:
+    query = (
+        select(
+            Company,
+            StockData,
+            DailyOHLC,
+            _LoanStatus
+        )
+        .outerjoin(StockData, Company.id == StockData.company_id)
+        .outerjoin(DailyOHLC, Company.id == DailyOHLC.company_id)
+        .outerjoin(_LoanStatus, Company.id == _LoanStatus.company_id)
+        .where(Company.trading_code == symbol.upper())
+        .order_by(
+            StockData.timestamp.desc(),
+            DailyOHLC.date.desc(),
+        )
+        .limit(1)
+    )
+
+    result = session.exec(query).first()
+
+    if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Stock not found"
         )
 
-    # Mock fundamental data (in real implementation, fetch from financial data API)
-    current_price = float(stock.current_price or 100)
+    stock, latest_tick, latest_ohlc, loan_status = result
 
-    # Mock financial ratios
+    # OPTIMIZATION 2: Batch fetch latest two years of financial + dividend data
+    financial_data = session.exec(
+        select(FinancialPerformance, _DividendInformation)
+        .outerjoin(
+            _DividendInformation,
+            and_(
+                FinancialPerformance.company_id == _DividendInformation.company_id,
+                FinancialPerformance.year == _DividendInformation.year
+            )
+        )
+        .where(FinancialPerformance.company_id == stock.id)
+        .order_by(FinancialPerformance.year.desc())
+        .limit(2)
+    ).all()
+
+    fin_perf = financial_data[0][0] if len(financial_data) > 0 else None
+    latest_div = financial_data[0][1] if len(financial_data) > 0 else None
+    fin_perf_prev = financial_data[1][0] if len(financial_data) > 1 else None
+    prev_div = financial_data[1][1] if len(financial_data) > 1 else None
+
+    # Current price and previous close
+    if latest_tick:
+        current_price = float(latest_tick.last_trade_price)
+        previous_close = float(latest_tick.previous_close)
+        ltp_change = float(latest_tick.change)
+    elif latest_ohlc:
+        current_price = float(latest_ohlc.close_price)
+        previous_close = float(current_price - latest_ohlc.change)
+        ltp_change = float(latest_ohlc.change)
+    else:
+        current_price = float(stock.nav or 0) or 0.0
+        previous_close = current_price
+        ltp_change = 0.0
+
+    # Shares and market cap
+    total_shares = (stock.total_shares or stock.total_outstanding_securities or 0) or 0
+    computed_market_cap = (current_price * total_shares) if total_shares else None
+    market_cap = float(stock.market_cap or 0) if stock.market_cap is not None else (float(computed_market_cap) if computed_market_cap is not None else None)
+
+    # Loan status / EV
+    total_loan = None
+    if loan_status:
+        if loan_status.total_loan is not None:
+            total_loan = float(loan_status.total_loan)
+        else:
+            st = float(loan_status.short_term_loan or 0)
+            lt = float(loan_status.long_term_loan or 0)
+            total_loan = st + lt
+
+    enterprise_value = None
+    if market_cap is not None:
+        enterprise_value = market_cap + (total_loan or 0)
+
+    latest_eps = float(fin_perf.eps_basic) if fin_perf and fin_perf.eps_basic is not None else None
+    latest_nav = float(fin_perf.nav_per_share) if fin_perf and fin_perf.nav_per_share is not None else float(stock.nav or 0) or None
+
+    # Valuation ratios
+    pe_ratio_val = float(stock.pe_ratio) if stock.pe_ratio is not None else (
+        (current_price / latest_eps) if latest_eps and latest_eps != 0 else None
+    )
+    pb_ratio_val = float(stock.pb_ratio) if stock.pb_ratio is not None else (
+        (current_price / latest_nav) if latest_nav and latest_nav != 0 else None
+    )
+
+    # Dividend yield
+    dividend_yield = float(latest_div.yield_percentage) if latest_div and latest_div.yield_percentage is not None else (
+        float(stock.dividend_yield) if stock.dividend_yield is not None else None
+    )
+
+    # Dividend per share
+    dividend_per_share = None
+    if latest_div and latest_div.cash_dividend is not None and stock.face_value:
+        try:
+            dividend_per_share = float(latest_div.cash_dividend) * float(stock.face_value) / 100.0
+        except Exception:
+            dividend_per_share = None
+
+    # EPS growth YoY
+    earnings_growth_1y = None
+    if fin_perf and fin_perf_prev and fin_perf.eps_basic is not None and fin_perf_prev.eps_basic is not None:
+        prev_eps = float(fin_perf_prev.eps_basic)
+        cur_eps = float(fin_perf.eps_basic)
+        if prev_eps != 0:
+            earnings_growth_1y = ((cur_eps - prev_eps) / abs(prev_eps)) * 100.0
+
+    # NAV growth
+    book_value_growth = None
+    if fin_perf and fin_perf_prev and fin_perf.nav_per_share is not None and fin_perf_prev.nav_per_share is not None:
+        prev_nav = float(fin_perf_prev.nav_per_share)
+        cur_nav = float(fin_perf.nav_per_share)
+        if prev_nav != 0:
+            book_value_growth = ((cur_nav - prev_nav) / abs(prev_nav)) * 100.0
+
+    # Dividend growth
+    dividend_growth_rate = None
+    if latest_div and prev_div and latest_div.cash_dividend is not None and prev_div.cash_dividend is not None:
+        prev_cash = float(prev_div.cash_dividend)
+        cur_cash = float(latest_div.cash_dividend)
+        if prev_cash != 0:
+            dividend_growth_rate = ((cur_cash - prev_cash) / abs(prev_cash)) * 100.0
+
+    # Debt to equity: Total debt / Reserve & Surplus
+    reserve_and_surplus = float(stock.reserve_and_surplus or 0) if stock.reserve_and_surplus is not None else None
+    debt_to_equity = None
+    if (total_loan is not None) and reserve_and_surplus and reserve_and_surplus != 0:
+        debt_to_equity = float(total_loan) / float(reserve_and_surplus)
+
+    # Additional derived metrics where feasible with available schema
+    # ROE: profit / equity (approximate equity as reserve_and_surplus)
+    return_on_equity = None
+    if fin_perf and fin_perf.profit is not None and reserve_and_surplus and reserve_and_surplus != 0:
+        try:
+            return_on_equity = (float(fin_perf.profit) / float(reserve_and_surplus)) * 100.0
+        except Exception:
+            return_on_equity = None
+
+    # ROA (approximate): profit / (debt + reserve) when both exist
+    return_on_assets = None
+    if fin_perf and fin_perf.profit is not None and (total_loan is not None) and (reserve_and_surplus is not None):
+        denom_assets_approx = float(total_loan) + float(reserve_and_surplus)
+        if denom_assets_approx > 0:
+            try:
+                return_on_assets = (float(fin_perf.profit) / denom_assets_approx) * 100.0
+            except Exception:
+                return_on_assets = None
+
+    # Debt to Assets (approximate): debt / (debt + reserve)
+    debt_to_assets = None
+    if (total_loan is not None) and (reserve_and_surplus is not None):
+        denom_assets_approx = float(total_loan) + float(reserve_and_surplus)
+        if denom_assets_approx > 0:
+            debt_to_assets = float(total_loan) / denom_assets_approx
+
+    # Payout ratio: total dividends / profit when possible
+    payout_ratio = None
+    if dividend_per_share is not None and total_shares and fin_perf and fin_perf.profit is not None:
+        try:
+            total_dividend_amount = float(dividend_per_share) * float(total_shares)
+            profit_amount = float(fin_perf.profit)
+            if profit_amount != 0:
+                payout_ratio = (total_dividend_amount / profit_amount) * 100.0
+        except Exception:
+            payout_ratio = None
+
     fundamental_data = {
         "basic_info": {
             "symbol": stock.trading_code,
             "name": stock.company_name,
             "sector": stock.sector,
             "current_price": current_price,
-            "market_cap": current_price * 1000000,  # Mock shares outstanding
-            "enterprise_value": current_price * 1100000
+            "previous_close": previous_close,
+            "change": ltp_change,
+            "market_cap": market_cap,
+            "enterprise_value": enterprise_value
         },
         "valuation_ratios": {
-            "pe_ratio": round(15.5 + (hash(symbol) % 20), 2),
-            "peg_ratio": round(1.2 + (hash(symbol) % 30) / 10, 2),
-            "price_to_book": round(2.1 + (hash(symbol) % 40) / 10, 2),
-            "price_to_sales": round(3.2 + (hash(symbol) % 50) / 10, 2),
-            "ev_to_ebitda": round(12.5 + (hash(symbol) % 25), 2),
-            "price_to_cash_flow": round(8.3 + (hash(symbol) % 20), 2)
+            "pe_ratio": pe_ratio_val,
+            "price_to_book": pb_ratio_val,
+            # The following require income statement / cash flow details which are not present in the schema
+            "peg_ratio": None,
+            "price_to_sales": None,
+            "ev_to_ebitda": None,
+            "price_to_cash_flow": None
         },
         "profitability_ratios": {
-            "gross_margin": round(35.5 + (hash(symbol) % 30), 2),
-            "operating_margin": round(12.3 + (hash(symbol) % 20), 2),
-            "net_margin": round(8.7 + (hash(symbol) % 15), 2),
-            "return_on_equity": round(15.2 + (hash(symbol) % 25), 2),
-            "return_on_assets": round(7.8 + (hash(symbol) % 15), 2),
-            "return_on_invested_capital": round(11.4 + (hash(symbol) % 20), 2)
+            # Not derivable precisely from available tables; return None placeholders
+            "gross_margin": None,
+            "operating_margin": None,
+            "net_margin": None,
+            "return_on_equity": return_on_equity,
+            "return_on_assets": return_on_assets,
+            "return_on_invested_capital": None
         },
         "financial_strength": {
-            "debt_to_equity": round(0.3 + (hash(symbol) % 80) / 100, 2),
-            "current_ratio": round(1.5 + (hash(symbol) % 20) / 10, 2),
-            "quick_ratio": round(1.1 + (hash(symbol) % 15) / 10, 2),
-            "interest_coverage": round(5.5 + (hash(symbol) % 30), 2),
-            "debt_to_assets": round(0.25 + (hash(symbol) % 40) / 100, 2)
+            "debt_to_equity": debt_to_equity,
+            "current_ratio": None,
+            "quick_ratio": None,
+            "interest_coverage": None,
+            "debt_to_assets": debt_to_assets
         },
         "growth_metrics": {
-            "revenue_growth_1y": round(-5.0 + (hash(symbol) % 30), 2),
-            "revenue_growth_3y": round(-3.0 + (hash(symbol) % 25), 2),
-            "earnings_growth_1y": round(-8.0 + (hash(symbol) % 40), 2),
-            "earnings_growth_3y": round(-5.0 + (hash(symbol) % 35), 2),
-            "dividend_growth_1y": round(0.0 + (hash(symbol) % 15), 2),
-            "book_value_growth": round(-2.0 + (hash(symbol) % 20), 2)
+            "earnings_growth_1y": earnings_growth_1y,
+            "book_value_growth": book_value_growth,
+            "dividend_growth_1y": dividend_growth_rate
         },
         "dividend_info": {
-            "dividend_yield": round(2.0 + (hash(symbol) % 50) / 10, 2),
-            "dividend_per_share": round(2.5 + (hash(symbol) % 30) / 10, 2),
-            "payout_ratio": round(30.0 + (hash(symbol) % 50), 2),
-            "dividend_growth_rate": round(3.0 + (hash(symbol) % 10), 2)
+            "dividend_yield": dividend_yield,
+            "dividend_per_share": dividend_per_share,
+            "payout_ratio": payout_ratio,
+            "dividend_growth_rate": dividend_growth_rate
         }
     }
 
     # Calculate investment score
     score = 0
-    if fundamental_data["valuation_ratios"]["pe_ratio"] < 20:
+    pe_for_score = fundamental_data["valuation_ratios"]["pe_ratio"]
+    dte_for_score = fundamental_data["financial_strength"]["debt_to_equity"]
+    earn_growth = fundamental_data["growth_metrics"].get("earnings_growth_1y")
+    dy = fundamental_data["dividend_info"]["dividend_yield"]
+
+    if pe_for_score is not None and pe_for_score < 20:
         score += 1
-    if fundamental_data["profitability_ratios"]["return_on_equity"] > 15:
+    # ROE not available; skip
+    if dte_for_score is not None and dte_for_score < 0.5:
         score += 1
-    if fundamental_data["financial_strength"]["debt_to_equity"] < 0.5:
+    if earn_growth is not None and earn_growth > 5:
         score += 1
-    if fundamental_data["growth_metrics"]["revenue_growth_1y"] > 5:
-        score += 1
-    if fundamental_data["dividend_info"]["dividend_yield"] > 2:
+    if dy is not None and dy > 2:
         score += 1
 
     fundamental_data["investment_score"] = {
         "score": score,
-        "max_score": 5,
+        "max_score": 4,
         "rating": "Strong Buy" if score >= 4 else "Buy" if score >= 3 else "Hold" if score >= 2 else "Sell"
     }
 

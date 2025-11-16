@@ -21,6 +21,7 @@ const AccountManager = lazy(() => import("./components/AccountManager").then(m =
 const PortfolioDashboard = lazy(() => import("./components/PortfolioDashboard").then(m => ({default: m.PortfolioDashboard})));
 const PortfolioDetail = lazy(() => import("./components/PortfolioDetail").then(m => ({default: m.PortfolioDetail})));
 const PortfolioForm = lazy(() => import("./components/PortfolioForm").then(m => ({default: m.PortfolioForm})));
+const UploadPortfolioDialog = lazy(() => import("./components/UploadPortfolioDialog").then(m => ({default: m.UploadPortfolioDialog})));
 const StockForm = lazy(() => import("./components/StockForm").then(m => ({default: m.StockForm})));
 const QuickTradeDialog = lazy(() => import("./components/QuickTradeDialog").then(m => ({default: m.QuickTradeDialog})));
 const PortfolioPerformance = lazy(() => import("./components/PortfolioPerformance").then(m => ({default: m.PortfolioPerformance})));
@@ -99,6 +100,7 @@ export default function App() {
     const [currentView, setCurrentView] = useState<View>("dashboard");
     const [isPortfolioFormOpen, setIsPortfolioFormOpen] = useState(false);
     const [isStockFormOpen, setIsStockFormOpen] = useState(false);
+    const [isUploadPortfolioOpen, setIsUploadPortfolioOpen] = useState(false);
     const [isQuickTradeOpen, setIsQuickTradeOpen] = useState(false);
     const [editingStock, setEditingStock] = useState<Stock | null>(null);
     const [quickTradeSymbol, setQuickTradeSymbol] = useState<string | undefined>();
@@ -402,11 +404,13 @@ export default function App() {
                     <Suspense fallback={<div>Loading Portfolio Dashboard...</div>}>
                         <PortfolioDashboard
                             onCreatePortfolio={handleCreatePortfolio}
+                            onUploadPortfolio={() => setIsUploadPortfolioOpen(true)}
                             onSelectPortfolio={handleSelectPortfolio}
                             onQuickTrade={handleQuickTrade}
                             onChartStock={handleChartStock}
                             portfolios={portfoliosWithLivePricing}
                             portfolioSummary={portfolioSummaryDisplay}
+                            selectedPortfolio={selectedPortfolioDisplay}
                         />
                     </Suspense>
                 );
@@ -775,6 +779,13 @@ export default function App() {
                     open={isPortfolioFormOpen}
                     onOpenChange={setIsPortfolioFormOpen}
                     onSubmit={handlePortfolioSubmit}
+                />
+            </Suspense>
+
+            <Suspense fallback={null}>
+                <UploadPortfolioDialog
+                    open={isUploadPortfolioOpen}
+                    onOpenChange={setIsUploadPortfolioOpen}
                 />
             </Suspense>
 

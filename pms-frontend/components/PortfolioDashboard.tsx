@@ -2,19 +2,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { Plus, TrendingUp, TrendingDown, DollarSign, PieChart, BarChart3, ShoppingCart } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, DollarSign, PieChart, BarChart3, ShoppingCart, Upload } from "lucide-react";
 import { Portfolio, PortfolioSummary } from "../types/portfolio";
 
 interface PortfolioDashboardProps {
   onCreatePortfolio: () => void;
+  onUploadPortfolio?: () => void;
   onSelectPortfolio: (portfolio: Portfolio) => void;
   onQuickTrade: (symbol?: string, side?: 'buy' | 'sell') => void;
   onChartStock: (symbol: string) => void;
   portfolios: Portfolio[];
   portfolioSummary: PortfolioSummary;
+  selectedPortfolio?: Portfolio | null;
 }
 
-export function PortfolioDashboard({ onCreatePortfolio, onSelectPortfolio, onQuickTrade, onChartStock, portfolios, portfolioSummary }: PortfolioDashboardProps) {
+export function PortfolioDashboard({ onCreatePortfolio, onUploadPortfolio, onSelectPortfolio, onQuickTrade, onChartStock, portfolios, portfolioSummary, selectedPortfolio }: PortfolioDashboardProps) {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -26,6 +28,13 @@ export function PortfolioDashboard({ onCreatePortfolio, onSelectPortfolio, onQui
     return `${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`;
   };
 
+  // Fallback: if no selected portfolio provided, use the first one when available
+  const portfolioForSummary = selectedPortfolio ?? (portfolios.length > 0 ? portfolios[0] : undefined);
+  const gainLossSelected = portfolioForSummary ? (portfolioForSummary.totalValue - portfolioForSummary.totalCost) : 0;
+  const gainLossPctSelected = portfolioForSummary && portfolioForSummary.totalCost > 0
+    ? (gainLossSelected / portfolioForSummary.totalCost) * 100
+    : 0;
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -34,28 +43,38 @@ export function PortfolioDashboard({ onCreatePortfolio, onSelectPortfolio, onQui
           <h1 className="text-3xl font-semibold text-foreground mb-2">My Portfolios</h1>
           <p className="text-muted-foreground text-lg">Manage and monitor your investment portfolios</p>
         </div>
-        <Button onClick={onCreatePortfolio} size="lg">
-          <Plus className="h-5 w-5 mr-2" />
-          Create Portfolio
-        </Button>
+        <div className="flex items-center gap-2">
+          {onUploadPortfolio && (
+            <Button onClick={onUploadPortfolio} variant="outline" size="lg">
+              <Upload className="h-5 w-5 mr-2" />
+              Upload Portfolio
+            </Button>
+          )}
+          <Button onClick={onCreatePortfolio} size="lg">
+            <Plus className="h-5 w-5 mr-2" />
+            Create Portfolio
+          </Button>
+        </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary Cards (Selected Portfolio) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm">Total Value</CardTitle>
+            <CardTitle className="text-sm">Total Value (Selected)</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{formatCurrency(portfolioSummary.totalValue)}</div>
+            <div className="text-2xl">
+              {portfolioForSummary ? formatCurrency(portfolioForSummary.totalValue) : '-'}
+            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm">Total Gain/Loss</CardTitle>
-            {portfolioSummary.totalGainLoss >= 0 ? (
+            {gainLossSelected >= 0 ? (
               <TrendingUp className="h-4 w-4 text-green-600" />
             ) : (
               <TrendingDown className="h-4 w-4 text-red-600" />
@@ -63,12 +82,12 @@ export function PortfolioDashboard({ onCreatePortfolio, onSelectPortfolio, onQui
           </CardHeader>
           <CardContent>
             <div className="text-2xl">
-              <span className={portfolioSummary.totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}>
-                {formatCurrency(portfolioSummary.totalGainLoss)}
+              <span className={gainLossSelected >= 0 ? 'text-green-600' : 'text-red-600'}>
+                {portfolioForSummary ? formatCurrency(gainLossSelected) : '-'}
               </span>
             </div>
-            <p className={`text-xs ${portfolioSummary.totalGainLossPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {formatPercent(portfolioSummary.totalGainLossPercent)}
+            <p className={`text-xs ${gainLossPctSelected >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {portfolioForSummary ? formatPercent(gainLossPctSelected) : '-'}
             </p>
           </CardContent>
         </Card>
@@ -76,7 +95,7 @@ export function PortfolioDashboard({ onCreatePortfolio, onSelectPortfolio, onQui
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm">Day Change</CardTitle>
-            {portfolioSummary.dayChange >= 0 ? (
+            {(portfolioSummary.dayChange ?? 0) >= 0 ? (
               <TrendingUp className="h-4 w-4 text-green-600" />
             ) : (
               <TrendingDown className="h-4 w-4 text-red-600" />
@@ -84,23 +103,23 @@ export function PortfolioDashboard({ onCreatePortfolio, onSelectPortfolio, onQui
           </CardHeader>
           <CardContent>
             <div className="text-2xl">
-              <span className={portfolioSummary.dayChange >= 0 ? 'text-green-600' : 'text-red-600'}>
-                {formatCurrency(portfolioSummary.dayChange)}
+              <span className={(portfolioSummary.dayChange ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                {formatCurrency(portfolioSummary.dayChange ?? 0)}
               </span>
             </div>
-            <p className={`text-xs ${portfolioSummary.dayChangePercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {formatPercent(portfolioSummary.dayChangePercent)}
+            <p className={`text-xs ${(portfolioSummary.dayChangePercent ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {formatPercent(portfolioSummary.dayChangePercent ?? 0)}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm">Portfolios</CardTitle>
+            <CardTitle className="text-sm">Holdings (Selected)</CardTitle>
             <PieChart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{portfolios.length}</div>
+            <div className="text-2xl">{portfolioForSummary ? portfolioForSummary.stocks.length : 0}</div>
           </CardContent>
         </Card>
       </div>
@@ -155,18 +174,18 @@ export function PortfolioDashboard({ onCreatePortfolio, onSelectPortfolio, onQui
         })}
       </div>
 
-      {/* Default Portfolio Holdings */}
-      {portfolios.length > 0 && portfolios[0].stocks.length > 0 && (
+      {/* Selected Portfolio Holdings */}
+      {portfolioForSummary && portfolioForSummary.stocks.length > 0 && (
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
               <div>
-                <CardTitle>Default Portfolio Holdings</CardTitle>
+                <CardTitle>Selected Portfolio Holdings</CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Showing stocks from: {portfolios[0].name}
+                  Showing stocks from: {portfolioForSummary.name}
                 </p>
               </div>
-              <Button variant="outline" onClick={() => onSelectPortfolio(portfolios[0])}>
+              <Button variant="outline" onClick={() => onSelectPortfolio(portfolioForSummary)}>
                 View Full Details
               </Button>
             </div>
@@ -187,7 +206,7 @@ export function PortfolioDashboard({ onCreatePortfolio, onSelectPortfolio, onQui
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {portfolios[0].stocks.map((stock) => {
+                {portfolioForSummary.stocks.map((stock) => {
                   const marketValue = stock.quantity * stock.currentPrice;
                   const costBasis = stock.quantity * stock.purchasePrice;
                   const gainLoss = marketValue - costBasis;

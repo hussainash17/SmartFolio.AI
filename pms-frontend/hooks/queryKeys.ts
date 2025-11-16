@@ -73,7 +73,7 @@ export const queryKeys = {
 
   // Performance Analytics
   performanceSummary: (portfolioId: string, period: string) => ['performance', 'summary', portfolioId, period] as const,
-  valueHistory: (portfolioId: string, period: string, benchmarkId?: string, frequency?: string) => 
+  valueHistory: (portfolioId: string, period: string, benchmarkId?: string, frequency?: string) =>
     ['performance', 'value-history', portfolioId, period, benchmarkId ?? 'none', frequency ?? 'daily'] as const,
   benchmarkComparison: (portfolioId: string, benchmarkId: string) => ['performance', 'benchmark-comparison', portfolioId, benchmarkId] as const,
   benchmarks: ['performance', 'benchmarks'] as const,
