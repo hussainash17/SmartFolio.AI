@@ -26,6 +26,104 @@ from app.services.holdings_service import HoldingsService
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
 
+# Portfolio Aggregates across all user portfolios
+@router.get("/aggregates")
+def get_portfolios_aggregate(
+        current_user: CurrentUser,
+        session: SessionDep,
+):
+    """
+    Aggregate totals for all portfolios of the current user.
+    
+    Returns:
+        {
+          "total_portfolio_value": float,   # stocks + cash
+          "total_invested_amount": float,   # sum of positions total_investment
+          "total_available_cash": float,    # sum of portfolios cash_balance
+          "total_gain_loss": float,         # stock_value - total_invested_amount
+          "total_day_change": float         # today's change across all stocks
+        }
+    """
+    # Fetch user portfolios
+    portfolios: List[Portfolio] = session.exec(
+        select(Portfolio).where(Portfolio.user_id == current_user.id)
+    ).all() or []
+
+    if not portfolios:
+        return {
+            "total_portfolio_value": 0.0,
+            "total_invested_amount": 0.0,
+            "total_available_cash": 0.0,
+            "total_gain_loss": 0.0,
+            "total_day_change": 0.0,
+        }
+
+    # Gather all positions across portfolios
+    portfolio_ids = [p.id for p in portfolios]
+    positions: List[PortfolioPosition] = session.exec(
+        select(PortfolioPosition).where(PortfolioPosition.portfolio_id.in_(portfolio_ids))
+    ).all() or []
+
+    def _d(value) -> Decimal:
+        try:
+            return Decimal(str(value or 0))
+        except Exception:
+            return Decimal(0)
+
+    # Sum invested and cash
+    total_invested_amount = sum(_d(pos.total_investment) for pos in positions)
+    total_available_cash = sum(_d(p.cash_balance) for p in portfolios)
+
+    # Map stock -> total qty
+    from collections import defaultdict
+    stock_qty = defaultdict(lambda: Decimal(0))
+    for pos in positions:
+        stock_qty[pos.stock_id] += _d(pos.quantity)
+
+    # Latest prices per stock
+    latest_prices: Dict[UUID, StockData] = {}
+    company_ids = list(stock_qty.keys())
+    if company_ids:
+        rows: List[StockData] = session.exec(
+            select(StockData)
+            .where(StockData.company_id.in_(company_ids))
+            .order_by(StockData.company_id, StockData.timestamp.desc())
+        ).all() or []
+        seen = set()
+        for row in rows:
+            if row.company_id not in seen:
+                latest_prices[row.company_id] = row
+                seen.add(row.company_id)
+
+    # Compute stock value with latest prices; fallback to stored current_value
+    stock_value = Decimal(0)
+    for pos in positions:
+        data = latest_prices.get(pos.stock_id)
+        if data:
+            stock_value += _d(data.last_trade_price) * _d(pos.quantity)
+        else:
+            stock_value += _d(pos.current_value)
+
+    total_portfolio_value = stock_value + total_available_cash
+
+    # Day change = sum((last - prev_close) * qty)
+    day_change_value = Decimal(0)
+    for cid, qty in stock_qty.items():
+        data = latest_prices.get(cid)
+        if data and _d(data.previous_close) > 0:
+            delta = _d(data.last_trade_price) - _d(data.previous_close)
+            day_change_value += delta * qty
+
+    total_gain_loss = stock_value - total_invested_amount
+
+    return {
+        "total_portfolio_value": float(total_portfolio_value),
+        "total_invested_amount": float(total_invested_amount),
+        "total_available_cash": float(total_available_cash),
+        "total_gain_loss": float(total_gain_loss),
+        "total_day_change": float(day_change_value),
+    }
+
 # Portfolio Management APIs
 @router.post("/", response_model=PortfolioPublic)
 def create_portfolio(
