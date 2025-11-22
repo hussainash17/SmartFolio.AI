@@ -1251,7 +1251,7 @@ export function PortfolioPerformance({
                                     ) : dividendError ? (
                                         <span className="text-muted-foreground">N/A</span>
                                     ) : (
-                                        formatCurrency(dividendAnalysis?.total_annual_dividends || 0)
+                                        formatCurrency((dividendAnalysis as any)?.total_annual_dividends || 0)
                                     )}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">Total annual income</p>
@@ -1272,7 +1272,7 @@ export function PortfolioPerformance({
                                     ) : dividendError ? (
                                         <span className="text-muted-foreground">N/A</span>
                                     ) : (
-                                        formatPercent(dividendAnalysis?.portfolio_dividend_yield || 0)
+                                        formatPercent((dividendAnalysis as any)?.portfolio_dividend_yield || 0)
                                     )}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">Portfolio yield</p>
@@ -1293,7 +1293,7 @@ export function PortfolioPerformance({
                                     ) : dividendError ? (
                                         <span className="text-muted-foreground">N/A</span>
                                     ) : (
-                                        formatCurrency(dividendAnalysis?.quarterly_income || 0)
+                                        formatCurrency((dividendAnalysis as any)?.quarterly_income || 0)
                                     )}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">Expected per quarter</p>
@@ -1314,7 +1314,7 @@ export function PortfolioPerformance({
                                     ) : dividendError ? (
                                         <span className="text-muted-foreground">N/A</span>
                                     ) : (
-                                        formatCurrency(dividendAnalysis?.monthly_income || 0)
+                                        formatCurrency((dividendAnalysis as any)?.monthly_income || 0)
                                     )}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">Expected per month</p>
@@ -1342,7 +1342,7 @@ export function PortfolioPerformance({
                                             : "Unable to load dividend analysis. Please try again."}
                                     </p>
                                 </div>
-                            ) : dividendAnalysis?.dividend_stocks && dividendAnalysis.dividend_stocks.length > 0 ? (
+                            ) : dividendAnalysis && typeof dividendAnalysis === 'object' && 'dividend_stocks' in dividendAnalysis && Array.isArray((dividendAnalysis as any).dividend_stocks) && (dividendAnalysis as any).dividend_stocks.length > 0 ? (
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -1356,7 +1356,7 @@ export function PortfolioPerformance({
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {dividendAnalysis.dividend_stocks.map((stock: any) => (
+                                        {(dividendAnalysis?.dividend_stocks as any[])?.map((stock: any) => (
                                             <TableRow key={stock.stock_id}>
                                                 <TableCell className="font-medium">{stock.symbol}</TableCell>
                                                 <TableCell>{stock.name}</TableCell>
@@ -1393,7 +1393,7 @@ export function PortfolioPerformance({
                             <CardContent>
                                 <div className="flex items-center gap-4">
                                     <div className="text-3xl font-bold text-green-600">
-                                        {formatPercent(dividendAnalysis.dividend_growth_estimate || 0)}
+                                        {formatPercent((dividendAnalysis as any)?.dividend_growth_estimate || 0)}
                                     </div>
                                     <div className="flex-1">
                                         <p className="text-sm text-muted-foreground">
@@ -1425,7 +1425,7 @@ export function PortfolioPerformance({
                                     ) : costBasisError ? (
                                         <span className="text-muted-foreground">N/A</span>
                                     ) : (
-                                        formatCurrency(costBasisAnalysis?.total_cost_basis || 0)
+                                        formatCurrency((costBasisAnalysis as any)?.total_cost_basis || 0)
                                     )}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">Total invested</p>
@@ -1446,7 +1446,7 @@ export function PortfolioPerformance({
                                     ) : costBasisError ? (
                                         <span className="text-muted-foreground">N/A</span>
                                     ) : (
-                                        formatCurrency(costBasisAnalysis?.total_current_value || 0)
+                                        formatCurrency((costBasisAnalysis as any)?.total_current_value || 0)
                                     )}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">Current market value</p>
@@ -1462,13 +1462,13 @@ export function PortfolioPerformance({
                             </CardHeader>
                             <CardContent>
                                 <div
-                                    className={`text-2xl font-bold ${(costBasisAnalysis?.total_unrealized_gains || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    className={`text-2xl font-bold ${((costBasisAnalysis as any)?.total_unrealized_gains || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                     {costBasisLoading ? (
                                         <Activity className="h-5 w-5 animate-pulse"/>
                                     ) : costBasisError ? (
                                         <span className="text-muted-foreground">N/A</span>
                                     ) : (
-                                        formatCurrency(costBasisAnalysis?.total_unrealized_gains || 0)
+                                        formatCurrency((costBasisAnalysis as any)?.total_unrealized_gains || 0)
                                     )}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">Unrealized P&L</p>
@@ -1489,7 +1489,7 @@ export function PortfolioPerformance({
                                     ) : costBasisError ? (
                                         <span className="text-muted-foreground">N/A</span>
                                     ) : (
-                                        formatCurrency(costBasisAnalysis?.estimated_tax_liability || 0)
+                                        formatCurrency((costBasisAnalysis as any)?.estimated_tax_liability || 0)
                                     )}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">Estimated (20% rate)</p>
@@ -1517,7 +1517,7 @@ export function PortfolioPerformance({
                                             : "Unable to load cost basis analysis. Please try again."}
                                     </p>
                                 </div>
-                            ) : costBasisAnalysis?.stock_analysis && Object.keys(costBasisAnalysis.stock_analysis).length > 0 ? (
+                            ) : costBasisAnalysis && typeof costBasisAnalysis === 'object' && 'stock_analysis' in costBasisAnalysis && costBasisAnalysis.stock_analysis && Object.keys(costBasisAnalysis.stock_analysis as Record<string, unknown>).length > 0 ? (
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -1565,7 +1565,11 @@ export function PortfolioPerformance({
                     </Card>
 
                     {/* Tax Loss Harvesting Opportunities */}
-                    {costBasisAnalysis?.tax_loss_opportunities && costBasisAnalysis.tax_loss_opportunities.length > 0 && (
+                    {costBasisAnalysis && 
+                     typeof costBasisAnalysis === 'object' && 
+                     'tax_loss_opportunities' in costBasisAnalysis && 
+                     Array.isArray((costBasisAnalysis as any).tax_loss_opportunities) && 
+                     (costBasisAnalysis as any).tax_loss_opportunities.length > 0 && (
                         <Card className="border-orange-200 bg-orange-50/50">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
@@ -1586,7 +1590,7 @@ export function PortfolioPerformance({
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {costBasisAnalysis.tax_loss_opportunities.map((opp: any) => (
+                                        {(costBasisAnalysis?.tax_loss_opportunities as any[])?.map((opp: any) => (
                                             <TableRow key={opp.symbol}>
                                                 <TableCell className="font-medium">{opp.symbol}</TableCell>
                                                 <TableCell className="text-right text-red-600 font-medium">

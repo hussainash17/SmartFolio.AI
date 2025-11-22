@@ -79,6 +79,11 @@ export function ComprehensiveDashboard({
     const formatPercent = (percent: number) => {
         return `${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`;
     };
+    const toMillions = (value: unknown) => {
+        const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+        if (!Number.isFinite(num)) return 0;
+        return num >= 10000 ? num / 1_000_000 : num;
+    };
     const {
         data: dashboardSummary = {
             total_portfolio_value: 0,
@@ -789,24 +794,46 @@ export function ComprehensiveDashboard({
                                 DSEX Index
                             </div>
                             <div className="text-sm font-bold text-foreground mb-2">
-                                {marketIndices?.DSEX?.value ? Number(marketIndices.DSEX.value).toFixed(2) : 'N/A'}
+                                {marketSummary?.dse_index ? Number(marketSummary.dse_index).toFixed(2) : 'N/A'}
                             </div>
-                            {marketIndices?.DSEX && (
-                                <div className={`text-sm font-medium flex items-center gap-1 ${
-                                    Number(marketIndices.DSEX.change_percent || 0) >= 0 ? 'text-green-600' : 'text-red-600'
-                                }`}>
-                                    {Number(marketIndices.DSEX.change_percent || 0) >= 0 ? '↑' : '↓'}
-                                    <span>
-                            {Number(marketIndices.DSEX.change || 0) >= 0 ? '+' : ''}
-                                        {Number(marketIndices.DSEX.change || 0).toFixed(2)}
+                        {marketSummary?.dse_index_change_percent && (
+                            <div className={`text-sm font-medium flex items-center gap-1 ${
+                                Number(marketSummary.dse_index_change_percent || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                                {Number(marketSummary.dse_index_change_percent || 0) >= 0 ? '↑' : '↓'}
+                                <span>
+                            {Number(marketSummary.dse_index_change || 0) >= 0 ? '+' : ''}
+                                        {Number(marketSummary.dse_index_change || 0).toFixed(2)}
                         </span>
-                                    <span>
-                            ({Number(marketIndices.DSEX.change_percent || 0) >= 0 ? '+' : ''}
-                                        {Number(marketIndices.DSEX.change_percent || 0).toFixed(2)}%)
+                                <span>
+                            ({Number(marketSummary.dse_index_change_percent || 0) >= 0 ? '+' : ''}
+                                        {Number(marketSummary.dse_index_change_percent || 0).toFixed(2)}%)
                         </span>
-                                </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
+                        {(marketSummary?.total_trades != null || marketSummary?.total_turnover != null || marketSummary?.total_volume != null) && (
+                            <div className="mt-3 space-y-1.5">
+                                {marketSummary?.total_trades != null && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-muted-foreground">Trades</span>
+                                        <span className="text-sm font-semibold text-foreground">{Number(marketSummary.total_trades).toLocaleString()}</span>
+                                    </div>
+                                )}
+                                {marketSummary?.total_turnover != null && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-muted-foreground">Turnover</span>
+                                        <span className="text-sm font-semibold text-foreground">{toMillions(marketSummary.total_turnover).toFixed(2)}M</span>
+                                    </div>
+                                )}
+                                {marketSummary?.total_volume != null && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-muted-foreground">Volume</span>
+                                        <span className="text-sm font-semibold text-foreground">{toMillions(marketSummary.total_volume).toFixed(2)}M</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
 
                         {/* Top Gainers Card */}
                         <div
@@ -972,7 +999,7 @@ export function ComprehensiveDashboard({
                                 Sector Performance
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
-                                {sectorAnalysis.sectors.slice(0, 8).map((sector: any) => {
+                                {sectorAnalysis.sectors.slice(0, 12).map((sector: any) => {
                                     const perf = sector.performance || {};
                                     const change = Number(perf['1_day'] || perf['1_week'] || sector.change_percent || sector.change || 0);
                                     const positive = change >= 0;
@@ -1030,35 +1057,44 @@ export function ComprehensiveDashboard({
                             <CardContent>
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                                     {enrichedPortfolios.map((p) => {
-                                        const dailyApprox = p.stocks.reduce((sum, s) => {
-                                            const q = marketData.find((m) => String(m.symbol || '').toUpperCase() === String(s.symbol || '').toUpperCase());
-                                            const price = Number(q?.currentPrice || s.currentPrice);
-                                            const cp = Number(q?.changePercent || 0);
-                                            return sum + s.quantity * price * (cp / 100);
-                                        }, 0);
-                                        const unrealized = (p as any).totalValue - (p as any).totalCost;
+                                        const gainLoss = (p as any).totalValue - (p as any).totalCost;
+                                        const gainLossPercent = (p as any).totalCost > 0 ? (gainLoss / (p as any).totalCost) * 100 : 0;
                                         return (
-                                            <button
-                                                key={p.id}
-                                                type="button"
-                                                onClick={() => { setGlobalSelectedPortfolioId(String(p.id)); onNavigate('portfolio-detail'); }}
-                                                className="p-4 rounded-lg border text-left w-full hover:shadow-sm hover:border-foreground/20 transition-colors"
-                                            >
-                                                <div className="text-sm font-medium mb-2">{p.name}</div>
-                                                <div
-                                                    className="text-sm font-bold">{formatCurrency((p as any).totalValue)}</div>
-                                                <div
-                                                    className={`text-sm font-semibold mt-1 ${dailyApprox >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(Math.abs(dailyApprox))}</div>
-                                                <div className="mt-2 space-y-1 text-sm">
-                                                    <div className="flex justify-between"><span
-                                                        className="text-muted-foreground">Unrealized P/L</span><span
-                                                        className={unrealized >= 0 ? 'text-green-600' : 'text-red-600'}>{formatCurrency(unrealized)}</span>
+                                            <Card key={p.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setGlobalSelectedPortfolioId(String(p.id)); onNavigate('portfolio-detail'); }}>
+                                                <CardHeader>
+                                                    <div className="flex justify-between items-start">
+                                                        <CardTitle className="text-lg">{p.name}</CardTitle>
+                                                        <Badge variant={gainLoss >= 0 ? 'default' : 'destructive'}>
+                                                            {formatPercent(gainLossPercent)}
+                                                        </Badge>
                                                     </div>
-                                                    <div className="flex justify-between"><span
-                                                        className="text-muted-foreground">Cash</span><span>{formatCurrency(p.cash)}</span>
+                                                    {(p as any).description && (
+                                                        <p className="text-sm text-muted-foreground">{(p as any).description}</p>
+                                                    )}
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className="space-y-2">
+                                                        <div className="flex justify-between">
+                                                            <span className="text-sm text-muted-foreground">Total Value</span>
+                                                            <span>{formatCurrency((p as any).totalValue)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-sm text-muted-foreground">Gain/Loss</span>
+                                                            <span className={gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                                {formatCurrency(gainLoss)}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-sm text-muted-foreground">Holdings</span>
+                                                            <span>{p.stocks.length} stocks</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-sm text-muted-foreground">Cash</span>
+                                                            <span>{formatCurrency(p.cash)}</span>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </button>
+                                                </CardContent>
+                                            </Card>
                                         );
                                     })}
                                 </div>
