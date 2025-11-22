@@ -38,6 +38,7 @@ export function AccountManager({ user, accountBalance, transactions, portfolios,
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [creditLimit, setCreditLimit] = useState<string>("");
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(portfolios[0]?.id ?? null);
+  const [detailPortfolioId, setDetailPortfolioId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!portfolios.length) {
@@ -289,152 +290,224 @@ export function AccountManager({ user, accountBalance, transactions, portfolios,
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Account Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Account Number</p>
-                    <p className="font-medium">{getAccountNumber()}</p>
+          {detailPortfolioId ? (
+            (() => {
+              const p = portfolios.find(x => x.id === detailPortfolioId);
+              const stockValue = Math.max((p?.totalValue || 0) - (p?.cash || 0), 0);
+              const gainLoss = (p?.totalValue || 0) - (p?.totalCost || 0);
+              const gainLossPercent = (p && p.totalCost > 0) ? (gainLoss / p.totalCost) * 100 : 0;
+              return (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-sm font-bold">{p?.name}</h2>
+                      <p className="text-sm text-muted-foreground">Portfolio metrics</p>
+                    </div>
+                    <Button variant="outline" onClick={() => setDetailPortfolioId(null)}>Back to Overview</Button>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Account Type</p>
-                    <Badge className={accountTypeColors[getAccountType() as keyof typeof accountTypeColors]}>
-                      {getAccountType().charAt(0).toUpperCase() + getAccountType().slice(1)}
-                    </Badge>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="font-medium">{user?.email || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Join Date</p>
-                    <p className="font-medium">{formatDate(getJoinDate())}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Balance Breakdown</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-              {hasPortfolios ? (
-                <div className="space-y-3">
-                  {portfolios.map((portfolio) => {
-                    const stockValue = Math.max(portfolio.totalValue - portfolio.cash, 0);
-                    const gainLoss = portfolio.totalValue - portfolio.totalCost;
-                    const gainLossPercent = portfolio.totalCost > 0 ? (gainLoss / portfolio.totalCost) * 100 : 0;
-                    return (
-                      <div
-                        key={portfolio.id}
-                        className="rounded-lg border bg-muted/20 p-3"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium">{portfolio.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Created {new Date(portfolio.createdDate).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-xs text-muted-foreground">Total Value</p>
-                            <p className="text-sm font-semibold">
-                              {formatCurrency(portfolio.totalValue)}
-                            </p>
-                          </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm">Total Value</CardTitle></CardHeader>
+                      <CardContent><div className="text-2xl font-bold">{formatCurrency(p?.totalValue || 0)}</div></CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm">Cash</CardTitle></CardHeader>
+                      <CardContent><div className="text-2xl font-bold">{formatCurrency(p?.cash || 0)}</div></CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm">Stock Value</CardTitle></CardHeader>
+                      <CardContent><div className="text-2xl font-bold">{formatCurrency(stockValue)}</div></CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm">Invested Capital</CardTitle></CardHeader>
+                      <CardContent><div className="text-2xl font-bold">{formatCurrency(p?.totalCost || 0)}</div></CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm">Unrealized P/L</CardTitle></CardHeader>
+                      <CardContent>
+                        <div className={`text-2xl ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(gainLoss)}</div>
+                        <p className={`text-xs ${gainLossPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatPercentage(gainLossPercent)}</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card>
+                    <CardHeader><CardTitle>Credit Limit</CardTitle></CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            className="flex-1 border rounded px-2 py-1 text-sm"
+                            placeholder="Credit limit"
+                            value={creditLimit}
+                            onChange={(e) => setCreditLimit(e.target.value)}
+                            type="number"
+                            min={0}
+                          />
+                          <Button variant="outline" onClick={handleUpdateCredit}>Update Credit</Button>
                         </div>
-                        <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                          <div>
-                            <p className="text-xs text-muted-foreground">Cash Balance</p>
-                            <p className="font-medium">
-                              {formatCurrency(portfolio.cash)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Stock Value</p>
-                            <p className="font-medium">
-                              {formatCurrency(stockValue)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Invested Capital</p>
-                            <p className="font-medium">
-                              {formatCurrency(portfolio.totalCost)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Unrealized P/L</p>
-                            <p className={`font-medium ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {formatCurrency(gainLoss)} ({formatPercentage(gainLossPercent)})
-                            </p>
-                          </div>
+                        <div className="text-sm text-muted-foreground self-center">
+                          Boost buying power: Cash + Credit - Reserved
                         </div>
                       </div>
-                    );
-                  })}
+                    </CardContent>
+                  </Card>
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No portfolios available yet. Create a portfolio to see detailed breakdowns.
-                </p>
-              )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Recent Activity</CardTitle>
-                <Button variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions.slice(0, 5).map((transaction) => (
-                    <TableRow key={transaction.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getTransactionIcon(transaction.type)}
-                          <Badge variant={getTransactionVariant(transaction.type)}>
-                            {transaction.type}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell>{transaction.description}</TableCell>
-                      <TableCell className={`text-right font-medium ${transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatCurrency(transaction.amount)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={transaction.status === 'completed' ? 'default' : transaction.status === 'pending' ? 'secondary' : 'destructive'}>
-                          {transaction.status}
+              );
+            })()
+          ) : (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Account Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Account Number</p>
+                        <p className="font-medium">{getAccountNumber()}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Account Type</p>
+                        <Badge className={accountTypeColors[getAccountType() as keyof typeof accountTypeColors]}>
+                          {getAccountType().charAt(0).toUpperCase() + getAccountType().slice(1)}
                         </Badge>
-                      </TableCell>
-                      <TableCell>{formatDate(transaction.date)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Email</p>
+                        <p className="font-medium">{user?.email || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Join Date</p>
+                        <p className="font-medium">{formatDate(getJoinDate())}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Balance Breakdown</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                  {hasPortfolios ? (
+                    <div className="space-y-3">
+                      {portfolios.map((portfolio) => {
+                        const stockValue = Math.max(portfolio.totalValue - portfolio.cash, 0);
+                        const gainLoss = portfolio.totalValue - portfolio.totalCost;
+                        const gainLossPercent = portfolio.totalCost > 0 ? (gainLoss / portfolio.totalCost) * 100 : 0;
+                        return (
+                          <button
+                            key={portfolio.id}
+                            type="button"
+                            onClick={() => setDetailPortfolioId(portfolio.id)}
+                            className="rounded-lg border bg-muted/20 p-3 text-left w-full hover:border-foreground/20 hover:shadow-sm"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium">{portfolio.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Created {new Date(portfolio.createdDate).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs text-muted-foreground">Total Value</p>
+                                <p className="text-sm font-semibold">
+                                  {formatCurrency(portfolio.totalValue)}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                              <div>
+                                <p className="text-xs text-muted-foreground">Cash Balance</p>
+                                <p className="font-medium">
+                                  {formatCurrency(portfolio.cash)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground">Stock Value</p>
+                                <p className="font-medium">
+                                  {formatCurrency(stockValue)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground">Invested Capital</p>
+                                <p className="font-medium">
+                                  {formatCurrency(portfolio.totalCost)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground">Unrealized P/L</p>
+                                <p className={`font-medium ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {formatCurrency(gainLoss)} ({formatPercentage(gainLossPercent)})
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No portfolios available yet. Create a portfolio to see detailed breakdowns.
+                    </p>
+                  )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Recent Activity</CardTitle>
+                    <Button variant="outline" size="sm">
+                      <Download className="h-4 w-4 mr-2" />
+                      Export
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {transactions.slice(0, 5).map((transaction) => (
+                        <TableRow key={transaction.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {getTransactionIcon(transaction.type)}
+                              <Badge variant={getTransactionVariant(transaction.type)}>
+                                {transaction.type}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell>{transaction.description}</TableCell>
+                          <TableCell className={`text-right font-medium ${transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatCurrency(transaction.amount)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={transaction.status === 'completed' ? 'default' : transaction.status === 'pending' ? 'secondary' : 'destructive'}>
+                              {transaction.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{formatDate(transaction.date)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </TabsContent>
 
         <TabsContent value="transactions" className="space-y-4">
@@ -559,22 +632,7 @@ export function AccountManager({ user, accountBalance, transactions, portfolios,
                   <Button variant="outline">Manage</Button>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="flex items-center gap-2">
-                    <input
-                      className="flex-1 border rounded px-2 py-1 text-sm"
-                      placeholder="Credit limit"
-                      value={creditLimit}
-                      onChange={(e) => setCreditLimit(e.target.value)}
-                      type="number"
-                      min={0}
-                    />
-                    <Button variant="outline" onClick={handleUpdateCredit}>Update Credit</Button>
-                  </div>
-                  <div className="text-sm text-muted-foreground self-center">
-                    Boost buying power: Cash + Credit - Reserved
-                  </div>
-                </div>
+                
 
                 <div className="flex items-center justify-between">
                   <div>

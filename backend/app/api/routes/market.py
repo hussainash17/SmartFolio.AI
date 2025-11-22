@@ -225,12 +225,12 @@ def get_top_movers(
         limit: int = Query(10, ge=1, le=50),
 ) -> Dict[str, List[Dict[str, Any]]]:
     # Determine latest timestamp across StockData
-    latest_time_row = session.exec(
+    latest_time_value = session.exec(
         select(func.max(StockData.timestamp))
     ).first()
-    if not latest_time_row or latest_time_row[0] is None:
+    if not latest_time_value:
         return {"gainers": [], "losers": []}
-    latest_time = latest_time_row[0]
+    latest_time = latest_time_value
 
     # Top gainers
     gainers = session.exec(
@@ -274,12 +274,12 @@ def get_most_active(
         limit: int = Query(10, ge=1, le=50),
 ) -> List[Dict[str, Any]]:
     # Determine latest timestamp across StockData
-    latest_time_row = session.exec(
+    latest_time_value = session.exec(
         select(func.max(StockData.timestamp))
     ).first()
-    if not latest_time_row or latest_time_row[0] is None:
+    if not latest_time_value:
         return []
-    latest_time = latest_time_row[0]
+    latest_time = latest_time_value
 
     rows = session.exec(
         select(StockData, Company)

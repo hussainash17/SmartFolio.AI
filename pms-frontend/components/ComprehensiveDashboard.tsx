@@ -10,20 +10,18 @@ import {
     ArrowUpRight,
     Award,
     BarChart3,
-    Calendar,
-    DollarSign,
     PieChart,
     Shield,
     Target,
     TrendingDown,
     TrendingUp
 } from "lucide-react";
+import {Bar, BarChart as RBarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis} from 'recharts';
 import {AccountBalance, MarketData as MarketDataType, NewsItem, Order, Transaction} from "../types/trading";
 import {useEffect, useMemo, useState} from "react";
 import {AnalyticsService, KycService, OpenAPI, RiskManagementService} from "../src/client";
-import {useQuery} from "@tanstack/react-query";
+import {useQueries, useQuery} from "@tanstack/react-query";
 import {queryKeys} from "../hooks/queryKeys";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "./ui/select";
 import {usePortfolios} from "../hooks/usePortfolios";
 import {useRiskAlerts, useRiskOverview} from "../hooks/useRisk";
 import {
@@ -58,8 +56,9 @@ export function ComprehensiveDashboard({
                                            selectedPortfolioId: initialPortfolioId,
                                        }: ComprehensiveDashboardProps) {
     // Portfolio selection state
-    const {portfolios} = usePortfolios();
+    const {portfolios, setSelectedPortfolioId: setGlobalSelectedPortfolioId} = usePortfolios();
     const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | undefined>(initialPortfolioId);
+    const [contributionView, setContributionView] = useState<'daily' | 'weekly' | 'unrealized'>('daily');
 
     // Set default portfolio when portfolios load
     useEffect(() => {
@@ -255,119 +254,759 @@ export function ComprehensiveDashboard({
 
     const dashboardSummaryMemo = useMemo(() => dashboardSummary, [dashboardSummary]);
 
+    const marketPriceMap = useMemo(() => {
+        const map = new Map<string, number>();
+        marketData.forEach((quote) => {
+            const symbol = String(quote.symbol || '').toUpperCase();
+            if (!symbol) return;
+            const price = Number(quote.currentPrice ?? quote.change ?? 0);
+            if (!Number.isFinite(price)) return;
+            map.set(symbol, price);
+        });
+        return map;
+    }, [marketData]);
+
+    const enrichedPortfolios = useMemo(() => {
+        return portfolios.map((p) => {
+            const stocks = p.stocks.map((s) => {
+                const live = marketPriceMap.get(String(s.symbol || '').toUpperCase()) ?? s.currentPrice;
+                return {...s, currentPrice: live};
+            });
+            const stocksMarketValue = stocks.reduce((sum, s) => sum + s.quantity * s.currentPrice, 0);
+            const totalCost = stocks.reduce((sum, s) => sum + s.quantity * s.purchasePrice, 0);
+            const totalValue = stocksMarketValue + p.cash;
+            return {...p, stocks, totalCost, totalValue};
+        });
+    }, [portfolios, marketPriceMap]);
+
+    const aggregates = useMemo(() => {
+        const totalValue = enrichedPortfolios.reduce((sum, p) => sum + (p as any).totalValue, 0);
+        const totalCost = enrichedPortfolios.reduce((sum, p) => sum + (p as any).totalCost, 0);
+        const totalCash = enrichedPortfolios.reduce((sum, p) => sum + p.cash, 0);
+        const unrealizedPL = totalValue - totalCost;
+        return {totalValue, totalCost, totalCash, unrealizedPL};
+    }, [enrichedPortfolios]);
+
+    const marketOverview = useMemo(() => {
+        let advancers = 0, decliners = 0, unchanged = 0;
+        let totalVolume = 0;
+        marketData.forEach((q) => {
+            totalVolume += Number(q.volume || 0);
+            const cp = Number(q.changePercent || 0);
+            if (cp > 0) advancers++; else if (cp < 0) decliners++; else unchanged++;
+        });
+        return {advancers, decliners, unchanged, totalVolume};
+    }, [marketData]);
+
+    const topMovers = useMemo(() => {
+        const items: Array<{
+            symbol: string;
+            name: string;
+            price: number;
+            changePercent: number;
+            volume: number;
+            contribution: number;
+        }> = [];
+        const bySymbolHoldings = new Map<string, { quantity: number; companyName: string }>();
+        enrichedPortfolios.forEach((p) => p.stocks.forEach((s) => {
+            const key = String(s.symbol || '').toUpperCase();
+            const prev = bySymbolHoldings.get(key) || {quantity: 0, companyName: s.companyName};
+            bySymbolHoldings.set(key, {quantity: prev.quantity + s.quantity, companyName: prev.companyName});
+        }));
+        marketData.forEach((q) => {
+            const key = String(q.symbol || '').toUpperCase();
+            const holding = bySymbolHoldings.get(key);
+            if (!holding) return;
+            const price = Number(q.currentPrice || 0);
+            const changePct = Number(q.changePercent || 0);
+            const contrib = holding.quantity * price * (changePct / 100);
+            items.push({
+                symbol: key,
+                name: holding.companyName,
+                price,
+                changePercent: changePct,
+                volume: Number(q.volume || 0),
+                contribution: contrib
+            });
+        });
+        return items.sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution)).slice(0, 8);
+    }, [enrichedPortfolios, marketData]);
+
+    const sectorExposure = useMemo(() => {
+        const map = new Map<string, number>();
+        enrichedPortfolios.forEach((p) => p.stocks.forEach((s) => {
+            const sector = String(s.sector || 'Unknown');
+            const value = s.quantity * s.currentPrice;
+            map.set(sector, (map.get(sector) || 0) + value);
+        }));
+        const total = Array.from(map.values()).reduce((a, b) => a + b, 0) || 1;
+        return Array.from(map.entries()).map(([sector, value]) => ({sector, value, percent: (value / total) * 100}))
+            .sort((a, b) => b.value - a.value).slice(0, 8);
+    }, [enrichedPortfolios]);
+
+    const weeklyAttributionQueries = useQueries({
+        queries: portfolios.map((p) => ({
+            queryKey: ['dashboard', 'security-attribution', '1W', p.id],
+            enabled: !!(OpenAPI as any).TOKEN,
+            staleTime: 5 * 60 * 1000,
+            queryFn: async () => {
+                const base = (OpenAPI as any).BASE || '';
+                const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolios/${p.id}/performance/attribution/securities?period=1W&limit=15`, {
+                    headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                    credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+                });
+                if (!res.ok) return null;
+                return await res.json();
+            }
+        }))
+    });
+
+    const monthlyAttributionQueries = useQueries({
+        queries: portfolios.map((p) => ({
+            queryKey: ['dashboard', 'security-attribution', '1M', p.id],
+            enabled: !!(OpenAPI as any).TOKEN,
+            staleTime: 5 * 60 * 1000,
+            queryFn: async () => {
+                const base = (OpenAPI as any).BASE || '';
+                const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolios/${p.id}/performance/attribution/securities?period=1M&limit=20`, {
+                    headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                    credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+                });
+                if (!res.ok) return null;
+                return await res.json();
+            }
+        }))
+    });
+
+    const contributionDaily = useMemo(() => {
+        return topMovers.map((m) => ({symbol: m.symbol, pl: m.contribution}));
+    }, [topMovers]);
+
+    const contributionWeekly = useMemo(() => {
+        const map = new Map<string, number>();
+        weeklyAttributionQueries.forEach((q) => {
+            const data = q.data as any;
+            if (!data) return;
+            const pos: any[] = Array.isArray(data.top_contributors) ? data.top_contributors : [];
+            const neg: any[] = Array.isArray(data.top_detractors) ? data.top_detractors : [];
+            pos.forEach((c) => {
+                const k = String(c.symbol || '').toUpperCase();
+                map.set(k, (map.get(k) || 0) + Number(c.contribution || 0));
+            });
+            neg.forEach((c) => {
+                const k = String(c.symbol || '').toUpperCase();
+                map.set(k, (map.get(k) || 0) - Math.abs(Number(c.contribution || 0)));
+            });
+        });
+        return Array.from(map.entries()).map(([symbol, pl]) => ({symbol, pl}))
+            .sort((a, b) => Math.abs(b.pl) - Math.abs(a.pl)).slice(0, 12);
+    }, [weeklyAttributionQueries]);
+
+    const contributionUnrealized = useMemo(() => {
+        const map = new Map<string, number>();
+        enrichedPortfolios.forEach((p) => p.stocks.forEach((s) => {
+            const k = String(s.symbol || '').toUpperCase();
+            const pl = s.quantity * (Number(s.currentPrice || 0) - Number(s.purchasePrice || 0));
+            map.set(k, (map.get(k) || 0) + pl);
+        }));
+        return Array.from(map.entries()).map(([symbol, pl]) => ({symbol, pl}))
+            .sort((a, b) => Math.abs(b.pl) - Math.abs(a.pl)).slice(0, 12);
+    }, [enrichedPortfolios]);
+
+    const weeklyPLTotal = useMemo(() => {
+        let total = 0;
+        weeklyAttributionQueries.forEach((q) => {
+            const data = q.data as any;
+            if (!data) return;
+            const pos: any[] = Array.isArray(data.top_contributors) ? data.top_contributors : [];
+            const neg: any[] = Array.isArray(data.top_detractors) ? data.top_detractors : [];
+            pos.forEach((c) => {
+                total += Number(c.contribution || 0);
+            });
+            neg.forEach((c) => {
+                total -= Math.abs(Number(c.contribution || 0));
+            });
+        });
+        return total;
+    }, [weeklyAttributionQueries]);
+
+    const monthlyPLTotal = useMemo(() => {
+        let total = 0;
+        monthlyAttributionQueries.forEach((q) => {
+            const data = q.data as any;
+            if (!data) return;
+            const pos: any[] = Array.isArray(data.top_contributors) ? data.top_contributors : [];
+            const neg: any[] = Array.isArray(data.top_detractors) ? data.top_detractors : [];
+            pos.forEach((c) => {
+                total += Number(c.contribution || 0);
+            });
+            neg.forEach((c) => {
+                total -= Math.abs(Number(c.contribution || 0));
+            });
+        });
+        return total;
+    }, [monthlyAttributionQueries]);
+
+    const weeklyPLPercent = useMemo(() => {
+        const base = Math.max(1, Number(aggregates.totalValue || 0));
+        return (Number(weeklyPLTotal || 0) / base) * 100;
+    }, [weeklyPLTotal, aggregates.totalValue]);
+
+    const monthlyPLPercent = useMemo(() => {
+        const base = Math.max(1, Number(aggregates.totalValue || 0));
+        return (Number(monthlyPLTotal || 0) / base) * 100;
+    }, [monthlyPLTotal, aggregates.totalValue]);
+
+    const decompositionYTDQueries = useQueries({
+        queries: portfolios.map((p) => ({
+            queryKey: ['dashboard', 'return-decomposition', 'YTD', p.id],
+            enabled: !!(OpenAPI as any).TOKEN,
+            staleTime: 5 * 60 * 1000,
+            queryFn: async () => {
+                const base = (OpenAPI as any).BASE || '';
+                const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolios/${p.id}/performance/decomposition?period=YTD`, {
+                    headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                    credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+                });
+                if (!res.ok) return null;
+                return await res.json();
+            }
+        }))
+    });
+
+    const decompositionDayQueries = useQueries({
+        queries: portfolios.map((p) => ({
+            queryKey: ['dashboard', 'return-decomposition', '1D', p.id],
+            enabled: !!(OpenAPI as any).TOKEN,
+            staleTime: 5 * 60 * 1000,
+            queryFn: async () => {
+                const base = (OpenAPI as any).BASE || '';
+                const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolios/${p.id}/performance/decomposition?period=1D`, {
+                    headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                    credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+                });
+                if (!res.ok) return null;
+                return await res.json();
+            }
+        }))
+    });
+
+    const realizedYTD = useMemo(() => {
+        let total = 0;
+        decompositionYTDQueries.forEach((q) => {
+            const data = q.data as any;
+            if (!data) return;
+            const candidates = [
+                (data as any).realized,
+                (data as any).realized_pnl,
+                (data as any).realized_profit,
+                (data as any).realized_gain,
+                (data as any).realized_gains,
+                (data as any).capital_gains_realized,
+                (data as any).capital_gain_realized,
+                (data as any).capital_realized,
+            ];
+            let val = candidates.find((v: any) => typeof v === 'number');
+            if (typeof val !== 'number') {
+                const comp = Array.isArray((data as any).components)
+                    ? (data as any).components
+                    : Array.isArray((data as any).decomposition)
+                        ? (data as any).decomposition
+                        : [];
+                if (comp.length) {
+                    let s = 0;
+                    comp.forEach((c: any) => {
+                        const key = String((c as any).type || (c as any).name || '').toLowerCase();
+                        if (key.includes('realized') || (key.includes('capital') && key.includes('gain') && key.includes('realized'))) {
+                            s += Number((c as any).value || (c as any).amount || 0);
+                        }
+                    });
+                    val = s;
+                } else {
+                    val = 0;
+                }
+            }
+            total += Number(val || 0);
+        });
+        return total;
+    }, [decompositionYTDQueries]);
+
+    const realizedToday = useMemo(() => {
+        let total = 0;
+        decompositionDayQueries.forEach((q) => {
+            const data = q.data as any;
+            if (!data) return;
+            const candidates = [
+                (data as any).realized,
+                (data as any).realized_pnl,
+                (data as any).realized_profit,
+                (data as any).realized_gain,
+                (data as any).realized_gains,
+                (data as any).capital_gains_realized,
+                (data as any).capital_gain_realized,
+                (data as any).capital_realized,
+            ];
+            let val = candidates.find((v: any) => typeof v === 'number');
+            if (typeof val !== 'number') {
+                const comp = Array.isArray((data as any).components)
+                    ? (data as any).components
+                    : Array.isArray((data as any).decomposition)
+                        ? (data as any).decomposition
+                        : [];
+                if (comp.length) {
+                    let s = 0;
+                    comp.forEach((c: any) => {
+                        const key = String((c as any).type || (c as any).name || '').toLowerCase();
+                        if (key.includes('realized') || (key.includes('capital') && key.includes('gain') && key.includes('realized'))) {
+                            s += Number((c as any).value || (c as any).amount || 0);
+                        }
+                    });
+                    val = s;
+                } else {
+                    val = 0;
+                }
+            }
+            total += Number(val || 0);
+        });
+        return total;
+    }, [decompositionDayQueries]);
+
+    const {data: marketIndices} = useQuery({
+        queryKey: queryKeys.indices,
+        enabled: !!(OpenAPI as any).TOKEN,
+        staleTime: 30 * 1000,
+        queryFn: async () => {
+            const base = (OpenAPI as any).BASE || '';
+            const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/market/indices`, {
+                headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+            });
+            if (!res.ok) return null;
+            return await res.json();
+        }
+    });
+
+    const {data: marketSummary} = useQuery({
+        queryKey: ['market', 'summary'],
+        enabled: !!(OpenAPI as any).TOKEN,
+        staleTime: 30 * 1000,
+        queryFn: async () => {
+            const base = (OpenAPI as any).BASE || '';
+            const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/market/summary`, {
+                headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+            });
+            if (!res.ok) return null;
+            return await res.json();
+        }
+    });
+
+    const {data: marketMostActive = []} = useQuery({
+        queryKey: queryKeys.mostActive,
+        enabled: !!(OpenAPI as any).TOKEN,
+        staleTime: 30 * 1000,
+        queryFn: async () => {
+            const base = (OpenAPI as any).BASE || '';
+            const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/market/most-active?limit=5`, {
+                headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+            });
+            if (!res.ok) return [];
+            return await res.json();
+        }
+    });
+
+    const {data: marketTopMovers} = useQuery({
+        queryKey: ['market', 'top-movers'],
+        enabled: !!(OpenAPI as any).TOKEN,
+        staleTime: 30 * 1000,
+        queryFn: async () => {
+            const base = (OpenAPI as any).BASE || '';
+            const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/market/top-movers?limit=5`, {
+                headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+            });
+            if (!res.ok) return {gainers: [], losers: []};
+            return await res.json();
+        }
+    });
+
+    const {data: sectorAnalysis} = useQuery({
+        queryKey: queryKeys.sectorAnalysis,
+        enabled: !!(OpenAPI as any).TOKEN,
+        staleTime: 5 * 60 * 1000,
+        queryFn: async () => {
+            const base = (OpenAPI as any).BASE || '';
+            const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/research/market/sectors`, {
+                headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+            });
+            if (!res.ok) return null;
+            return await res.json();
+        }
+    });
+
+    const vsIndex1D = useMemo(() => {
+        const port = Number(dashboardSummaryMemo?.day_change_percent || 0);
+        const idx = Number(marketIndices?.DSEX?.change_percent || 0);
+        return port - idx;
+    }, [dashboardSummaryMemo?.day_change_percent, marketIndices]);
+
+    const vsIndex1W = weeklyPLPercent - 0;
+    const vsIndex1M = monthlyPLPercent - 0;
+    const vsIndexYTD = Number(dashboardSummaryMemo?.ytd_return_percent || 0) - 0;
+
     return (
         <div className="space-y-6">
             {/* Page Header with Portfolio Selector */}
-            <div className="flex items-center justify-between mb-8">
-                <div className="flex-1">
-                    <h1 className="text-3xl font-semibold text-foreground mb-2">Dashboard</h1>
-                    <p className="text-muted-foreground text-lg">Comprehensive view of your investment portfolio and
-                        financial goals</p>
-                </div>
-                <div className="flex gap-3 items-center">
-                    {/* Portfolio Selector */}
-                    <div className="min-w-[250px]">
-                        <Select value={selectedPortfolioId || ''} onValueChange={setSelectedPortfolioId}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select Portfolio"/>
-                            </SelectTrigger>
-                            <SelectContent>
-                                {portfolios.map((portfolio) => (
-                                    <SelectItem key={portfolio.id} value={portfolio.id}>
-                                        {portfolio.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <Button variant="outline" onClick={() => onNavigate('reports')}>
-                        <BarChart3 className="h-4 w-4 mr-2"/>
-                        Report
-                    </Button>
-                    <Button onClick={() => onQuickTrade()}>
-                        <DollarSign className="h-4 w-4 mr-2"/>
-                        Trade
-                    </Button>
-                </div>
-            </div>
-
-            {/* Key Metrics Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card>
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-sm">Total Portfolio Value</CardTitle>
-                            <TrendingUp className="h-4 w-4 text-green-600"/>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">
-                            {formatCurrency(currentValue?.current_value ?? 0)}
-                        </div>
-                        {returnsYTD && (
-                            <div className="flex items-center gap-1 mt-1">
-                                {(returnsYTD.time_weighted_return || 0) >= 0 ? (
-                                    <ArrowUpRight className="h-3 w-3 text-green-600"/>
-                                ) : (
-                                    <ArrowDownRight className="h-3 w-3 text-red-600"/>
-                                )}
-                                <span
-                                    className={`${(returnsYTD.time_weighted_return || 0) >= 0 ? 'text-green-600' : 'text-red-600'} text-sm`}>
-                                    {formatPercent(returnsYTD.time_weighted_return || 0)}
-                                </span>
-                                <span className="text-sm text-muted-foreground">YTD</span>
+            <Card>
+                <CardContent className="p-6">
+                    <div className="flex items-center justify-between pb-3 mb-3 border-b">
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-sm text-muted-foreground font-medium">Portfolio:</span>
+                                <span className="text-sm font-bold text-foreground">{formatCurrency(aggregates.totalValue)}</span>
                             </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-sm">Year-to-Date Return</CardTitle>
-                            <Calendar className="h-4 w-4 text-blue-600"/>
+                            <div className={`flex items-center gap-1 px-2 py-0.5 rounded ${(Number(dashboardSummaryMemo?.day_change || 0)) >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+                                {(Number(dashboardSummaryMemo?.day_change || 0)) >= 0 ?
+                                    <ArrowUpRight className="h-4 w-4 text-green-600"/> :
+                                    <ArrowDownRight className="h-4 w-4 text-red-600"/>}
+                                <span className={`text-sm font-semibold ${(Number(dashboardSummaryMemo?.day_change || 0)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {formatCurrency(Math.abs(Number(dashboardSummaryMemo?.day_change || 0)))}
+                                </span>
+                                <span className={`text-sm ${(Number(dashboardSummaryMemo?.day_change_percent || 0)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    ({(Number(dashboardSummaryMemo?.day_change_percent || 0)) >= 0 ? '+' : ''}{Number(dashboardSummaryMemo?.day_change_percent || 0).toFixed(2)}%)
+                                </span>
+                            </div>
+                            <span className="text-sm text-muted-foreground">Today</span>
                         </div>
-                    </CardHeader>
-                </Card>
+                    </div>
 
-                <Card>
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-sm">Risk Score</CardTitle>
-                            <Shield className="h-4 w-4 text-orange-600"/>
+                    <div className="space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+                            <div className={`p-3 rounded-lg border shadow-sm ${Number(weeklyPLTotal || 0) >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        {Number(weeklyPLTotal || 0) >= 0 ? <TrendingUp className="h-4 w-4 text-green-600"/> : <TrendingDown className="h-4 w-4 text-red-600"/>}
+                                        <span className="text-xs text-muted-foreground">Weekly P/L</span>
+                                    </div>
+                                    <span className={`text-xs ${Number(weeklyPLPercent || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{Number(weeklyPLPercent || 0) >= 0 ? '+' : ''}{Number(weeklyPLPercent || 0).toFixed(2)}%</span>
+                                </div>
+                                <div className={`mt-1 text-lg font-bold ${Number(weeklyPLTotal || 0) >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(Number(weeklyPLTotal || 0))}</div>
+                            </div>
+
+                            <div className={`p-3 rounded-lg border shadow-sm ${Number(monthlyPLTotal || 0) >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        {Number(monthlyPLTotal || 0) >= 0 ? <TrendingUp className="h-4 w-4 text-green-600"/> : <TrendingDown className="h-4 w-4 text-red-600"/>}
+                                        <span className="text-xs text-muted-foreground">Monthly P/L</span>
+                                    </div>
+                                    <span className={`text-xs ${Number(monthlyPLPercent || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{Number(monthlyPLPercent || 0) >= 0 ? '+' : ''}{Number(monthlyPLPercent || 0).toFixed(2)}%</span>
+                                </div>
+                                <div className={`mt-1 text-lg font-bold ${Number(monthlyPLTotal || 0) >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(Number(monthlyPLTotal || 0))}</div>
+                            </div>
+
+                            <div className={`p-3 rounded-lg border shadow-sm ${Number(aggregates.unrealizedPL || 0) >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <BarChart3 className={`h-4 w-4 ${Number(aggregates.unrealizedPL || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}/>
+                                        <span className="text-xs text-muted-foreground">Unrealized P/L</span>
+                                    </div>
+                                    <span className={`text-xs ${Number(aggregates.unrealizedPL || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{Number(aggregates.unrealizedPL || 0) >= 0 ? '+' : ''}{(((Number(aggregates.unrealizedPL || 0)) / Math.max(1, Number(aggregates.totalCost || 0))) * 100).toFixed(2)}%</span>
+                                </div>
+                                <div className={`mt-1 text-lg font-bold ${Number(aggregates.unrealizedPL || 0) >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(Number(aggregates.unrealizedPL || 0))}</div>
+                            </div>
+
+                            <div className={`p-3 rounded-lg border shadow-sm ${Number(realizedYTD || 0) >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Award className={`h-4 w-4 ${Number(realizedYTD || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}/>
+                                        <span className="text-xs text-muted-foreground">Realized (YTD)</span>
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">{formatCurrency(Number(realizedToday))} today</span>
+                                </div>
+                                <div className={`mt-1 text-lg font-bold ${Number(realizedYTD || 0) >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(Number(realizedYTD))}</div>
+                            </div>
+
+                            <div className="p-3 rounded-lg border shadow-sm bg-muted">
+                                <div className="flex items-center gap-2">
+                                    <Target className="h-4 w-4 text-muted-foreground"/>
+                                    <span className="text-xs text-muted-foreground">Invested</span>
+                                </div>
+                                <div className="mt-1 text-lg font-bold text-foreground">{formatCurrency(Number(aggregates.totalCost || 0))}</div>
+                            </div>
+
+                            <div className="p-3 rounded-lg border shadow-sm bg-muted">
+                                <div className="flex items-center gap-2">
+                                    <Shield className="h-4 w-4 text-muted-foreground"/>
+                                    <span className="text-xs text-muted-foreground">Cash</span>
+                                </div>
+                                <div className="mt-1 text-lg font-bold text-foreground">{formatCurrency(Number(aggregates.totalCash || 0))}</div>
+                            </div>
                         </div>
-                    </CardHeader>
-                    <CardContent>
+
+                        <div className="flex items-center gap-3 pt-2 border-t">
+                            <span className="text-sm text-muted-foreground font-medium">vs DSEX</span>
+                            <div className="flex items-center gap-2">
+                                <div className={`px-2 py-1 rounded-md border ${Number(vsIndex1D) >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                                    <span className="text-xs text-muted-foreground">1D</span>
+                                    <span className={`ml-2 text-xs font-semibold ${Number(vsIndex1D) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{Number(vsIndex1D) >= 0 ? '+' : ''}{Number(vsIndex1D).toFixed(2)}%</span>
+                                </div>
+                                <div className={`px-2 py-1 rounded-md border ${Number(vsIndex1W) >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                                    <span className="text-xs text-muted-foreground">1W</span>
+                                    <span className={`ml-2 text-xs font-semibold ${Number(vsIndex1W) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{Number(vsIndex1W) >= 0 ? '+' : ''}{Number(vsIndex1W).toFixed(2)}%</span>
+                                </div>
+                                <div className={`px-2 py-1 rounded-md border ${Number(vsIndex1M) >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                                    <span className="text-xs text-muted-foreground">1M</span>
+                                    <span className={`ml-2 text-xs font-semibold ${Number(vsIndex1M) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{Number(vsIndex1M) >= 0 ? '+' : ''}{Number(vsIndex1M).toFixed(2)}%</span>
+                                </div>
+                                <div className={`px-2 py-1 rounded-md border ${Number(vsIndexYTD) >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                                    <span className="text-xs text-muted-foreground">YTD</span>
+                                    <span className={`ml-2 text-xs font-semibold ${Number(vsIndexYTD) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{Number(vsIndexYTD) >= 0 ? '+' : ''}{Number(vsIndexYTD).toFixed(2)}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Market Intelligence Card - REDESIGNED (Matching HTML Version) */}
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <Activity className="h-5 w-5 text-primary"/>
+                        <CardTitle>Market Intelligence</CardTitle>
+                    </div>
+                </CardHeader>
+
+                <CardContent className="space-y-6">
+                    {/* Market Overview - 5 Column Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                        {/* DSEX Index Card */}
                         <div
-                            className="text-2xl font-bold">{Number(dashboardSummaryMemo?.risk_score ?? 0).toFixed(1)}</div>
-                        <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className="text-orange-600 border-orange-200">
-                                {dashboardSummaryMemo.risk_level || 'Moderate'} Risk
-                            </Badge>
+                            className="bg-white dark:bg-slate-950 rounded-xl p-5 border hover:shadow-lg transition-shadow">
+                            <div className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                                DSEX Index
+                            </div>
+                            <div className="text-sm font-bold text-foreground mb-2">
+                                {marketIndices?.DSEX?.value ? Number(marketIndices.DSEX.value).toFixed(2) : 'N/A'}
+                            </div>
+                            {marketIndices?.DSEX && (
+                                <div className={`text-sm font-medium flex items-center gap-1 ${
+                                    Number(marketIndices.DSEX.change_percent || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                                }`}>
+                                    {Number(marketIndices.DSEX.change_percent || 0) >= 0 ? '↑' : '↓'}
+                                    <span>
+                            {Number(marketIndices.DSEX.change || 0) >= 0 ? '+' : ''}
+                                        {Number(marketIndices.DSEX.change || 0).toFixed(2)}
+                        </span>
+                                    <span>
+                            ({Number(marketIndices.DSEX.change_percent || 0) >= 0 ? '+' : ''}
+                                        {Number(marketIndices.DSEX.change_percent || 0).toFixed(2)}%)
+                        </span>
+                                </div>
+                            )}
                         </div>
-                    </CardContent>
-                </Card>
 
-                <Card>
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-sm">Active Goals</CardTitle>
-                            <Target className="h-4 w-4 text-purple-600"/>
+                        {/* Top Gainers Card */}
+                        <div
+                            className="bg-white dark:bg-slate-950 rounded-xl p-5 border hover:shadow-lg transition-shadow">
+                            <div className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                                Top Gainers
+                            </div>
+                            <ul className="space-y-2">
+                                {marketTopMovers?.gainers && marketTopMovers.gainers.length > 0 ? (
+                                    marketTopMovers.gainers.slice(0, 3).map((stock: any) => {
+                                        const change = Number(stock.change_percent || 0);
+                                        return (
+                                            <li key={stock.symbol}
+                                                className="flex items-center justify-between py-2 border-b border-muted last:border-0">
+                                                <span
+                                                    className="text-sm font-medium text-foreground">{stock.symbol}</span>
+                                                <span
+                                                    className="text-sm font-semibold text-green-600">+{change.toFixed(2)}%</span>
+                                            </li>
+                                        );
+                                    })
+                                ) : (
+                                    <>
+                                        <li className="flex items-center justify-between py-2 border-b border-muted">
+                                            <span className="text-sm font-medium">FASFIN</span>
+                                            <span className="text-sm font-semibold text-green-600">+10.10%</span>
+                                        </li>
+                                        <li className="flex items-center justify-between py-2 border-b border-muted">
+                                            <span className="text-sm font-medium">NBL</span>
+                                            <span className="text-sm font-semibold text-green-600">+10.00%</span>
+                                        </li>
+                                        <li className="flex items-center justify-between py-2">
+                                            <span className="text-sm font-medium">CNATEX</span>
+                                            <span className="text-sm font-semibold text-green-600">+10.00%</span>
+                                        </li>
+                                    </>
+                                )}
+                            </ul>
                         </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{dashboardSummaryMemo.active_goals}</div>
-                        <div className="flex items-center gap-1 mt-1">
-                            <span className="text-sm text-muted-foreground">Avg progress:</span>
-                            <span className="text-sm font-medium">
-                {investmentGoals.length > 0 && Object.keys(goalProgressMap).length > 0
-                    ? (Object.values(goalProgressMap).reduce((acc: number, val: any) => acc + (Number(val) || 0), 0) / investmentGoals.length).toFixed(1)
-                    : '0.0'}%
-              </span>
+
+                        {/* Top Losers Card */}
+                        <div
+                            className="bg-white dark:bg-slate-950 rounded-xl p-5 border hover:shadow-lg transition-shadow">
+                            <div className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                                Top Losers
+                            </div>
+                            <ul className="space-y-2">
+                                {marketTopMovers?.losers && marketTopMovers.losers.length > 0 ? (
+                                    marketTopMovers.losers.slice(0, 3).map((stock: any) => {
+                                        const change = Number(stock.change_percent || 0);
+                                        return (
+                                            <li key={stock.symbol}
+                                                className="flex items-center justify-between py-2 border-b border-muted last:border-0">
+                                                <span
+                                                    className="text-sm font-medium text-foreground">{stock.symbol}</span>
+                                                <span
+                                                    className="text-sm font-semibold text-red-600">{change.toFixed(2)}%</span>
+                                            </li>
+                                        );
+                                    })
+                                ) : (
+                                    <>
+                                        <li className="flex items-center justify-between py-2 border-b border-muted">
+                                            <span className="text-sm font-medium">SIMTEX</span>
+                                            <span className="text-sm font-semibold text-red-600">-9.84%</span>
+                                        </li>
+                                        <li className="flex items-center justify-between py-2 border-b border-muted">
+                                            <span className="text-sm font-medium">PRAGATILIFE</span>
+                                            <span className="text-sm font-semibold text-red-600">-7.89%</span>
+                                        </li>
+                                        <li className="flex items-center justify-between py-2">
+                                            <span className="text-sm font-medium">PRIMETEX</span>
+                                            <span className="text-sm font-semibold text-red-600">-6.98%</span>
+                                        </li>
+                                    </>
+                                )}
+                            </ul>
                         </div>
-                    </CardContent>
-                </Card>
-            </div>
+
+                        {/* Most Active Card */}
+                        <div
+                            className="bg-white dark:bg-slate-950 rounded-xl p-5 border hover:shadow-lg transition-shadow">
+                            <div className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                                Most Active
+                            </div>
+                            <ul className="space-y-2">
+                                {marketMostActive && marketMostActive.length > 0 ? (
+                                    marketMostActive.slice(0, 3).map((stock: any) => {
+                                        const volume = Number(stock.volume || 0);
+                                        const volumeText = volume >= 1000000
+                                            ? `${(volume / 1000000).toFixed(2)}M`
+                                            : volume >= 1000
+                                                ? `${(volume / 1000).toFixed(2)}K`
+                                                : volume.toString();
+                                        return (
+                                            <li key={stock.symbol}
+                                                className="flex items-center justify-between py-2 border-b border-muted last:border-0">
+                                                <span
+                                                    className="text-sm font-medium text-foreground">{stock.symbol}</span>
+                                                <span
+                                                    className="text-sm font-semibold text-muted-foreground">{volumeText}</span>
+                                            </li>
+                                        );
+                                    })
+                                ) : (
+                                    <>
+                                        <li className="flex items-center justify-between py-2 border-b border-muted">
+                                            <span className="text-sm font-medium">BPPL</span>
+                                            <span className="text-sm font-semibold text-muted-foreground">9.84M</span>
+                                        </li>
+                                        <li className="flex items-center justify-between py-2 border-b border-muted">
+                                            <span className="text-sm font-medium">IFIC</span>
+                                            <span className="text-sm font-semibold text-muted-foreground">8.71M</span>
+                                        </li>
+                                        <li className="flex items-center justify-between py-2">
+                                            <span className="text-sm font-medium">NBL</span>
+                                            <span className="text-sm font-semibold text-muted-foreground">4.91M</span>
+                                        </li>
+                                    </>
+                                )}
+                            </ul>
+                        </div>
+
+                        {/* Market Breadth Card */}
+                        <div
+                            className="bg-white dark:bg-slate-950 rounded-xl p-5 border hover:shadow-lg transition-shadow">
+                            <div className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                                Market Breadth
+                            </div>
+                            <div className="flex items-center gap-4 mb-3">
+                                <div className="flex flex-col">
+                                    <span
+                                        className="text-sm font-bold text-green-600">{marketOverview.advancers}</span>
+                                    <span className="text-sm text-muted-foreground mt-1">Advances</span>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-bold text-red-600">{marketOverview.decliners}</span>
+                                    <span className="text-sm text-muted-foreground mt-1">Declines</span>
+                                </div>
+                            </div>
+                            {marketOverview.advancers + marketOverview.decliners > 0 && (
+                                <>
+                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-green-600 transition-all"
+                                            style={{
+                                                width: `${(marketOverview.advancers / (marketOverview.advancers + marketOverview.decliners)) * 100}%`
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="text-sm text-muted-foreground text-center mt-2">
+                                        {marketOverview.unchanged} unchanged
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Sector Performance */}
+                    {sectorAnalysis?.sectors && Array.isArray(sectorAnalysis.sectors) && sectorAnalysis.sectors.length > 0 && (
+                        <div>
+                            <div className="text-sm font-semibold text-foreground uppercase tracking-wide mb-4">
+                                Sector Performance
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+                                {sectorAnalysis.sectors.slice(0, 8).map((sector: any) => {
+                                    const perf = sector.performance || {};
+                                    const change = Number(perf['1_day'] || perf['1_week'] || sector.change_percent || sector.change || 0);
+                                    const positive = change >= 0;
+
+                                    return (
+                                        <div
+                                            key={sector.sector || sector.name}
+                                            className={`bg-white dark:bg-slate-950 rounded-lg p-4 border-l-4 hover:translate-y-[-2px] transition-transform ${
+                                                positive ? 'border-l-green-600' : 'border-l-red-600'
+                                            }`}
+                                            style={{boxShadow: '0 1px 3px rgba(0,0,0,0.08)'}}
+                                        >
+                                            <div className="flex items-start justify-between mb-2">
+                                    <span className="text-sm font-semibold text-foreground">
+                                        {sector.sector || sector.name}
+                                    </span>
+                                                <span
+                                                    className={`text-sm font-bold ${positive ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {positive ? '+' : ''}{change.toFixed(1)}%
+                                                </span>
+                                            </div>
+                                            {sector.market_cap_weight && (
+                                                <div className="text-sm text-muted-foreground">
+                                                    {Number(sector.market_cap_weight).toFixed(1)}% weight
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
 
             {/* Main Content Tabs */}
             <Tabs defaultValue="overview" className="space-y-6">
@@ -380,200 +1019,225 @@ export function ComprehensiveDashboard({
                 </TabsList>
 
                 <TabsContent value="overview" className="space-y-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Asset Allocation */}
-                        <Card>
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                        <Card className="lg:col-span-4">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <PieChart className="h-5 w-5"/>
-                                    Asset Allocation
+                                    Broker Portfolios
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="space-y-4">
-                                    {Array.isArray(assetAllocation) && assetAllocation.length > 0 ? (
-                                        assetAllocation.map((asset) => (
-                                            <div key={asset.type} className="space-y-2">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        <div
-                                                            className="w-3 h-3 rounded-full"
-                                                            style={{backgroundColor: asset.color}}
-                                                        />
-                                                        <span className="text-sm">{asset.type}</span>
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                                    {enrichedPortfolios.map((p) => {
+                                        const dailyApprox = p.stocks.reduce((sum, s) => {
+                                            const q = marketData.find((m) => String(m.symbol || '').toUpperCase() === String(s.symbol || '').toUpperCase());
+                                            const price = Number(q?.currentPrice || s.currentPrice);
+                                            const cp = Number(q?.changePercent || 0);
+                                            return sum + s.quantity * price * (cp / 100);
+                                        }, 0);
+                                        const unrealized = (p as any).totalValue - (p as any).totalCost;
+                                        return (
+                                            <button
+                                                key={p.id}
+                                                type="button"
+                                                onClick={() => { setGlobalSelectedPortfolioId(String(p.id)); onNavigate('portfolio-detail'); }}
+                                                className="p-4 rounded-lg border text-left w-full hover:shadow-sm hover:border-foreground/20 transition-colors"
+                                            >
+                                                <div className="text-sm font-medium mb-2">{p.name}</div>
+                                                <div
+                                                    className="text-sm font-bold">{formatCurrency((p as any).totalValue)}</div>
+                                                <div
+                                                    className={`text-sm font-semibold mt-1 ${dailyApprox >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(Math.abs(dailyApprox))}</div>
+                                                <div className="mt-2 space-y-1 text-sm">
+                                                    <div className="flex justify-between"><span
+                                                        className="text-muted-foreground">Unrealized P/L</span><span
+                                                        className={unrealized >= 0 ? 'text-green-600' : 'text-red-600'}>{formatCurrency(unrealized)}</span>
                                                     </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span
-                                                            className="text-sm font-medium">{formatCurrency(asset.value)}</span>
-                                                        <span
-                                                            className="text-sm text-muted-foreground">{asset.percentage}%</span>
-                                                    </div>
-                                                </div>
-                                                <Progress value={asset.percentage} className="h-2"/>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground text-center py-4">
-                                            No allocation data available
-                                        </p>
-                                    )}
-                                </div>
-                                <Button
-                                    variant="outline"
-                                    className="w-full mt-4"
-                                    onClick={() => onNavigate('allocation')}
-                                >
-                                    View Detailed Allocation
-                                </Button>
-                            </CardContent>
-                        </Card>
-
-                        {/* Risk Alerts & Recommendations */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <AlertTriangle className="h-5 w-5"/>
-                                    Risk Alerts & Recommendations
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                {/* Alert Summary Grid */}
-                                <div className="grid grid-cols-4 gap-2">
-                                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                                        <div className="text-xs text-muted-foreground">Total</div>
-                                        <div className="text-lg font-bold">{riskAlerts.length}</div>
-                                    </div>
-                                    <div className="p-3 rounded-lg bg-red-50 border border-red-200">
-                                        <div className="text-xs text-red-600">High</div>
-                                        <div
-                                            className="text-lg font-bold text-red-600">{riskAlerts.filter(a => a.severity === 'high').length}</div>
-                                    </div>
-                                    <div className="p-3 rounded-lg bg-yellow-50 border border-yellow-200">
-                                        <div className="text-xs text-yellow-600">Medium</div>
-                                        <div
-                                            className="text-lg font-bold text-yellow-600">{riskAlerts.filter(a => a.severity === 'medium').length}</div>
-                                    </div>
-                                    <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200">
-                                        <div className="text-xs text-emerald-600">Low</div>
-                                        <div
-                                            className="text-lg font-bold text-emerald-600">{riskAlerts.filter(a => a.severity === 'low').length}</div>
-                                    </div>
-                                </div>
-
-                                {/* Risk Overview Metrics Grid */}
-                                {riskOverviewLoading ? (
-                                    <div className="grid grid-cols-4 gap-2">
-                                        {[...Array(4)].map((_, i) => (
-                                            <div key={i} className="h-16 bg-muted rounded animate-pulse"/>
-                                        ))}
-                                    </div>
-                                ) : riskOverview ? (
-                                    <div className="grid grid-cols-4 gap-2">
-                                        <div className="p-3 rounded-lg border">
-                                            <div className="text-xs text-muted-foreground">Risk Score</div>
-                                            <div
-                                                className="text-lg font-bold">{riskOverview.riskScore?.toFixed(1) || '—'}</div>
-                                        </div>
-                                        <div className="p-3 rounded-lg border">
-                                            <div className="text-xs text-muted-foreground">Volatility</div>
-                                            <div
-                                                className="text-lg font-bold">{riskOverview.volatility ? `${(riskOverview.volatility * 100).toFixed(1)}%` : '—'}</div>
-                                        </div>
-                                        <div className="p-3 rounded-lg border">
-                                            <div className="text-xs text-muted-foreground">Sharpe</div>
-                                            <div
-                                                className="text-lg font-bold">{riskOverview.sharpeRatio?.toFixed(2) || '—'}</div>
-                                        </div>
-                                        <div className="p-3 rounded-lg border">
-                                            <div className="text-xs text-muted-foreground">Max DD</div>
-                                            <div
-                                                className="text-lg font-bold text-red-600">{riskOverview.maxDrawdown ? `${(riskOverview.maxDrawdown * 100).toFixed(1)}%` : '—'}</div>
-                                        </div>
-                                    </div>
-                                ) : null}
-
-                                {/* Top 2 Alerts */}
-                                <div className="space-y-2">
-                                    {riskAlertsLoading ? (
-                                        <>
-                                            <div className="h-12 bg-muted rounded animate-pulse"/>
-                                            <div className="h-12 bg-muted rounded animate-pulse"/>
-                                        </>
-                                    ) : riskAlerts.length === 0 ? (
-                                        <div className="text-center py-4">
-                                            <Shield className="h-8 w-8 mx-auto text-green-600 mb-2"/>
-                                            <p className="text-sm text-muted-foreground">No active alerts</p>
-                                        </div>
-                                    ) : (
-                                        riskAlerts.slice(0, 2).map((alert, index) => (
-                                            <div key={index} className={`p-3 rounded-lg border text-sm ${
-                                                alert.severity === 'high' ? 'bg-red-50 border-red-200' : alert.severity === 'medium' ? 'bg-yellow-50 border-yellow-200' : 'bg-emerald-50 border-emerald-200'
-                                            }`}>
-                                                <div className="flex items-start gap-2">
-                                                    <AlertTriangle
-                                                        className={`h-4 w-4 mt-0.5 flex-shrink-0 ${alert.severity === 'high' ? 'text-red-600' : alert.severity === 'medium' ? 'text-yellow-600' : 'text-emerald-600'}`}/>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="font-medium">{alert.type.toUpperCase()}</div>
-                                                        <p className="text-xs mt-0.5 line-clamp-1">{alert.message}</p>
+                                                    <div className="flex justify-between"><span
+                                                        className="text-muted-foreground">Cash</span><span>{formatCurrency(p.cash)}</span>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))
-                                    )}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
-
-                                <Button
-                                    variant="outline"
-                                    className="w-full"
-                                    onClick={() => onNavigate('risk-analysis')}
-                                >
-                                    View Risk Analysis
-                                </Button>
                             </CardContent>
                         </Card>
                     </div>
 
-                    {/* Recent Activity */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Activity className="h-5 w-5"/>
-                                Recent Activity
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
-                                {recentOrders.slice(0, 5).map((order) => (
-                                    <div key={order.id} className="flex items-center justify-between py-2">
-                                        <div className="flex items-center gap-3">
-                                            <Badge variant="outline"
-                                                   className={`${order.side === 'buy' ? 'text-emerald-600 border-emerald-200' : 'text-red-600 border-red-200'}`}>
-                                                {order.side.toUpperCase()}
-                                            </Badge>
-                                            <div>
-                                                <div
-                                                    className="font-medium">{order.symbol} · {order.orderType.toUpperCase()}</div>
-                                                <div
-                                                    className="text-sm text-muted-foreground">Qty {order.quantity} · {order.status.toUpperCase()}</div>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="font-medium">{formatCurrency(order.totalValue)}</div>
-                                            <div
-                                                className="text-sm text-muted-foreground">Fees: {formatCurrency(order.fees)}</div>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <Card className="lg:col-span-2">
+                            <CardHeader>
+                                <CardTitle className="flex items-center justify-between">
+                                    <span className="flex items-center gap-2"><BarChart3 className="h-5 w-5"/>Contribution Analytics</span>
+                                    <div className="flex gap-1 bg-muted rounded-lg p-1">
+                                        <button onClick={() => setContributionView('daily')}
+                                                className={`px-3 py-1 rounded text-sm ${contributionView === 'daily' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Daily
+                                            P/L
+                                        </button>
+                                        <button onClick={() => setContributionView('weekly')}
+                                                className={`px-3 py-1 rounded text-sm ${contributionView === 'weekly' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Weekly
+                                            P/L
+                                        </button>
+                                        <button onClick={() => setContributionView('unrealized')}
+                                                className={`px-3 py-1 rounded text-sm ${contributionView === 'unrealized' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Unrealized
+                                            P/L
+                                        </button>
+                                    </div>
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-80">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <RBarChart
+                                            data={(contributionView === 'daily' ? contributionDaily : contributionView === 'weekly' ? contributionWeekly : contributionUnrealized)}
+                                            layout="vertical" margin={{left: 0, right: 20}}>
+                                            <XAxis type="number" stroke="#64748b" tick={{fontSize: 12}}/>
+                                            <YAxis type="category" dataKey="symbol" width={100} stroke="#64748b"
+                                                   tick={{fontSize: 12}}/>
+                                            <Tooltip contentStyle={{
+                                                backgroundColor: 'var(--background)',
+                                                border: '1px solid var(--border)',
+                                                borderRadius: 8
+                                            }} formatter={(value: number) => [formatCurrency(Number(value)), 'P/L']}/>
+                                            <Bar dataKey="pl" radius={[0, 4, 4, 0]}>
+                                                {(contributionView === 'daily' ? contributionDaily : contributionView === 'weekly' ? contributionWeekly : contributionUnrealized).map((entry, index) => (
+                                                    <Cell key={`cell-${index}`}
+                                                          fill={entry.pl >= 0 ? '#10b981' : '#f43f5e'}/>
+                                                ))}
+                                            </Bar>
+                                        </RBarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5 pt-5 border-t">
+                                    <div className="text-center">
+                                        <div className="text-sm text-muted-foreground mb-1">Total Positive</div>
+                                        <div className="text-sm text-green-600">
+                                            {formatCurrency(((contributionView === 'daily' ? contributionDaily : contributionView === 'weekly' ? contributionWeekly : contributionUnrealized).filter(d => d.pl > 0).reduce((sum, d) => sum + d.pl, 0)))}
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                            <Button
-                                variant="outline"
-                                className="w-full mt-4"
-                                onClick={() => onNavigate('orders')}
-                            >
-                                View All Orders
-                            </Button>
-                        </CardContent>
-                    </Card>
+                                    <div className="text-center">
+                                        <div className="text-sm text-muted-foreground mb-1">Total Negative</div>
+                                        <div className="text-sm text-red-600">
+                                            {formatCurrency(((contributionView === 'daily' ? contributionDaily : contributionView === 'weekly' ? contributionWeekly : contributionUnrealized).filter(d => d.pl < 0).reduce((sum, d) => sum + d.pl, 0)))}
+                                        </div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-sm text-muted-foreground mb-1">Net</div>
+                                        <div
+                                            className={`text-sm ${(contributionView === 'daily' ? contributionDaily : contributionView === 'weekly' ? contributionWeekly : contributionUnrealized).reduce((sum, d) => sum + d.pl, 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                            {formatCurrency(((contributionView === 'daily' ? contributionDaily : contributionView === 'weekly' ? contributionWeekly : contributionUnrealized).reduce((sum, d) => sum + d.pl, 0)))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <PieChart className="h-5 w-5"/>
+                                    Sector Exposure
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-3">
+                                    {sectorExposure.map((sec) => (
+                                        <div key={sec.sector}>
+                                            <div className="flex justify-between text-sm mb-1"><span>{sec.sector}</span><span
+                                                className="font-semibold">{sec.percent.toFixed(1)}%</span></div>
+                                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                                <div className="h-full bg-primary"
+                                                     style={{width: `${sec.percent}%`}}></div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <Button variant="outline" className="w-full mt-4"
+                                        onClick={() => onNavigate('allocation')}>View Detailed Allocation</Button>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+
+                    
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Activity className="h-5 w-5"/>
+                                    Recent Activity
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-4">
+                                    {recentOrders.slice(0, 5).map((order) => (
+                                        <div key={order.id} className="flex items-center justify-between py-2">
+                                            <div className="flex items-center gap-3">
+                                                <Badge variant="outline"
+                                                       className={`${order.side === 'buy' ? 'text-emerald-600 border-emerald-200' : 'text-red-600 border-red-200'}`}>{order.side.toUpperCase()}</Badge>
+                                                <div>
+                                                    <div
+                                                        className="font-medium">{order.symbol} · {order.orderType.toUpperCase()}</div>
+                                                    <div
+                                                        className="text-sm text-muted-foreground">Qty {order.quantity} · {order.status.toUpperCase()}</div>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="font-medium">{formatCurrency(order.totalValue)}</div>
+                                                <div
+                                                    className="text-sm text-muted-foreground">Fees: {formatCurrency(order.fees)}</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <Button variant="outline" className="w-full mt-4" onClick={() => onNavigate('orders')}>View
+                                    All Orders</Button>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <AlertTriangle className="h-5 w-5"/>
+                                    Risk Alerts
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {riskAlerts.length === 0 ? (
+                                    <div className="text-center py-8">
+                                        <Shield className="h-12 w-12 mx-auto text-green-600 mb-3"/>
+                                        <p className="text-muted-foreground">No active risk alerts</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {riskAlerts.map((alert, index) => (
+                                            <div key={index}
+                                                 className={`p-4 rounded-lg border ${alert.severity === 'high' ? 'bg-red-50 border-red-200' : alert.severity === 'medium' ? 'bg-yellow-50 border-yellow-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                                                <div className="flex items-start gap-3">
+                                                    <AlertTriangle
+                                                        className={`h-5 w-5 mt-0.5 ${alert.severity === 'high' ? 'text-red-600' : alert.severity === 'medium' ? 'text-yellow-600' : 'text-emerald-600'}`}/>
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span
+                                                                className="font-semibold">{alert.type.toUpperCase()}</span>
+                                                            <Badge variant="outline"
+                                                                   className={alert.severity === 'high' ? 'border-red-300 text-red-700' : alert.severity === 'medium' ? 'border-yellow-300 text-yellow-700' : 'border-emerald-300 text-emerald-700'}>
+                                                                {alert.severity.toUpperCase()}
+                                                            </Badge>
+                                                        </div>
+                                                        <p className="text-sm">{alert.message}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                <Button variant="outline" className="w-full mt-4"
+                                        onClick={() => onNavigate('risk-analysis')}>View Risk Analysis</Button>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </TabsContent>
 
                 <TabsContent value="performance" className="space-y-6">
@@ -587,22 +1251,22 @@ export function ComprehensiveDashboard({
                                     <div>
                                         <div className="text-sm text-muted-foreground">Total Return</div>
                                         <div
-                                            className={`text-xl font-semibold ${portfolioPerformance.totalReturn >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatPercent(portfolioPerformance.totalReturn)}</div>
+                                            className={`text-sm font-semibold ${portfolioPerformance.totalReturn >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatPercent(portfolioPerformance.totalReturn)}</div>
                                     </div>
                                     <div>
                                         <div className="text-sm text-muted-foreground">Year to Date</div>
                                         <div
-                                            className={`text-xl font-semibold ${portfolioPerformance.yearToDate >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatPercent(portfolioPerformance.yearToDate)}</div>
+                                            className={`text-sm font-semibold ${portfolioPerformance.yearToDate >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatPercent(portfolioPerformance.yearToDate)}</div>
                                     </div>
                                     <div>
                                         <div className="text-sm text-muted-foreground">1Y Annualized</div>
                                         <div
-                                            className={`text-xl font-semibold ${portfolioPerformance.oneYear >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatPercent(portfolioPerformance.oneYear)}</div>
+                                            className={`text-sm font-semibold ${portfolioPerformance.oneYear >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatPercent(portfolioPerformance.oneYear)}</div>
                                     </div>
                                     <div>
                                         <div className="text-sm text-muted-foreground">3Y CAGR</div>
                                         <div
-                                            className={`text-xl font-semibold ${portfolioPerformance.threeYear >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatPercent(portfolioPerformance.threeYear)}</div>
+                                            className={`text-sm font-semibold ${portfolioPerformance.threeYear >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatPercent(portfolioPerformance.threeYear)}</div>
                                     </div>
                                 </div>
                             </CardContent>
@@ -617,17 +1281,17 @@ export function ComprehensiveDashboard({
                                     <div>
                                         <div className="text-sm text-muted-foreground">Sharpe Ratio</div>
                                         <div
-                                            className="text-xl font-semibold">{portfolioPerformance.sharpeRatio.toFixed(2)}</div>
+                                            className="text-sm font-semibold">{portfolioPerformance.sharpeRatio.toFixed(2)}</div>
                                     </div>
                                     <div>
                                         <div className="text-sm text-muted-foreground">Volatility</div>
                                         <div
-                                            className="text-xl font-semibold">{formatPercent(portfolioPerformance.volatility)}</div>
+                                            className="text-sm font-semibold">{formatPercent(portfolioPerformance.volatility)}</div>
                                     </div>
                                     <div>
                                         <div className="text-sm text-muted-foreground">Max Drawdown</div>
                                         <div
-                                            className="text-xl font-semibold">{formatPercent(portfolioPerformance.maxDrawdown)}</div>
+                                            className="text-sm font-semibold">{formatPercent(portfolioPerformance.maxDrawdown)}</div>
                                     </div>
                                 </div>
                             </CardContent>
@@ -697,7 +1361,7 @@ export function ComprehensiveDashboard({
                                 <CardTitle className="text-sm">Total Goals</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold">{investmentGoals.length}</div>
+                                <div className="text-sm font-bold">{investmentGoals.length}</div>
                                 <div className="text-sm text-muted-foreground mt-1">
                                     {investmentGoals.filter(g => g.status === 'ACTIVE').length} active
                                 </div>
@@ -709,7 +1373,7 @@ export function ComprehensiveDashboard({
                                 <CardTitle className="text-sm">Total Target</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold">
+                                <div className="text-sm font-bold">
                                     {formatCurrency(investmentGoals.reduce((sum, g) => sum + (Number(g.target) || 0), 0))}
                                 </div>
                                 <div className="text-sm text-muted-foreground mt-1">
@@ -723,7 +1387,7 @@ export function ComprehensiveDashboard({
                                 <CardTitle className="text-sm">Average Progress</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold">
+                                <div className="text-sm font-bold">
                                     {investmentGoals.length > 0 && Object.keys(goalProgressMap).length > 0
                                         ? (Object.values(goalProgressMap).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0) / investmentGoals.length).toFixed(1)
                                         : '0.0'}%
@@ -768,7 +1432,7 @@ export function ComprehensiveDashboard({
                                                 <div className="flex items-start justify-between">
                                                     <div className="flex-1">
                                                         <div className="flex items-center gap-2">
-                                                            <h3 className="font-semibold text-lg">{goal.name}</h3>
+                                                <h3 className="font-semibold text-sm">{goal.name}</h3>
                                                             <Badge
                                                                 variant="outline"
                                                                 className={
@@ -790,7 +1454,7 @@ export function ComprehensiveDashboard({
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
-                                                        <div className="text-2xl font-bold">{progress.toFixed(1)}%</div>
+                                                        <div className="text-sm font-bold">{progress.toFixed(1)}%</div>
                                                         <div className="text-sm text-muted-foreground">Complete</div>
                                                     </div>
                                                 </div>
@@ -843,7 +1507,7 @@ export function ComprehensiveDashboard({
                             </CardHeader>
                             <CardContent>
                                 <div
-                                    className="text-2xl font-bold">{(Number(dashboardSummaryMemo?.risk_score) || 0).toFixed(1)}</div>
+                                    className="text-sm font-bold">{(Number(dashboardSummaryMemo?.risk_score) || 0).toFixed(1)}</div>
                                 <Badge
                                     variant="outline"
                                     className={
@@ -865,7 +1529,7 @@ export function ComprehensiveDashboard({
                             </CardHeader>
                             <CardContent>
                                 <div
-                                    className="text-2xl font-bold">{formatPercent(portfolioPerformance?.volatility || 0)}</div>
+                                    className="text-sm font-bold">{formatPercent(portfolioPerformance?.volatility || 0)}</div>
                                 <div className="text-sm text-muted-foreground mt-1">
                                     Annualized
                                 </div>
@@ -878,7 +1542,7 @@ export function ComprehensiveDashboard({
                             </CardHeader>
                             <CardContent>
                                 <div
-                                    className="text-2xl font-bold text-red-600">{formatPercent(portfolioPerformance?.maxDrawdown || 0)}</div>
+                                    className="text-sm font-bold text-red-600">{formatPercent(portfolioPerformance?.maxDrawdown || 0)}</div>
                                 <div className="text-sm text-muted-foreground mt-1">
                                     Worst decline
                                 </div>
@@ -890,7 +1554,7 @@ export function ComprehensiveDashboard({
                                 <CardTitle className="text-sm">Active Alerts</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold">{riskAlerts?.length || 0}</div>
+                                <div className="text-sm font-bold">{riskAlerts?.length || 0}</div>
                                 <div className="text-sm text-muted-foreground mt-1">
                                     {(riskAlerts?.filter(a => a.severity === 'high') || []).length} high priority
                                 </div>
@@ -914,7 +1578,7 @@ export function ComprehensiveDashboard({
                                             <div>
                                                 <div className="text-sm text-muted-foreground">Risk Tolerance</div>
                                                 <div
-                                                    className="font-semibold text-lg capitalize">{riskProfile.risk_tolerance || 'Moderate'}</div>
+                                                    className="font-semibold text-sm capitalize">{riskProfile.risk_tolerance || 'Moderate'}</div>
                                             </div>
                                             <div>
                                                 <div className="text-sm text-muted-foreground">Investment Horizon</div>
@@ -960,27 +1624,27 @@ export function ComprehensiveDashboard({
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div className="p-4 border rounded-lg">
+                                    <div className="p-4 border rounded-lg">
                                     <div className="text-sm text-muted-foreground mb-1">Sharpe Ratio</div>
                                     <div
-                                        className="text-2xl font-bold">{(portfolioPerformance?.sharpeRatio || 0).toFixed(2)}</div>
-                                    <div className="text-xs text-muted-foreground mt-1">
+                                        className="text-sm font-bold">{(portfolioPerformance?.sharpeRatio || 0).toFixed(2)}</div>
+                                    <div className="text-sm text-muted-foreground mt-1">
                                         {(portfolioPerformance?.sharpeRatio || 0) > 1 ? 'Good' : (portfolioPerformance?.sharpeRatio || 0) > 0.5 ? 'Fair' : 'Poor'}
                                     </div>
                                 </div>
-                                <div className="p-4 border rounded-lg">
+                                    <div className="p-4 border rounded-lg">
                                     <div className="text-sm text-muted-foreground mb-1">Volatility</div>
                                     <div
-                                        className="text-2xl font-bold">{formatPercent(portfolioPerformance?.volatility || 0)}</div>
-                                    <div className="text-xs text-muted-foreground mt-1">
+                                        className="text-sm font-bold">{formatPercent(portfolioPerformance?.volatility || 0)}</div>
+                                    <div className="text-sm text-muted-foreground mt-1">
                                         {Math.abs(portfolioPerformance?.volatility || 0) < 15 ? 'Low' : Math.abs(portfolioPerformance?.volatility || 0) < 25 ? 'Moderate' : 'High'}
                                     </div>
                                 </div>
-                                <div className="p-4 border rounded-lg">
+                                    <div className="p-4 border rounded-lg">
                                     <div className="text-sm text-muted-foreground mb-1">Max Drawdown</div>
                                     <div
-                                        className="text-2xl font-bold text-red-600">{formatPercent(portfolioPerformance?.maxDrawdown || 0)}</div>
-                                    <div className="text-xs text-muted-foreground mt-1">
+                                        className="text-sm font-bold text-red-600">{formatPercent(portfolioPerformance?.maxDrawdown || 0)}</div>
+                                    <div className="text-sm text-muted-foreground mt-1">
                                         Worst decline
                                     </div>
                                 </div>

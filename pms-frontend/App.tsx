@@ -108,6 +108,19 @@ export default function App() {
     const [selectedChartStock, setSelectedChartStock] = useState<string>("AAPL");
     const [researchChartSymbol, setResearchChartSymbol] = useState<string>("");
     const [fundamentalsSymbol, setFundamentalsSymbol] = useState<string>("");
+    const [detailBackTarget, setDetailBackTarget] = useState<View>("portfolios");
+
+    useEffect(() => {
+        const applyHashToView = () => {
+            const hash = window.location.hash.replace(/^#\/?/, '');
+            if (hash) {
+                setCurrentView(hash as View);
+            }
+        };
+        applyHashToView();
+        window.addEventListener('hashchange', applyHashToView);
+        return () => window.removeEventListener('hashchange', applyHashToView);
+    }, []);
 
     // Portfolio hooks
     const {
@@ -263,7 +276,11 @@ export default function App() {
     // Main app handlers
     const handleViewChange = (view: string) => {
         startTransition(() => {
+            if (view === "portfolio-detail") {
+                setDetailBackTarget(currentView);
+            }
             setCurrentView(view as View);
+            window.location.hash = `/${view}`;
         });
     };
 
@@ -291,11 +308,17 @@ export default function App() {
 
     const handleSelectPortfolio = (portfolio: Portfolio) => {
         setSelectedPortfolioId(portfolio.id);
+        setDetailBackTarget("portfolios");
         setCurrentView("portfolio-detail");
+        window.location.hash = "/portfolio-detail";
     };
 
-    const handleBackToPortfolios = () => {
-        setCurrentView("portfolios");
+    const handleBackFromDetail = () => {
+        const target = detailBackTarget || "portfolios";
+        startTransition(() => {
+            setCurrentView(target);
+            window.location.hash = `/${target}`;
+        });
     };
 
     const handleAddStock = () => {
@@ -420,7 +443,7 @@ export default function App() {
                     <Suspense fallback={<div>Loading Portfolio Detail...</div>}>
                         <PortfolioDetail
                             portfolio={selectedPortfolioDisplay}
-                            onBack={handleBackToPortfolios}
+                            onBack={handleBackFromDetail}
                             onAddStock={handleAddStock}
                             onEditStock={handleEditStock}
                             onDeleteStock={handleDeleteStock}
