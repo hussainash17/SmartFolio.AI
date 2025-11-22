@@ -98,7 +98,7 @@ export function PortfolioPerformance({
                                      }: PortfolioPerformanceProps = {}) {
     const {portfolios, loading: portfoliosLoading} = usePortfolios();
     const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(initialPortfolioId || null);
-    const [selectedPeriod, setSelectedPeriod] = useState("YTD");
+    const [selectedPeriod, setSelectedPeriod] = useState("1W");
     const [selectedBenchmark, setSelectedBenchmark] = useState("DSEX");
     const [showCustomBenchmark, setShowCustomBenchmark] = useState(false);
     const [activeTab, setActiveTab] = useState("overview");
@@ -320,7 +320,7 @@ export function PortfolioPerformance({
             )}
 
             {/* Performance Summary Cards */}
-            {isLoadingPerformanceData ? (
+            {isLoadingCriticalData ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {[1, 2, 3, 4].map((i) => (
                         <Card key={i}>

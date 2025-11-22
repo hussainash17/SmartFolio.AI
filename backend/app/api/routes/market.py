@@ -19,7 +19,16 @@ router = APIRouter(prefix="/market", tags=["market"])
 
 
 @router.get("/summary")
-def get_market_summary(MarketSummary, session: SessionDep) -> Dict[str, Any]:
+def get_market_summary(session: SessionDep) -> Dict[str, Any]:
+    """Get the latest market summary data.
+    
+    Returns the most recent market summary including:
+    - DSE and CSE index values and changes
+    - Market breadth (advancers, decliners, unchanged)
+    - Trading statistics (total trades, volume, turnover)
+    
+    No request parameters required - returns latest available data.
+    """
     latest = session.exec(
         select(MarketSummary).order_by(MarketSummary.timestamp.desc()).limit(1)
     ).first()

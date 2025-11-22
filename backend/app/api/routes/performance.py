@@ -5,8 +5,6 @@ This module contains all portfolio performance analytics endpoints.
 Includes 20 APIs for comprehensive performance tracking and reporting.
 """
 
-import hashlib
-import json
 from datetime import date, datetime, timedelta
 from typing import Optional, Type
 
@@ -30,43 +28,13 @@ from app.model.user import User
 from app.services.benchmark_service import BenchmarkService
 from app.services.daily_valuation_service import DailyValuationService
 from app.services.performance_calculator import PerformanceCalculator
+from app.services.cache_service import get_db_cached_or_compute
 
 router = APIRouter(tags=["performance"])
-
-# Simple in-memory cache for performance data
-_performance_cache = {}
-_cache_ttl = 1200  # 20 minutes
-
 
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
-
-def get_cache_key(*args) -> str:
-    """Generate cache key from arguments."""
-    key_str = json.dumps(args, sort_keys=True, default=str)
-    return hashlib.md5(key_str.encode()).hexdigest()
-
-
-def get_cached_or_compute(cache_key: str, compute_fn, ttl: int = _cache_ttl):
-    """Get from cache or compute and cache the result."""
-    now = datetime.now().timestamp()
-
-    if cache_key in _performance_cache:
-        cached_data, cached_time = _performance_cache[cache_key]
-        if now - cached_time < ttl:
-            return cached_data
-
-    # Compute fresh data
-    result = compute_fn()
-    _performance_cache[cache_key] = (result, now)
-
-    # Clean old cache entries (simple cleanup)
-    if len(_performance_cache) > 1000:
-        cutoff = now - ttl
-        _performance_cache.clear()  # Simple approach: clear all if too large
-
-    return result
 
 
 def get_date_range_from_period(period: str) -> tuple[date, date]:
@@ -134,8 +102,6 @@ def get_portfolio_returns(
     portfolio = verify_portfolio_access(session, portfolio_id, current_user)
     start_date, end_date = get_date_range_from_period(period)
 
-    cache_key = get_cache_key("returns", portfolio_id, period)
-
     def compute_returns():
         calc = PerformanceCalculator(session)
         twr = calc.calculate_time_weighted_return(portfolio_id, start_date, end_date)
@@ -152,7 +118,15 @@ def get_portfolio_returns(
             "days": days
         }
 
-    return get_cached_or_compute(cache_key, compute_returns)
+    return get_db_cached_or_compute(
+        session=session,
+        portfolio_id=portfolio_id,
+        period=period,
+        benchmark_id=None,
+        cache_type="returns",
+        compute_fn=compute_returns,
+        ttl_seconds=900,
+    )
 
 
 @router.get("/portfolios/{portfolio_id}/performance/risk-metrics")
@@ -171,8 +145,6 @@ def get_portfolio_risk_metrics(
     """
     portfolio = verify_portfolio_access(session, portfolio_id, current_user)
     start_date, end_date = get_date_range_from_period(period)
-
-    cache_key = get_cache_key("risk", portfolio_id, period)
 
     def compute_risk():
         calc = PerformanceCalculator(session)
@@ -205,7 +177,15 @@ def get_portfolio_risk_metrics(
             "max_drawdown": round(max_dd['max_drawdown_percent'], 2)
         }
 
-    return get_cached_or_compute(cache_key, compute_risk)
+    return get_db_cached_or_compute(
+        session=session,
+        portfolio_id=portfolio_id,
+        period=period,
+        benchmark_id=None,
+        cache_type="risk-metrics",
+        compute_fn=compute_risk,
+        ttl_seconds=900,
+    )
 
 
 @router.get("/portfolios/{portfolio_id}/performance/best-worst")
@@ -224,8 +204,6 @@ def get_portfolio_best_worst_periods(
     """
     portfolio = verify_portfolio_access(session, portfolio_id, current_user)
     start_date, end_date = get_date_range_from_period(period)
-
-    cache_key = get_cache_key("best-worst", portfolio_id, period)
 
     def compute_best_worst():
         calc = PerformanceCalculator(session)
@@ -255,7 +233,15 @@ def get_portfolio_best_worst_periods(
             "worst_month": worst_month
         }
 
-    return get_cached_or_compute(cache_key, compute_best_worst)
+    return get_db_cached_or_compute(
+        session=session,
+        portfolio_id=portfolio_id,
+        period=period,
+        benchmark_id=None,
+        cache_type="best-worst",
+        compute_fn=compute_best_worst,
+        ttl_seconds=900,
+    )
 
 
 @router.get("/portfolios/{portfolio_id}/performance/cash-flows")
@@ -275,8 +261,6 @@ def get_portfolio_cash_flows(
     portfolio = verify_portfolio_access(session, portfolio_id, current_user)
     start_date, end_date = get_date_range_from_period(period)
 
-    cache_key = get_cache_key("cash-flows", portfolio_id, period)
-
     def compute_cash_flows():
         calc = PerformanceCalculator(session)
         cash_flows = calc._get_all_cash_flows(portfolio_id, start_date, end_date)
@@ -292,7 +276,15 @@ def get_portfolio_cash_flows(
             "net_flow": round(net_withdrawals - abs(net_contributions), 2)
         }
 
-    return get_cached_or_compute(cache_key, compute_cash_flows)
+    return get_db_cached_or_compute(
+        session=session,
+        portfolio_id=portfolio_id,
+        period=period,
+        benchmark_id=None,
+        cache_type="cash-flows",
+        compute_fn=compute_cash_flows,
+        ttl_seconds=900,
+    )
 
 
 @router.get("/portfolios/{portfolio_id}/performance/current-value")
@@ -309,8 +301,6 @@ def get_portfolio_current_value(
     """
     portfolio = verify_portfolio_access(session, portfolio_id, current_user)
 
-    cache_key = get_cache_key("current-value", portfolio_id, date.today())
-
     def compute_value():
         calc = PerformanceCalculator(session)
         current_value = calc._get_portfolio_value_on_date(portfolio_id, date.today())
@@ -322,7 +312,15 @@ def get_portfolio_current_value(
             "as_of_date": date.today().isoformat()
         }
 
-    return get_cached_or_compute(cache_key, compute_value, ttl=60)  # 1 minute cache
+    return get_db_cached_or_compute(
+        session=session,
+        portfolio_id=portfolio_id,
+        period="current",
+        benchmark_id=None,
+        cache_type="current-value",
+        compute_fn=compute_value,
+        ttl_seconds=60,
+    )
 
 
 # Legacy endpoint - kept for backward compatibility but marked as deprecated
@@ -359,8 +357,6 @@ def get_portfolio_performance_summary(
     start_date, end_date = get_date_range_from_period(period)
 
     # Check cache first
-    cache_key = get_cache_key("summary", portfolio_id, period, start_date, end_date)
-
     def compute_summary():
         try:
             # Initialize calculator
@@ -445,8 +441,16 @@ def get_portfolio_performance_summary(
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error calculating performance: {str(e)}")
 
-    # Use cached result or compute
-    return get_cached_or_compute(cache_key, compute_summary)
+    # Use DB-backed cache
+    return get_db_cached_or_compute(
+        session=session,
+        portfolio_id=portfolio_id,
+        period=period,
+        benchmark_id=None,
+        cache_type="summary",
+        compute_fn=compute_summary,
+        ttl_seconds=900,
+    )
 
 
 # ============================================================================
@@ -571,77 +575,141 @@ def get_benchmark_comparison(
     calc = PerformanceCalculator(session)
     benchmark_service = BenchmarkService(session)
 
-    periods = ["1W", "1M", "3M", "6M", "YTD", "1Y", "3Y", "5Y"]
-    comparison = []
+    def compute_comparison():
+        periods = ["1W", "1M", "3M", "6M", "YTD", "1Y", "3Y", "5Y"]
+        # Prefetch full-range data once
+        end_date = date.today()
+        start_dates = {p: get_date_range_from_period(p)[0] for p in periods}
+        min_start = min(start_dates.values())
 
-    for period in periods:
-        try:
-            start_date, end_date = get_date_range_from_period(period)
+        bench_full = benchmark_service.get_benchmark_returns(benchmark_id, min_start, end_date)
+        if not bench_full:
+            return {
+                "portfolio_id": portfolio_id,
+                "benchmark_id": benchmark_id,
+                "benchmark_name": benchmark.name,
+                "comparison": []
+            }
+        bench_by_date = {b['date']: b for b in bench_full}
 
-            # Calculate portfolio return
-            twr = calc.calculate_time_weighted_return(portfolio_id, start_date, end_date)
+        portfolio_full = calc.calculate_cumulative_returns(portfolio_id, min_start, end_date, frequency='daily')
+        if not portfolio_full:
+            return {
+                "portfolio_id": portfolio_id,
+                "benchmark_id": benchmark_id,
+                "benchmark_name": benchmark.name,
+                "comparison": []
+            }
 
-            # Get benchmark return
-            benchmark_data = benchmark_service.get_benchmark_returns(
-                benchmark_id, start_date, end_date
-            )
+        # Helper to compute benchmark cumulative for a period from full series
+        def compute_benchmark_cumulative(start: date) -> float:
+            # Find first and last entries within [start, end_date]
+            start_key = None
+            end_key = None
+            for entry in bench_full:
+                d = date.fromisoformat(entry['date'])
+                if d >= start:
+                    start_key = entry
+                    break
+            for entry in reversed(bench_full):
+                d = date.fromisoformat(entry['date'])
+                if d <= end_date:
+                    end_key = entry
+                    break
+            if not start_key or not end_key:
+                return 0.0
+            start_val = float(start_key['value'])
+            end_val = float(end_key['value'])
+            if start_val <= 0:
+                return 0.0
+            return (end_val - start_val) / start_val
 
-            if not benchmark_data:
+        comparison = []
+        from app.model.performance import BenchmarkComparisonPeriod
+
+        for period in periods:
+            try:
+                start_date = start_dates[period]
+
+                # Portfolio return via cached 'returns' endpoint result
+                def _compute_returns_payload():
+                    twr_val = calc.calculate_time_weighted_return(portfolio_id, start_date, end_date)
+                    annualized = calc.annualize_return(twr_val, (end_date - start_date).days)
+                    return {
+                        "portfolio_id": portfolio_id,
+                        "period": period,
+                        "time_weighted_return": round(twr_val * 100, 2),
+                        "money_weighted_return": round(0.0, 2),
+                        "annualized_return": round(annualized * 100, 2),
+                        "days": (end_date - start_date).days,
+                    }
+
+                returns_payload = get_db_cached_or_compute(
+                    session=session,
+                    portfolio_id=portfolio_id,
+                    period=period,
+                    benchmark_id=None,
+                    cache_type="returns",
+                    compute_fn=_compute_returns_payload,
+                    ttl_seconds=900,
+                )
+                twr = float(returns_payload.get("time_weighted_return", 0.0)) / 100.0
+
+                # Benchmark cumulative return for the period
+                benchmark_return = compute_benchmark_cumulative(start_date)
+                relative_return = twr - benchmark_return
+
+                # Daily returns arrays for risk metrics
+                port_returns = [p['daily_return'] / 100 for p in portfolio_full
+                                if date.fromisoformat(p['date']) >= start_date and p.get('daily_return') is not None]
+                bench_returns = [b['return_1d'] for b in bench_full
+                                 if date.fromisoformat(b['date']) >= start_date and b.get('return_1d') is not None]
+
+                min_len = min(len(port_returns), len(bench_returns))
+                if min_len > 2:
+                    beta = calc.calculate_beta(port_returns[:min_len], bench_returns[:min_len])
+                    alpha = calc.calculate_alpha(twr, benchmark_return, beta)
+                    rel = [port_returns[i] - bench_returns[i] for i in range(min_len)]
+                    tracking_error = calc.calculate_volatility(rel, annualize=True)
+                    information_ratio = relative_return / tracking_error if tracking_error > 0 else 0.0
+                else:
+                    beta = 1.0
+                    alpha = 0.0
+                    tracking_error = 0.0
+                    information_ratio = 0.0
+
+                comparison.append(
+                    BenchmarkComparisonPeriod(
+                        period=period,
+                        portfolio_return=twr * 100,
+                        benchmark_return=benchmark_return * 100,
+                        relative_return=relative_return * 100,
+                        alpha=alpha * 100,
+                        beta=beta,
+                        tracking_error=tracking_error * 100,
+                        information_ratio=information_ratio,
+                    )
+                )
+            except Exception as e:
+                print(f"Error calculating period {period}: {str(e)}")
                 continue
 
-            benchmark_return = benchmark_data[-1]['cumulative_return'] / 100 if benchmark_data else 0.0
+        return {
+            "portfolio_id": portfolio_id,
+            "benchmark_id": benchmark_id,
+            "benchmark_name": benchmark.name,
+            "comparison": comparison,
+        }
 
-            # Calculate relative metrics
-            relative_return = twr - benchmark_return
-
-            # Get returns for beta calculation
-            portfolio_data = calc.calculate_cumulative_returns(portfolio_id, start_date, end_date)
-            port_returns = [p['daily_return'] / 100 for p in portfolio_data if p['daily_return']]
-            bench_returns = [b['return_1d'] for b in benchmark_data if b['return_1d']]
-
-            # Align returns
-            min_len = min(len(port_returns), len(bench_returns))
-            if min_len > 2:
-                beta = calc.calculate_beta(port_returns[:min_len], bench_returns[:min_len])
-                alpha = calc.calculate_alpha(twr, benchmark_return, beta)
-
-                # Calculate tracking error
-                relative_returns = [port_returns[i] - bench_returns[i] for i in range(min_len)]
-                tracking_error = calc.calculate_volatility(relative_returns, annualize=True)
-
-                # Information ratio
-                information_ratio = relative_return / tracking_error if tracking_error > 0 else 0.0
-            else:
-                beta = 1.0
-                alpha = 0.0
-                tracking_error = 0.0
-                information_ratio = 0.0
-
-            from app.model.performance import BenchmarkComparisonPeriod
-
-            comparison.append(
-                BenchmarkComparisonPeriod(
-                    period=period,
-                    portfolio_return=twr * 100,
-                    benchmark_return=benchmark_return * 100,
-                    relative_return=relative_return * 100,
-                    alpha=alpha * 100,
-                    beta=beta,
-                    tracking_error=tracking_error * 100,
-                    information_ratio=information_ratio
-                )
-            )
-
-        except Exception as e:
-            print(f"Error calculating period {period}: {str(e)}")
-            continue
-
-    return {
-        "portfolio_id": portfolio_id,
-        "benchmark_id": benchmark_id,
-        "benchmark_name": benchmark.name,
-        "comparison": comparison
-    }
+    return get_db_cached_or_compute(
+        session=session,
+        portfolio_id=portfolio_id,
+        period="bmcmp",
+        benchmark_id=benchmark_id,
+        cache_type="benchmark-comparison",
+        compute_fn=compute_comparison,
+        ttl_seconds=900,
+    )
 
 
 # ============================================================================
