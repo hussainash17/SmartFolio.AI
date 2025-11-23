@@ -40,7 +40,19 @@ app = FastAPI(
 )
 
 # Set all CORS enabled origins
-if settings.all_cors_origins:
+# In local environment, use regex pattern to allow any origin (localhost, IP addresses, etc.)
+# This allows accessing frontend from different machines via IP while maintaining credentials
+if settings.ENVIRONMENT == "local":
+    # Allow any origin matching common local development patterns
+    # This includes localhost, 127.0.0.1, and any IP address
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+elif settings.all_cors_origins:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.all_cors_origins,
