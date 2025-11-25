@@ -20,11 +20,11 @@ interface PortfolioDetailProps {
   marketData?: MarketData[];
 }
 
-export function PortfolioDetail({ 
-  portfolio, 
-  onBack, 
-  onAddStock, 
-  onEditStock, 
+export function PortfolioDetail({
+  portfolio,
+  onBack,
+  onAddStock,
+  onEditStock,
   onDeleteStock,
   onQuickTrade,
   onChartStock,
@@ -74,7 +74,7 @@ export function PortfolioDetail({
   const totalCost = enhancedStocks.reduce((sum, stock) => sum + (stock.quantity * stock.purchasePrice), 0);
   const totalStockValue = enhancedStocks.reduce((sum, stock) => sum + (stock.quantity * stock.livePrice), 0);
   const totalValue = totalStockValue + portfolio.cash;
-  const totalGainLoss = totalValue - totalCost;
+  const totalGainLoss = totalStockValue - totalCost;
   const totalGainLossPercent = totalCost > 0 ? (totalGainLoss / totalCost) * 100 : 0;
 
   // Calculate sector allocation
@@ -110,8 +110,8 @@ export function PortfolioDetail({
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Button 
-            onClick={() => setIsUploadDialogOpen(true)} 
+          <Button
+            onClick={() => setIsUploadDialogOpen(true)}
             variant="outline"
             className="flex items-center gap-2"
           >

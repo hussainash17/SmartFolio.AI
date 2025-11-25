@@ -1,8 +1,8 @@
-import {Card, CardContent, CardHeader, CardTitle} from "./ui/card";
-import {Badge} from "./ui/badge";
-import {Button} from "./ui/button";
-import {Progress} from "./ui/progress";
-import {Tabs, TabsContent, TabsList, TabsTrigger} from "./ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Progress } from "./ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
     Activity,
     AlertTriangle,
@@ -16,14 +16,14 @@ import {
     TrendingDown,
     TrendingUp
 } from "lucide-react";
-import {Bar, BarChart as RBarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis} from 'recharts';
-import {AccountBalance, MarketData as MarketDataType, NewsItem, Order, Transaction} from "../types/trading";
-import {useEffect, useMemo, useState} from "react";
-import {AnalyticsService, KycService, OpenAPI, RiskManagementService} from "../src/client";
-import {useQueries, useQuery} from "@tanstack/react-query";
-import {queryKeys} from "../hooks/queryKeys";
-import {usePortfolios} from "../hooks/usePortfolios";
-import {useRiskAlerts, useRiskOverview} from "../hooks/useRisk";
+import { Bar, BarChart as RBarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { AccountBalance, MarketData as MarketDataType, NewsItem, Order, Transaction } from "../types/trading";
+import { useEffect, useMemo, useState } from "react";
+import { AnalyticsService, KycService, OpenAPI, RiskManagementService } from "../src/client";
+import { useQueries, useQuery } from "@tanstack/react-query";
+import { queryKeys } from "../hooks/queryKeys";
+import { usePortfolios } from "../hooks/usePortfolios";
+import { useRiskAlerts, useRiskOverview } from "../hooks/useRisk";
 import {
     useBestWorstPeriods,
     useCashFlows,
@@ -46,19 +46,19 @@ interface ComprehensiveDashboardProps {
 }
 
 export function ComprehensiveDashboard({
-                                           accountBalance,
-                                           recentOrders,
-                                           recentTransactions,
-                                           news,
-                                           marketData,
-                                           onQuickTrade,
-                                           onChartStock,
-                                           onNavigate,
-                                           onSelectPortfolioId,
-                                           selectedPortfolioId: initialPortfolioId,
-                                       }: ComprehensiveDashboardProps) {
+    accountBalance,
+    recentOrders,
+    recentTransactions,
+    news,
+    marketData,
+    onQuickTrade,
+    onChartStock,
+    onNavigate,
+    onSelectPortfolioId,
+    selectedPortfolioId: initialPortfolioId,
+}: ComprehensiveDashboardProps) {
     // Portfolio selection state
-    const {portfolios, setSelectedPortfolioId: setGlobalSelectedPortfolioId} = usePortfolios();
+    const { portfolios, setSelectedPortfolioId: setGlobalSelectedPortfolioId } = usePortfolios();
     const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | undefined>(initialPortfolioId);
     const [contributionView, setContributionView] = useState<'daily' | 'weekly' | 'unrealized'>('daily');
 
@@ -99,7 +99,7 @@ export function ComprehensiveDashboard({
         queryFn: async () => {
             const base = (OpenAPI as any).BASE || '';
             const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/dashboard/summary`, {
-                headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
                 credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
             });
             if (!res.ok) return {
@@ -124,14 +124,14 @@ export function ComprehensiveDashboard({
     });
 
     // Use new optimized split APIs for performance data
-    const {data: currentValue} = useCurrentValue(selectedPortfolioId);
-    const {data: returnsYTD} = usePerformanceReturns(selectedPortfolioId, 'YTD');
-    const {data: returns1Y} = usePerformanceReturns(selectedPortfolioId, '1Y');
-    const {data: returns3Y} = usePerformanceReturns(selectedPortfolioId, '3Y');
-    const {data: returnsAll} = usePerformanceReturns(selectedPortfolioId, 'ALL');
-    const {data: riskMetrics1Y} = usePerformanceRiskMetrics(selectedPortfolioId, '1Y');
-    const {data: bestWorstYTD} = useBestWorstPeriods(selectedPortfolioId, 'YTD');
-    const {data: cashFlowsYTD} = useCashFlows(selectedPortfolioId, 'YTD');
+    const { data: currentValue } = useCurrentValue(selectedPortfolioId);
+    const { data: returnsYTD } = usePerformanceReturns(selectedPortfolioId, 'YTD');
+    const { data: returns1Y } = usePerformanceReturns(selectedPortfolioId, '1Y');
+    const { data: returns3Y } = usePerformanceReturns(selectedPortfolioId, '3Y');
+    const { data: returnsAll } = usePerformanceReturns(selectedPortfolioId, 'ALL');
+    const { data: riskMetrics1Y } = usePerformanceRiskMetrics(selectedPortfolioId, '1Y');
+    const { data: bestWorstYTD } = useBestWorstPeriods(selectedPortfolioId, 'YTD');
+    const { data: cashFlowsYTD } = useCashFlows(selectedPortfolioId, 'YTD');
 
     // Aggregate performance data from split APIs
     const portfolioPerformance = useMemo(() => {
@@ -146,7 +146,7 @@ export function ComprehensiveDashboard({
         };
     }, [returnsAll, returnsYTD, returns1Y, returns3Y, riskMetrics1Y]);
 
-    const {data: assetAllocation = []} = useQuery({
+    const { data: assetAllocation = [] } = useQuery({
         queryKey: queryKeys.portfolioAllocation(selectedPortfolioId || 'none'),
         enabled: !!selectedPortfolioId,
         queryFn: async () => {
@@ -157,7 +157,7 @@ export function ComprehensiveDashboard({
                 color: string
             }>;
             try {
-                const alloc = await AnalyticsService.getPortfolioAllocation({portfolioId: selectedPortfolioId});
+                const alloc = await AnalyticsService.getPortfolioAllocation({ portfolioId: selectedPortfolioId });
                 const sectors = ((alloc as any).sector_wise_allocation || []) as Array<any>;
 
                 // Ensure sectors is an array
@@ -180,7 +180,7 @@ export function ComprehensiveDashboard({
         },
     });
 
-    const {data: investmentGoals = []} = useQuery({
+    const { data: investmentGoals = [] } = useQuery({
         queryKey: queryKeys.investmentGoals,
         queryFn: async () => {
             try {
@@ -203,13 +203,13 @@ export function ComprehensiveDashboard({
         staleTime: 5 * 60 * 1000, // 5 minutes
     });
 
-    const {data: goalProgressMap = {}} = useQuery({
+    const { data: goalProgressMap = {} } = useQuery({
         queryKey: ['kyc', 'goals', 'progress', investmentGoals.map(g => g.id).join(',')],
         queryFn: async () => {
             const result: Record<string, number> = {};
             for (const g of investmentGoals) {
                 try {
-                    const contribs = await KycService.listGoalContributions({goalId: g.id});
+                    const contribs = await KycService.listGoalContributions({ goalId: g.id });
                     const sum = (contribs as any[]).reduce((acc: number, c: any) => acc + Number(c.amount || 0), 0);
                     const target = Number(g.target || 0);
                     result[g.id] = target > 0 ? Math.min(100, (sum / target) * 100) : 0;
@@ -225,7 +225,7 @@ export function ComprehensiveDashboard({
     });
 
     // Fetch active risk alerts
-    const {data: riskAlertsData = [], isLoading: riskAlertsLoading} = useRiskAlerts(selectedPortfolioId, true);
+    const { data: riskAlertsData = [], isLoading: riskAlertsLoading } = useRiskAlerts(selectedPortfolioId, true);
 
     // Transform raw alerts to display format
     const riskAlerts = useMemo(() => {
@@ -237,10 +237,10 @@ export function ComprehensiveDashboard({
     }, [riskAlertsData]);
 
     // Fetch risk overview metrics
-    const {data: riskOverview, isLoading: riskOverviewLoading} = useRiskOverview(selectedPortfolioId, '1M');
+    const { data: riskOverview, isLoading: riskOverviewLoading } = useRiskOverview(selectedPortfolioId, '1M');
 
     // Fetch user risk profile
-    const {data: riskProfile} = useQuery({
+    const { data: riskProfile } = useQuery({
         queryKey: ['risk', 'profile'],
         queryFn: async () => {
             try {
@@ -277,12 +277,12 @@ export function ComprehensiveDashboard({
         return portfolios.map((p) => {
             const stocks = p.stocks.map((s) => {
                 const live = marketPriceMap.get(String(s.symbol || '').toUpperCase()) ?? s.currentPrice;
-                return {...s, currentPrice: live};
+                return { ...s, currentPrice: live };
             });
             const stocksMarketValue = stocks.reduce((sum, s) => sum + s.quantity * s.currentPrice, 0);
             const totalCost = stocks.reduce((sum, s) => sum + s.quantity * s.purchasePrice, 0);
             const totalValue = stocksMarketValue + p.cash;
-            return {...p, stocks, stocksMarketValue, totalCost, totalValue};
+            return { ...p, stocks, stocksMarketValue, totalCost, totalValue };
         });
     }, [portfolios, marketPriceMap]);
 
@@ -292,7 +292,7 @@ export function ComprehensiveDashboard({
         const totalCash = enrichedPortfolios.reduce((sum, p) => sum + p.cash, 0);
         const totalStocksValue = enrichedPortfolios.reduce((sum, p) => sum + Number((p as any).stocksMarketValue || 0), 0);
         const unrealizedPL = totalStocksValue - totalCost;
-        return {totalValue, totalCost, totalCash, unrealizedPL};
+        return { totalValue, totalCost, totalCash, unrealizedPL };
     }, [enrichedPortfolios]);
 
     const marketOverview = useMemo(() => {
@@ -303,7 +303,7 @@ export function ComprehensiveDashboard({
             const cp = Number(q.changePercent || 0);
             if (cp > 0) advancers++; else if (cp < 0) decliners++; else unchanged++;
         });
-        return {advancers, decliners, unchanged, totalVolume};
+        return { advancers, decliners, unchanged, totalVolume };
     }, [marketData]);
 
     const topMovers = useMemo(() => {
@@ -318,8 +318,8 @@ export function ComprehensiveDashboard({
         const bySymbolHoldings = new Map<string, { quantity: number; companyName: string }>();
         enrichedPortfolios.forEach((p) => p.stocks.forEach((s) => {
             const key = String(s.symbol || '').toUpperCase();
-            const prev = bySymbolHoldings.get(key) || {quantity: 0, companyName: s.companyName};
-            bySymbolHoldings.set(key, {quantity: prev.quantity + s.quantity, companyName: prev.companyName});
+            const prev = bySymbolHoldings.get(key) || { quantity: 0, companyName: s.companyName };
+            bySymbolHoldings.set(key, { quantity: prev.quantity + s.quantity, companyName: prev.companyName });
         }));
         marketData.forEach((q) => {
             const key = String(q.symbol || '').toUpperCase();
@@ -348,7 +348,7 @@ export function ComprehensiveDashboard({
             map.set(sector, (map.get(sector) || 0) + value);
         }));
         const total = Array.from(map.values()).reduce((a, b) => a + b, 0) || 1;
-        return Array.from(map.entries()).map(([sector, value]) => ({sector, value, percent: (value / total) * 100}))
+        return Array.from(map.entries()).map(([sector, value]) => ({ sector, value, percent: (value / total) * 100 }))
             .sort((a, b) => b.value - a.value).slice(0, 8);
     }, [enrichedPortfolios]);
 
@@ -360,7 +360,7 @@ export function ComprehensiveDashboard({
             queryFn: async () => {
                 const base = (OpenAPI as any).BASE || '';
                 const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolios/${p.id}/performance/attribution/securities?period=1W&limit=15`, {
-                    headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                    headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
                     credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
                 });
                 if (!res.ok) return null;
@@ -377,7 +377,7 @@ export function ComprehensiveDashboard({
             queryFn: async () => {
                 const base = (OpenAPI as any).BASE || '';
                 const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolios/${p.id}/performance/attribution/securities?period=1M&limit=20`, {
-                    headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                    headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
                     credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
                 });
                 if (!res.ok) return null;
@@ -394,7 +394,7 @@ export function ComprehensiveDashboard({
             queryFn: async () => {
                 const base = (OpenAPI as any).BASE || '';
                 const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolios/${p.id}/performance/valuation/period?period=1W`, {
-                    headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                    headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
                     credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
                 });
                 if (!res.ok) return null;
@@ -411,7 +411,7 @@ export function ComprehensiveDashboard({
             queryFn: async () => {
                 const base = (OpenAPI as any).BASE || '';
                 const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolios/${p.id}/performance/valuation/period?period=1M`, {
-                    headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                    headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
                     credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
                 });
                 if (!res.ok) return null;
@@ -421,7 +421,7 @@ export function ComprehensiveDashboard({
     });
 
     const contributionDaily = useMemo(() => {
-        return topMovers.map((m) => ({symbol: m.symbol, pl: m.contribution}));
+        return topMovers.map((m) => ({ symbol: m.symbol, pl: m.contribution }));
     }, [topMovers]);
 
     const contributionWeekly = useMemo(() => {
@@ -440,7 +440,7 @@ export function ComprehensiveDashboard({
                 map.set(k, (map.get(k) || 0) - Math.abs(Number(c.contribution || 0)));
             });
         });
-        return Array.from(map.entries()).map(([symbol, pl]) => ({symbol, pl}))
+        return Array.from(map.entries()).map(([symbol, pl]) => ({ symbol, pl }))
             .sort((a, b) => Math.abs(b.pl) - Math.abs(a.pl)).slice(0, 12);
     }, [weeklyAttributionQueries]);
 
@@ -451,7 +451,7 @@ export function ComprehensiveDashboard({
             const pl = s.quantity * (Number(s.currentPrice || 0) - Number(s.purchasePrice || 0));
             map.set(k, (map.get(k) || 0) + pl);
         }));
-        return Array.from(map.entries()).map(([symbol, pl]) => ({symbol, pl}))
+        return Array.from(map.entries()).map(([symbol, pl]) => ({ symbol, pl }))
             .sort((a, b) => Math.abs(b.pl) - Math.abs(a.pl)).slice(0, 12);
     }, [enrichedPortfolios]);
 
@@ -509,7 +509,7 @@ export function ComprehensiveDashboard({
             queryFn: async () => {
                 const base = (OpenAPI as any).BASE || '';
                 const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolios/${p.id}/performance/decomposition?period=YTD`, {
-                    headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                    headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
                     credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
                 });
                 if (!res.ok) return null;
@@ -526,7 +526,7 @@ export function ComprehensiveDashboard({
             queryFn: async () => {
                 const base = (OpenAPI as any).BASE || '';
                 const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolios/${p.id}/performance/decomposition?period=1D`, {
-                    headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                    headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
                     credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
                 });
                 if (!res.ok) return null;
@@ -615,14 +615,14 @@ export function ComprehensiveDashboard({
         return total;
     }, [decompositionDayQueries]);
 
-    const {data: marketIndices} = useQuery({
+    const { data: marketIndices } = useQuery({
         queryKey: queryKeys.indices,
         enabled: !!(OpenAPI as any).TOKEN,
         staleTime: 30 * 1000,
         queryFn: async () => {
             const base = (OpenAPI as any).BASE || '';
             const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/market/indices`, {
-                headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
                 credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
             });
             if (!res.ok) return null;
@@ -630,14 +630,14 @@ export function ComprehensiveDashboard({
         }
     });
 
-    const {data: marketSummary} = useQuery({
+    const { data: marketSummary } = useQuery({
         queryKey: ['market', 'summary'],
         enabled: !!(OpenAPI as any).TOKEN,
         staleTime: 30 * 1000,
         queryFn: async () => {
             const base = (OpenAPI as any).BASE || '';
             const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/market/summary`, {
-                headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
                 credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
             });
             if (!res.ok) return null;
@@ -645,14 +645,29 @@ export function ComprehensiveDashboard({
         }
     });
 
-    const {data: marketMostActive = []} = useQuery({
+    const { data: benchmarkData } = useQuery({
+        queryKey: ['market', 'benchmark', 'DSEX'],
+        enabled: !!(OpenAPI as any).TOKEN,
+        staleTime: 30 * 1000,
+        queryFn: async () => {
+            const base = (OpenAPI as any).BASE || '';
+            const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/market/benchmark/DSEX`, {
+                headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
+                credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+            });
+            if (!res.ok) return null;
+            return await res.json();
+        }
+    });
+
+    const { data: marketMostActive = [] } = useQuery({
         queryKey: queryKeys.mostActive,
         enabled: !!(OpenAPI as any).TOKEN,
         staleTime: 30 * 1000,
         queryFn: async () => {
             const base = (OpenAPI as any).BASE || '';
             const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/market/most-active?limit=5`, {
-                headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
                 credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
             });
             if (!res.ok) return [];
@@ -660,29 +675,29 @@ export function ComprehensiveDashboard({
         }
     });
 
-    const {data: marketTopMovers} = useQuery({
+    const { data: marketTopMovers } = useQuery({
         queryKey: ['market', 'top-movers'],
         enabled: !!(OpenAPI as any).TOKEN,
         staleTime: 30 * 1000,
         queryFn: async () => {
             const base = (OpenAPI as any).BASE || '';
             const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/market/top-movers?limit=5`, {
-                headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
                 credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
             });
-            if (!res.ok) return {gainers: [], losers: []};
+            if (!res.ok) return { gainers: [], losers: [] };
             return await res.json();
         }
     });
 
-    const {data: sectorAnalysis} = useQuery({
+    const { data: sectorAnalysis } = useQuery({
         queryKey: queryKeys.sectorAnalysis,
         enabled: !!(OpenAPI as any).TOKEN,
         staleTime: 5 * 60 * 1000,
         queryFn: async () => {
             const base = (OpenAPI as any).BASE || '';
             const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/research/market/sectors`, {
-                headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
                 credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
             });
             if (!res.ok) return null;
@@ -713,8 +728,8 @@ export function ComprehensiveDashboard({
                             </div>
                             <div className={`flex items-center gap-1 px-2 py-0.5 rounded ${(Number(dashboardSummaryMemo?.day_change || 0)) >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
                                 {(Number(dashboardSummaryMemo?.day_change || 0)) >= 0 ?
-                                    <ArrowUpRight className="h-4 w-4 text-green-600"/> :
-                                    <ArrowDownRight className="h-4 w-4 text-red-600"/>}
+                                    <ArrowUpRight className="h-4 w-4 text-green-600" /> :
+                                    <ArrowDownRight className="h-4 w-4 text-red-600" />}
                                 <span className={`text-sm font-semibold ${(Number(dashboardSummaryMemo?.day_change || 0)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                     {formatCurrency(Math.abs(Number(dashboardSummaryMemo?.day_change || 0)))}
                                 </span>
@@ -731,7 +746,7 @@ export function ComprehensiveDashboard({
                             <div className={`p-3 rounded-lg border shadow-sm ${Number(weeklyPLTotal || 0) >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        {Number(weeklyPLTotal || 0) >= 0 ? <TrendingUp className="h-4 w-4 text-green-600"/> : <TrendingDown className="h-4 w-4 text-red-600"/>}
+                                        {Number(weeklyPLTotal || 0) >= 0 ? <TrendingUp className="h-4 w-4 text-green-600" /> : <TrendingDown className="h-4 w-4 text-red-600" />}
                                         <span className="text-xs text-muted-foreground">Weekly P/L</span>
                                     </div>
                                     <span className={`text-xs ${Number(weeklyPLPercent || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{Number(weeklyPLPercent || 0) >= 0 ? '+' : ''}{Number(weeklyPLPercent || 0).toFixed(2)}%</span>
@@ -742,7 +757,7 @@ export function ComprehensiveDashboard({
                             <div className={`p-3 rounded-lg border shadow-sm ${Number(monthlyPLTotal || 0) >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        {Number(monthlyPLTotal || 0) >= 0 ? <TrendingUp className="h-4 w-4 text-green-600"/> : <TrendingDown className="h-4 w-4 text-red-600"/>}
+                                        {Number(monthlyPLTotal || 0) >= 0 ? <TrendingUp className="h-4 w-4 text-green-600" /> : <TrendingDown className="h-4 w-4 text-red-600" />}
                                         <span className="text-xs text-muted-foreground">Monthly P/L</span>
                                     </div>
                                     <span className={`text-xs ${Number(monthlyPLPercent || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{Number(monthlyPLPercent || 0) >= 0 ? '+' : ''}{Number(monthlyPLPercent || 0).toFixed(2)}%</span>
@@ -753,7 +768,7 @@ export function ComprehensiveDashboard({
                             <div className={`p-3 rounded-lg border shadow-sm ${Number(aggregates.unrealizedPL || 0) >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <BarChart3 className={`h-4 w-4 ${Number(aggregates.unrealizedPL || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}/>
+                                        <BarChart3 className={`h-4 w-4 ${Number(aggregates.unrealizedPL || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`} />
                                         <span className="text-xs text-muted-foreground">Unrealized P/L</span>
                                     </div>
                                     <span className={`text-xs ${Number(aggregates.unrealizedPL || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{Number(aggregates.unrealizedPL || 0) >= 0 ? '+' : ''}{(((Number(aggregates.unrealizedPL || 0)) / Math.max(1, Number(aggregates.totalCost || 0))) * 100).toFixed(2)}%</span>
@@ -764,7 +779,7 @@ export function ComprehensiveDashboard({
                             <div className={`p-3 rounded-lg border shadow-sm ${Number(realizedYTD || 0) >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <Award className={`h-4 w-4 ${Number(realizedYTD || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}/>
+                                        <Award className={`h-4 w-4 ${Number(realizedYTD || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`} />
                                         <span className="text-xs text-muted-foreground">Realized (YTD)</span>
                                     </div>
                                     <span className="text-xs text-muted-foreground">{formatCurrency(Number(realizedToday))} today</span>
@@ -774,7 +789,7 @@ export function ComprehensiveDashboard({
 
                             <div className="p-3 rounded-lg border shadow-sm bg-muted">
                                 <div className="flex items-center gap-2">
-                                    <Target className="h-4 w-4 text-muted-foreground"/>
+                                    <Target className="h-4 w-4 text-muted-foreground" />
                                     <span className="text-xs text-muted-foreground">Invested</span>
                                 </div>
                                 <div className="mt-1 text-lg font-bold text-foreground">{formatCurrency(Number(aggregates.totalCost || 0))}</div>
@@ -782,7 +797,7 @@ export function ComprehensiveDashboard({
 
                             <div className="p-3 rounded-lg border shadow-sm bg-muted">
                                 <div className="flex items-center gap-2">
-                                    <Shield className="h-4 w-4 text-muted-foreground"/>
+                                    <Shield className="h-4 w-4 text-muted-foreground" />
                                     <span className="text-xs text-muted-foreground">Cash</span>
                                 </div>
                                 <div className="mt-1 text-lg font-bold text-foreground">{formatCurrency(Number(aggregates.totalCash || 0))}</div>
@@ -818,7 +833,7 @@ export function ComprehensiveDashboard({
             <Card>
                 <CardHeader>
                     <div className="flex items-center gap-2">
-                        <Activity className="h-5 w-5 text-primary"/>
+                        <Activity className="h-5 w-5 text-primary" />
                         <CardTitle>Market Intelligence</CardTitle>
                     </div>
                 </CardHeader>
@@ -833,46 +848,45 @@ export function ComprehensiveDashboard({
                                 DSEX Index
                             </div>
                             <div className="text-sm font-bold text-foreground mb-2">
-                                {marketSummary?.dse_index ? Number(marketSummary.dse_index).toFixed(2) : 'N/A'}
+                                {benchmarkData?.close_value ? Number(benchmarkData.close_value).toFixed(2) : 'N/A'}
                             </div>
-                        {marketSummary?.dse_index_change_percent && (
-                            <div className={`text-sm font-medium flex items-center gap-1 ${
-                                Number(marketSummary.dse_index_change_percent || 0) >= 0 ? 'text-green-600' : 'text-red-600'
-                            }`}>
-                                {Number(marketSummary.dse_index_change_percent || 0) >= 0 ? '↑' : '↓'}
-                                <span>
-                            {Number(marketSummary.dse_index_change || 0) >= 0 ? '+' : ''}
-                                        {Number(marketSummary.dse_index_change || 0).toFixed(2)}
-                        </span>
-                                <span>
-                            ({Number(marketSummary.dse_index_change_percent || 0) >= 0 ? '+' : ''}
-                                        {Number(marketSummary.dse_index_change_percent || 0).toFixed(2)}%)
-                        </span>
-                            </div>
-                        )}
-                        {(marketSummary?.total_trades != null || marketSummary?.total_turnover != null || marketSummary?.total_volume != null) && (
-                            <div className="mt-3 space-y-1.5">
-                                {marketSummary?.total_trades != null && (
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs text-muted-foreground">Trades</span>
-                                        <span className="text-sm font-semibold text-foreground">{Number(marketSummary.total_trades).toLocaleString()}</span>
-                                    </div>
-                                )}
-                                {marketSummary?.total_turnover != null && (
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs text-muted-foreground">Turnover</span>
-                                        <span className="text-sm font-semibold text-foreground">{toMillions(marketSummary.total_turnover).toFixed(2)}M</span>
-                                    </div>
-                                )}
-                                {marketSummary?.total_volume != null && (
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs text-muted-foreground">Volume</span>
-                                        <span className="text-sm font-semibold text-foreground">{toMillions(marketSummary.total_volume).toFixed(2)}M</span>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
+                            {benchmarkData?.daily_return != null && (
+                                <div className={`text-sm font-medium flex items-center gap-1 ${Number(benchmarkData.daily_return || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                                    }`}>
+                                    {Number(benchmarkData.daily_return || 0) >= 0 ? '↑' : '↓'}
+                                    <span>
+                                        {Number(benchmarkData.change || 0) >= 0 ? '+' : ''}
+                                        {Number(benchmarkData.change || 0).toFixed(2)}
+                                    </span>
+                                    <span>
+                                        ({Number(benchmarkData.daily_return || 0) >= 0 ? '+' : ''}
+                                        {Number(benchmarkData.daily_return || 0).toFixed(2)}%)
+                                    </span>
+                                </div>
+                            )}
+                            {(benchmarkData?.trades != null || benchmarkData?.total_value != null || benchmarkData?.volume != null) && (
+                                <div className="mt-3 space-y-1.5">
+                                    {benchmarkData?.trades != null && (
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-muted-foreground">Trades</span>
+                                            <span className="text-sm font-semibold text-foreground">{Number(benchmarkData.trades).toLocaleString()}</span>
+                                        </div>
+                                    )}
+                                    {benchmarkData?.total_value != null && (
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-muted-foreground">Turnover</span>
+                                            <span className="text-sm font-semibold text-foreground">{toMillions(benchmarkData.total_value).toFixed(2)}M</span>
+                                        </div>
+                                    )}
+                                    {benchmarkData?.volume != null && (
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-muted-foreground">Volume</span>
+                                            <span className="text-sm font-semibold text-foreground">{toMillions(benchmarkData.volume).toFixed(2)}M</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
 
                         {/* Top Gainers Card */}
                         <div
@@ -1046,15 +1060,14 @@ export function ComprehensiveDashboard({
                                     return (
                                         <div
                                             key={sector.sector || sector.name}
-                                            className={`bg-white dark:bg-slate-950 rounded-lg p-4 border-l-4 hover:translate-y-[-2px] transition-transform ${
-                                                positive ? 'border-l-green-600' : 'border-l-red-600'
-                                            }`}
-                                            style={{boxShadow: '0 1px 3px rgba(0,0,0,0.08)'}}
+                                            className={`bg-white dark:bg-slate-950 rounded-lg p-4 border-l-4 hover:translate-y-[-2px] transition-transform ${positive ? 'border-l-green-600' : 'border-l-red-600'
+                                                }`}
+                                            style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}
                                         >
                                             <div className="flex items-start justify-between mb-2">
-                                    <span className="text-sm font-semibold text-foreground">
-                                        {sector.sector || sector.name}
-                                    </span>
+                                                <span className="text-sm font-semibold text-foreground">
+                                                    {sector.sector || sector.name}
+                                                </span>
                                                 <span
                                                     className={`text-sm font-bold ${positive ? 'text-green-600' : 'text-red-600'}`}>
                                                     {positive ? '+' : ''}{change.toFixed(1)}%
@@ -1089,7 +1102,7 @@ export function ComprehensiveDashboard({
                         <Card className="lg:col-span-4">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <PieChart className="h-5 w-5"/>
+                                    <PieChart className="h-5 w-5" />
                                     Broker Portfolios
                                 </CardTitle>
                             </CardHeader>
@@ -1145,18 +1158,18 @@ export function ComprehensiveDashboard({
                         <Card className="lg:col-span-2">
                             <CardHeader>
                                 <CardTitle className="flex items-center justify-between">
-                                    <span className="flex items-center gap-2"><BarChart3 className="h-5 w-5"/>Contribution Analytics</span>
+                                    <span className="flex items-center gap-2"><BarChart3 className="h-5 w-5" />Contribution Analytics</span>
                                     <div className="flex gap-1 bg-muted rounded-lg p-1">
                                         <button onClick={() => setContributionView('daily')}
-                                                className={`px-3 py-1 rounded text-sm ${contributionView === 'daily' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Daily
+                                            className={`px-3 py-1 rounded text-sm ${contributionView === 'daily' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Daily
                                             P/L
                                         </button>
                                         <button onClick={() => setContributionView('weekly')}
-                                                className={`px-3 py-1 rounded text-sm ${contributionView === 'weekly' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Weekly
+                                            className={`px-3 py-1 rounded text-sm ${contributionView === 'weekly' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Weekly
                                             P/L
                                         </button>
                                         <button onClick={() => setContributionView('unrealized')}
-                                                className={`px-3 py-1 rounded text-sm ${contributionView === 'unrealized' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Unrealized
+                                            className={`px-3 py-1 rounded text-sm ${contributionView === 'unrealized' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Unrealized
                                             P/L
                                         </button>
                                     </div>
@@ -1167,19 +1180,19 @@ export function ComprehensiveDashboard({
                                     <ResponsiveContainer width="100%" height="100%">
                                         <RBarChart
                                             data={(contributionView === 'daily' ? contributionDaily : contributionView === 'weekly' ? contributionWeekly : contributionUnrealized)}
-                                            layout="vertical" margin={{left: 0, right: 20}}>
-                                            <XAxis type="number" stroke="#64748b" tick={{fontSize: 12}}/>
+                                            layout="vertical" margin={{ left: 0, right: 20 }}>
+                                            <XAxis type="number" stroke="#64748b" tick={{ fontSize: 12 }} />
                                             <YAxis type="category" dataKey="symbol" width={100} stroke="#64748b"
-                                                   tick={{fontSize: 12}}/>
+                                                tick={{ fontSize: 12 }} />
                                             <Tooltip contentStyle={{
                                                 backgroundColor: 'var(--background)',
                                                 border: '1px solid var(--border)',
                                                 borderRadius: 8
-                                            }} formatter={(value: number) => [formatCurrency(Number(value)), 'P/L']}/>
+                                            }} formatter={(value: number) => [formatCurrency(Number(value)), 'P/L']} />
                                             <Bar dataKey="pl" radius={[0, 4, 4, 0]}>
                                                 {(contributionView === 'daily' ? contributionDaily : contributionView === 'weekly' ? contributionWeekly : contributionUnrealized).map((entry, index) => (
                                                     <Cell key={`cell-${index}`}
-                                                          fill={entry.pl >= 0 ? '#10b981' : '#f43f5e'}/>
+                                                        fill={entry.pl >= 0 ? '#10b981' : '#f43f5e'} />
                                                 ))}
                                             </Bar>
                                         </RBarChart>
@@ -1211,7 +1224,7 @@ export function ComprehensiveDashboard({
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <PieChart className="h-5 w-5"/>
+                                    <PieChart className="h-5 w-5" />
                                     Sector Exposure
                                 </CardTitle>
                             </CardHeader>
@@ -1223,25 +1236,25 @@ export function ComprehensiveDashboard({
                                                 className="font-semibold">{sec.percent.toFixed(1)}%</span></div>
                                             <div className="h-2 bg-muted rounded-full overflow-hidden">
                                                 <div className="h-full bg-primary"
-                                                     style={{width: `${sec.percent}%`}}></div>
+                                                    style={{ width: `${sec.percent}%` }}></div>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                                 <Button variant="outline" className="w-full mt-4"
-                                        onClick={() => onNavigate('allocation')}>View Detailed Allocation</Button>
+                                    onClick={() => onNavigate('allocation')}>View Detailed Allocation</Button>
                             </CardContent>
                         </Card>
                     </div>
 
 
-                    
+
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <Activity className="h-5 w-5"/>
+                                    <Activity className="h-5 w-5" />
                                     Recent Activity
                                 </CardTitle>
                             </CardHeader>
@@ -1251,7 +1264,7 @@ export function ComprehensiveDashboard({
                                         <div key={order.id} className="flex items-center justify-between py-2">
                                             <div className="flex items-center gap-3">
                                                 <Badge variant="outline"
-                                                       className={`${order.side === 'buy' ? 'text-emerald-600 border-emerald-200' : 'text-red-600 border-red-200'}`}>{order.side.toUpperCase()}</Badge>
+                                                    className={`${order.side === 'buy' ? 'text-emerald-600 border-emerald-200' : 'text-red-600 border-red-200'}`}>{order.side.toUpperCase()}</Badge>
                                                 <div>
                                                     <div
                                                         className="font-medium">{order.symbol} · {order.orderType.toUpperCase()}</div>
@@ -1274,30 +1287,30 @@ export function ComprehensiveDashboard({
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <AlertTriangle className="h-5 w-5"/>
+                                    <AlertTriangle className="h-5 w-5" />
                                     Risk Alerts
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 {riskAlerts.length === 0 ? (
                                     <div className="text-center py-8">
-                                        <Shield className="h-12 w-12 mx-auto text-green-600 mb-3"/>
+                                        <Shield className="h-12 w-12 mx-auto text-green-600 mb-3" />
                                         <p className="text-muted-foreground">No active risk alerts</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
                                         {riskAlerts.map((alert, index) => (
                                             <div key={index}
-                                                 className={`p-4 rounded-lg border ${alert.severity === 'high' ? 'bg-red-50 border-red-200' : alert.severity === 'medium' ? 'bg-yellow-50 border-yellow-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                                                className={`p-4 rounded-lg border ${alert.severity === 'high' ? 'bg-red-50 border-red-200' : alert.severity === 'medium' ? 'bg-yellow-50 border-yellow-200' : 'bg-emerald-50 border-emerald-200'}`}>
                                                 <div className="flex items-start gap-3">
                                                     <AlertTriangle
-                                                        className={`h-5 w-5 mt-0.5 ${alert.severity === 'high' ? 'text-red-600' : alert.severity === 'medium' ? 'text-yellow-600' : 'text-emerald-600'}`}/>
+                                                        className={`h-5 w-5 mt-0.5 ${alert.severity === 'high' ? 'text-red-600' : alert.severity === 'medium' ? 'text-yellow-600' : 'text-emerald-600'}`} />
                                                     <div className="flex-1">
                                                         <div className="flex items-center gap-2 mb-1">
                                                             <span
                                                                 className="font-semibold">{alert.type.toUpperCase()}</span>
                                                             <Badge variant="outline"
-                                                                   className={alert.severity === 'high' ? 'border-red-300 text-red-700' : alert.severity === 'medium' ? 'border-yellow-300 text-yellow-700' : 'border-emerald-300 text-emerald-700'}>
+                                                                className={alert.severity === 'high' ? 'border-red-300 text-red-700' : alert.severity === 'medium' ? 'border-yellow-300 text-yellow-700' : 'border-emerald-300 text-emerald-700'}>
                                                                 {alert.severity.toUpperCase()}
                                                             </Badge>
                                                         </div>
@@ -1309,7 +1322,7 @@ export function ComprehensiveDashboard({
                                     </div>
                                 )}
                                 <Button variant="outline" className="w-full mt-4"
-                                        onClick={() => onNavigate('risk-analysis')}>View Risk Analysis</Button>
+                                    onClick={() => onNavigate('risk-analysis')}>View Risk Analysis</Button>
                             </CardContent>
                         </Card>
                     </div>
@@ -1386,21 +1399,21 @@ export function ComprehensiveDashboard({
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
-                                                <TrendingUp className="h-4 w-4 text-green-600"/>
+                                                <TrendingUp className="h-4 w-4 text-green-600" />
                                                 <span className="text-sm">Best Month</span>
                                             </div>
                                             <span className="text-sm font-semibold text-green-600">
-                        {formatPercent(bestWorstYTD.best_month.return)}
-                      </span>
+                                                {formatPercent(bestWorstYTD.best_month.return)}
+                                            </span>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
-                                                <TrendingDown className="h-4 w-4 text-red-600"/>
+                                                <TrendingDown className="h-4 w-4 text-red-600" />
                                                 <span className="text-sm">Worst Month</span>
                                             </div>
                                             <span className="text-sm font-semibold text-red-600">
-                        {formatPercent(bestWorstYTD.worst_month.return)}
-                      </span>
+                                                {formatPercent(bestWorstYTD.worst_month.return)}
+                                            </span>
                                         </div>
                                         {cashFlowsYTD && (
                                             <>
@@ -1408,16 +1421,16 @@ export function ComprehensiveDashboard({
                                                     <div className="flex items-center justify-between">
                                                         <span className="text-sm text-muted-foreground">Net Contributions</span>
                                                         <span className="text-sm font-medium text-green-600">
-                              {formatCurrency(cashFlowsYTD.net_contributions)}
-                            </span>
+                                                            {formatCurrency(cashFlowsYTD.net_contributions)}
+                                                        </span>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center justify-between">
                                                     <span
                                                         className="text-sm text-muted-foreground">Net Withdrawals</span>
                                                     <span className="text-sm font-medium text-red-600">
-                            {formatCurrency(cashFlowsYTD.net_withdrawals)}
-                          </span>
+                                                        {formatCurrency(cashFlowsYTD.net_withdrawals)}
+                                                    </span>
                                                 </div>
                                             </>
                                         )}
@@ -1480,7 +1493,7 @@ export function ComprehensiveDashboard({
                             <div className="flex items-center justify-between">
                                 <CardTitle>Investment Goals</CardTitle>
                                 <Button variant="outline" size="sm" onClick={() => onNavigate('goals')}>
-                                    <Target className="h-4 w-4 mr-2"/>
+                                    <Target className="h-4 w-4 mr-2" />
                                     Manage Goals
                                 </Button>
                             </div>
@@ -1488,7 +1501,7 @@ export function ComprehensiveDashboard({
                         <CardContent>
                             {investmentGoals.length === 0 ? (
                                 <div className="text-center py-8">
-                                    <Target className="h-12 w-12 mx-auto text-muted-foreground mb-3"/>
+                                    <Target className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
                                     <p className="text-muted-foreground mb-4">No investment goals yet</p>
                                     <Button onClick={() => onNavigate('goals')}>
                                         Create Your First Goal
@@ -1507,7 +1520,7 @@ export function ComprehensiveDashboard({
                                                 <div className="flex items-start justify-between">
                                                     <div className="flex-1">
                                                         <div className="flex items-center gap-2">
-                                                <h3 className="font-semibold text-sm">{goal.name}</h3>
+                                                            <h3 className="font-semibold text-sm">{goal.name}</h3>
                                                             <Badge
                                                                 variant="outline"
                                                                 className={
@@ -1534,7 +1547,7 @@ export function ComprehensiveDashboard({
                                                     </div>
                                                 </div>
 
-                                                <Progress value={progress} className="h-3"/>
+                                                <Progress value={progress} className="h-3" />
 
                                                 <div className="grid grid-cols-3 gap-4 text-sm">
                                                     <div>
@@ -1560,7 +1573,7 @@ export function ComprehensiveDashboard({
                                                 {progress >= 100 && (
                                                     <div
                                                         className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded text-green-700 text-sm">
-                                                        <Award className="h-4 w-4"/>
+                                                        <Award className="h-4 w-4" />
                                                         <span className="font-medium">Goal Achieved! 🎉</span>
                                                     </div>
                                                 )}
@@ -1642,7 +1655,7 @@ export function ComprehensiveDashboard({
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <Shield className="h-5 w-5"/>
+                                    <Shield className="h-5 w-5" />
                                     Your Risk Profile
                                 </CardTitle>
                             </CardHeader>
@@ -1699,7 +1712,7 @@ export function ComprehensiveDashboard({
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div className="p-4 border rounded-lg">
+                                <div className="p-4 border rounded-lg">
                                     <div className="text-sm text-muted-foreground mb-1">Sharpe Ratio</div>
                                     <div
                                         className="text-sm font-bold">{(portfolioPerformance?.sharpeRatio || 0).toFixed(2)}</div>
@@ -1707,7 +1720,7 @@ export function ComprehensiveDashboard({
                                         {(portfolioPerformance?.sharpeRatio || 0) > 1 ? 'Good' : (portfolioPerformance?.sharpeRatio || 0) > 0.5 ? 'Fair' : 'Poor'}
                                     </div>
                                 </div>
-                                    <div className="p-4 border rounded-lg">
+                                <div className="p-4 border rounded-lg">
                                     <div className="text-sm text-muted-foreground mb-1">Volatility</div>
                                     <div
                                         className="text-sm font-bold">{formatPercent(portfolioPerformance?.volatility || 0)}</div>
@@ -1715,7 +1728,7 @@ export function ComprehensiveDashboard({
                                         {Math.abs(portfolioPerformance?.volatility || 0) < 15 ? 'Low' : Math.abs(portfolioPerformance?.volatility || 0) < 25 ? 'Moderate' : 'High'}
                                     </div>
                                 </div>
-                                    <div className="p-4 border rounded-lg">
+                                <div className="p-4 border rounded-lg">
                                     <div className="text-sm text-muted-foreground mb-1">Max Drawdown</div>
                                     <div
                                         className="text-sm font-bold text-red-600">{formatPercent(portfolioPerformance?.maxDrawdown || 0)}</div>
@@ -1732,7 +1745,7 @@ export function ComprehensiveDashboard({
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <CardTitle className="flex items-center gap-2">
-                                    <AlertTriangle className="h-5 w-5"/>
+                                    <AlertTriangle className="h-5 w-5" />
                                     Risk Alerts
                                 </CardTitle>
                                 <Button variant="outline" size="sm" onClick={() => onNavigate('risk-analysis')}>
@@ -1743,7 +1756,7 @@ export function ComprehensiveDashboard({
                         <CardContent>
                             {riskAlerts.length === 0 ? (
                                 <div className="text-center py-8">
-                                    <Shield className="h-12 w-12 mx-auto text-green-600 mb-3"/>
+                                    <Shield className="h-12 w-12 mx-auto text-green-600 mb-3" />
                                     <p className="text-muted-foreground">No active risk alerts</p>
                                     <p className="text-sm text-muted-foreground mt-1">Your portfolio is within
                                         acceptable risk parameters</p>
@@ -1751,12 +1764,11 @@ export function ComprehensiveDashboard({
                             ) : (
                                 <div className="space-y-3">
                                     {riskAlerts.map((alert, index) => (
-                                        <div key={index} className={`p-4 rounded-lg border ${
-                                            alert.severity === 'high' ? 'bg-red-50 border-red-200' : alert.severity === 'medium' ? 'bg-yellow-50 border-yellow-200' : 'bg-emerald-50 border-emerald-200'
-                                        }`}>
+                                        <div key={index} className={`p-4 rounded-lg border ${alert.severity === 'high' ? 'bg-red-50 border-red-200' : alert.severity === 'medium' ? 'bg-yellow-50 border-yellow-200' : 'bg-emerald-50 border-emerald-200'
+                                            }`}>
                                             <div className="flex items-start gap-3">
                                                 <AlertTriangle
-                                                    className={`h-5 w-5 mt-0.5 ${alert.severity === 'high' ? 'text-red-600' : alert.severity === 'medium' ? 'text-yellow-600' : 'text-emerald-600'}`}/>
+                                                    className={`h-5 w-5 mt-0.5 ${alert.severity === 'high' ? 'text-red-600' : alert.severity === 'medium' ? 'text-yellow-600' : 'text-emerald-600'}`} />
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-2 mb-1">
                                                         <span

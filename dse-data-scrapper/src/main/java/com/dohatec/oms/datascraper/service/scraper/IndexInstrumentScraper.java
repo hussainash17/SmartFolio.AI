@@ -78,11 +78,8 @@ public class IndexInstrumentScraper {
     /**
      * Fetch the DSE homepage HTML.
      */
-    @Retryable(
-            retryFor = {NetworkException.class, Exception.class},
-            maxAttempts = 3,
-            backoff = @Backoff(delay = 1000L, multiplier = 2.0)
-    )
+    @Retryable(retryFor = { NetworkException.class,
+            Exception.class }, maxAttempts = 3, backoff = @Backoff(delay = 1000L, multiplier = 2.0))
     protected String fetchHtml() {
         String url = scraperProperties.getDse().getMarketSummaryUrl();
         try {
@@ -227,14 +224,14 @@ public class IndexInstrumentScraper {
     }
 
     private void upsertBenchmarkData(IndexSnapshot snapshot,
-                                     Benchmark benchmark,
-                                     LocalDate date,
-                                     OffsetDateTime now) {
+            Benchmark benchmark,
+            LocalDate date,
+            OffsetDateTime now) {
         BenchmarkData data = benchmarkDataRepository.findByBenchmarkAndDate(benchmark, date)
                 .orElseGet(() -> BenchmarkData.builder()
                         .benchmark(benchmark)
                         .date(date)
-                        .openValue(snapshot.value())      // first tick of the day
+                        .openValue(snapshot.value()) // first tick of the day
                         .build());
 
         BigDecimal price = snapshot.value();
@@ -244,7 +241,12 @@ public class IndexInstrumentScraper {
         }
         data.setHighValue(max(data.getHighValue(), price));
         data.setLowValue(min(data.getLowValue(), price));
-        data.setCloseValue(price);                        // last tick seen so far
+        data.setCloseValue(price); // last tick seen so far
+
+        // Store daily return (percentage change)
+        if (snapshot.percentChange() != null) {
+            data.setDailyReturn(snapshot.percentChange());
+        }
 
         MarketTotals totals = snapshot.marketTotals();
         if (totals != null) {
@@ -267,14 +269,18 @@ public class IndexInstrumentScraper {
     }
 
     private BigDecimal max(BigDecimal a, BigDecimal b) {
-        if (a == null) return b;
-        if (b == null) return a;
+        if (a == null)
+            return b;
+        if (b == null)
+            return a;
         return a.max(b);
     }
 
     private BigDecimal min(BigDecimal a, BigDecimal b) {
-        if (a == null) return b;
-        if (b == null) return a;
+        if (a == null)
+            return b;
+        if (b == null)
+            return a;
         return a.min(b);
     }
 
@@ -286,8 +292,8 @@ public class IndexInstrumentScraper {
             BigDecimal value,
             BigDecimal change,
             BigDecimal percentChange,
-            MarketTotals marketTotals
-    ) {}
+            MarketTotals marketTotals) {
+    }
 
     /**
      * Enum representing metadata for each DSE index.
@@ -301,8 +307,7 @@ public class IndexInstrumentScraper {
         private static final Map<String, IndexMetadata> LABEL_TO_METADATA = Map.of(
                 "DSEX", DSEX,
                 "DSES", DSES,
-                "DS30", DS30
-        );
+                "DS30", DS30);
 
         private final String id;
         private final String ticker;
@@ -313,12 +318,12 @@ public class IndexInstrumentScraper {
         private final String dataSource;
 
         IndexMetadata(String id,
-                      String ticker,
-                      String name,
-                      String description,
-                      String assetClass,
-                      String region,
-                      String dataSource) {
+                String ticker,
+                String name,
+                String description,
+                String assetClass,
+                String region,
+                String dataSource) {
             this.id = id;
             this.ticker = ticker;
             this.name = name;
@@ -336,4 +341,3 @@ public class IndexInstrumentScraper {
         }
     }
 }
-

@@ -14,8 +14,87 @@ from app.model.stock import (
     MarketSummary,
     StockData,
 )
+from app.model.performance import BenchmarkData
 
 router = APIRouter(prefix="/market", tags=["market"])
+
+
+@router.get("/benchmark/{benchmark_id}")
+def get_benchmark_data(benchmark_id: str, session: SessionDep) -> Dict[str, Any]:
+    """Get benchmark index data by benchmark_id.
+    
+    Returns today's data if available, otherwise returns the most recent data.
+    Includes index value, change, trades, volume, and turnover.
+    
+    Args:
+        benchmark_id: The benchmark identifier (e.g., 'DSEX', 'CSE')
+        session: Database session
+    
+    Returns:
+        Dict containing benchmark data including close_value, daily_return, 
+        trades, volume, total_value (turnover), and date
+    """
+    from datetime import date as date_type
+    
+    # Try to get today's data first
+    today = date_type.today()
+    benchmark = session.exec(
+        select(BenchmarkData)
+        .where(BenchmarkData.benchmark_id == benchmark_id)
+        .where(BenchmarkData.date == today)
+    ).first()
+    
+    # If no data for today, get the most recent data
+    if not benchmark:
+        benchmark = session.exec(
+            select(BenchmarkData)
+            .where(BenchmarkData.benchmark_id == benchmark_id)
+            .order_by(BenchmarkData.date.desc())
+            .limit(1)
+        ).first()
+    
+    if not benchmark:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No data found for benchmark '{benchmark_id}'"
+        )
+    
+    # Query raw row to get all columns including those not in the model
+    from sqlalchemy import text
+    raw_query = text("""
+        SELECT close_value, open_value, high_value, low_value,
+               daily_return, return_1d, trades, volume, total_value, date
+        FROM benchmark_data
+        WHERE id = :id
+    """)
+    result = session.execute(raw_query, {"id": benchmark.id}).fetchone()
+    
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No data found for benchmark '{benchmark_id}'"
+        )
+    
+    # Use daily_return if available, otherwise fall back to return_1d
+    daily_return_pct = float(result.daily_return) if result.daily_return is not None else (float(result.return_1d) if result.return_1d is not None else 0.0)
+    close_val = float(result.close_value)
+    # Calculate absolute change from percentage
+    absolute_change = close_val * (daily_return_pct / 100) if daily_return_pct != 0 else 0.0
+    
+    return {
+        "benchmark_id": benchmark.benchmark_id,
+        "date": result.date,
+        "close_value": close_val,
+        "open_value": float(result.open_value) if result.open_value is not None else None,
+        "high_value": float(result.high_value) if result.high_value is not None else None,
+        "low_value": float(result.low_value) if result.low_value is not None else None,
+        "daily_return": daily_return_pct,
+        "change": absolute_change,
+        "trades": int(result.trades) if result.trades is not None else None,
+        "volume": int(result.volume) if result.volume is not None else None,
+        "total_value": float(result.total_value) if result.total_value is not None else None,
+    }
+
 
 
 @router.get("/summary")
