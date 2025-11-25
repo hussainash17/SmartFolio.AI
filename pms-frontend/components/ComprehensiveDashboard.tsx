@@ -41,6 +41,7 @@ interface ComprehensiveDashboardProps {
     onQuickTrade: (symbol?: string, side?: 'buy' | 'sell') => void;
     onChartStock: (symbol: string) => void;
     onNavigate: (view: string) => void;
+    onSelectPortfolioId?: (id: string) => void;
     selectedPortfolioId?: string;
 }
 
@@ -53,6 +54,7 @@ export function ComprehensiveDashboard({
                                            onQuickTrade,
                                            onChartStock,
                                            onNavigate,
+                                           onSelectPortfolioId,
                                            selectedPortfolioId: initialPortfolioId,
                                        }: ComprehensiveDashboardProps) {
     // Portfolio selection state
@@ -280,7 +282,7 @@ export function ComprehensiveDashboard({
             const stocksMarketValue = stocks.reduce((sum, s) => sum + s.quantity * s.currentPrice, 0);
             const totalCost = stocks.reduce((sum, s) => sum + s.quantity * s.purchasePrice, 0);
             const totalValue = stocksMarketValue + p.cash;
-            return {...p, stocks, totalCost, totalValue};
+            return {...p, stocks, stocksMarketValue, totalCost, totalValue};
         });
     }, [portfolios, marketPriceMap]);
 
@@ -288,7 +290,8 @@ export function ComprehensiveDashboard({
         const totalValue = enrichedPortfolios.reduce((sum, p) => sum + (p as any).totalValue, 0);
         const totalCost = enrichedPortfolios.reduce((sum, p) => sum + (p as any).totalCost, 0);
         const totalCash = enrichedPortfolios.reduce((sum, p) => sum + p.cash, 0);
-        const unrealizedPL = totalValue - totalCost;
+        const totalStocksValue = enrichedPortfolios.reduce((sum, p) => sum + Number((p as any).stocksMarketValue || 0), 0);
+        const unrealizedPL = totalStocksValue - totalCost;
         return {totalValue, totalCost, totalCash, unrealizedPL};
     }, [enrichedPortfolios]);
 
@@ -383,6 +386,40 @@ export function ComprehensiveDashboard({
         }))
     });
 
+    const weeklyValuationQueries = useQueries({
+        queries: portfolios.map((p) => ({
+            queryKey: ['dashboard', 'period-valuation', '1W', p.id],
+            enabled: !!(OpenAPI as any).TOKEN,
+            staleTime: 5 * 60 * 1000,
+            queryFn: async () => {
+                const base = (OpenAPI as any).BASE || '';
+                const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolios/${p.id}/performance/valuation/period?period=1W`, {
+                    headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                    credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+                });
+                if (!res.ok) return null;
+                return await res.json();
+            }
+        }))
+    });
+
+    const monthlyValuationQueries = useQueries({
+        queries: portfolios.map((p) => ({
+            queryKey: ['dashboard', 'period-valuation', '1M', p.id],
+            enabled: !!(OpenAPI as any).TOKEN,
+            staleTime: 5 * 60 * 1000,
+            queryFn: async () => {
+                const base = (OpenAPI as any).BASE || '';
+                const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolios/${p.id}/performance/valuation/period?period=1M`, {
+                    headers: (OpenAPI as any).TOKEN ? {Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}`} : undefined,
+                    credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
+                });
+                if (!res.ok) return null;
+                return await res.json();
+            }
+        }))
+    });
+
     const contributionDaily = useMemo(() => {
         return topMovers.map((m) => ({symbol: m.symbol, pl: m.contribution}));
     }, [topMovers]);
@@ -419,48 +456,50 @@ export function ComprehensiveDashboard({
     }, [enrichedPortfolios]);
 
     const weeklyPLTotal = useMemo(() => {
-        let total = 0;
-        weeklyAttributionQueries.forEach((q) => {
+        let startSum = 0;
+        let endSum = 0;
+        weeklyValuationQueries.forEach((q) => {
             const data = q.data as any;
             if (!data) return;
-            const pos: any[] = Array.isArray(data.top_contributors) ? data.top_contributors : [];
-            const neg: any[] = Array.isArray(data.top_detractors) ? data.top_detractors : [];
-            pos.forEach((c) => {
-                total += Number(c.contribution || 0);
-            });
-            neg.forEach((c) => {
-                total -= Math.abs(Number(c.contribution || 0));
-            });
+            startSum += Number(data.start_value || 0);
+            endSum += Number(data.end_value || 0);
         });
-        return total;
-    }, [weeklyAttributionQueries]);
+        return endSum - startSum;
+    }, [weeklyValuationQueries]);
 
     const monthlyPLTotal = useMemo(() => {
-        let total = 0;
-        monthlyAttributionQueries.forEach((q) => {
+        let startSum = 0;
+        let endSum = 0;
+        monthlyValuationQueries.forEach((q) => {
             const data = q.data as any;
             if (!data) return;
-            const pos: any[] = Array.isArray(data.top_contributors) ? data.top_contributors : [];
-            const neg: any[] = Array.isArray(data.top_detractors) ? data.top_detractors : [];
-            pos.forEach((c) => {
-                total += Number(c.contribution || 0);
-            });
-            neg.forEach((c) => {
-                total -= Math.abs(Number(c.contribution || 0));
-            });
+            startSum += Number(data.start_value || 0);
+            endSum += Number(data.end_value || 0);
         });
-        return total;
-    }, [monthlyAttributionQueries]);
+        return endSum - startSum;
+    }, [monthlyValuationQueries]);
 
     const weeklyPLPercent = useMemo(() => {
-        const base = Math.max(1, Number(aggregates.totalValue || 0));
+        let startSum = 0;
+        weeklyValuationQueries.forEach((q) => {
+            const data = q.data as any;
+            if (!data) return;
+            startSum += Number(data.start_value || 0);
+        });
+        const base = Math.max(1, startSum);
         return (Number(weeklyPLTotal || 0) / base) * 100;
-    }, [weeklyPLTotal, aggregates.totalValue]);
+    }, [weeklyPLTotal, weeklyValuationQueries]);
 
     const monthlyPLPercent = useMemo(() => {
-        const base = Math.max(1, Number(aggregates.totalValue || 0));
+        let startSum = 0;
+        monthlyValuationQueries.forEach((q) => {
+            const data = q.data as any;
+            if (!data) return;
+            startSum += Number(data.start_value || 0);
+        });
+        const base = Math.max(1, startSum);
         return (Number(monthlyPLTotal || 0) / base) * 100;
-    }, [monthlyPLTotal, aggregates.totalValue]);
+    }, [monthlyPLTotal, monthlyValuationQueries]);
 
     const decompositionYTDQueries = useQueries({
         queries: portfolios.map((p) => ({
@@ -1060,7 +1099,7 @@ export function ComprehensiveDashboard({
                                         const gainLoss = (p as any).totalValue - (p as any).totalCost;
                                         const gainLossPercent = (p as any).totalCost > 0 ? (gainLoss / (p as any).totalCost) * 100 : 0;
                                         return (
-                                            <Card key={p.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setGlobalSelectedPortfolioId(String(p.id)); onNavigate('portfolio-detail'); }}>
+                                            <Card key={p.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => { (onSelectPortfolioId ? onSelectPortfolioId(String(p.id)) : setGlobalSelectedPortfolioId(String(p.id))); onNavigate('portfolio-detail'); }}>
                                                 <CardHeader>
                                                     <div className="flex justify-between items-start">
                                                         <CardTitle className="text-lg">{p.name}</CardTitle>

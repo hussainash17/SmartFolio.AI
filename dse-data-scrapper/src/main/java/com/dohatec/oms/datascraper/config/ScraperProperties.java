@@ -64,6 +64,9 @@ public class ScraperProperties {
         
         // Daily OHLC aggregation runs at 3:30 PM
         private String dailyAggregationCron = "0 30 15 * * MON-THU";
+
+        // Portfolio daily valuation runs at 2:30 PM
+        private String portfolioValuationCron = "0 30 15 * * MON-THU";
         
         // Company list sync runs weekly on Saturday at 10 AM
         private String companyListSyncCron = "0 0 10 * * SAT";

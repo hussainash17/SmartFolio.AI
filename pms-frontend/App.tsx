@@ -417,6 +417,7 @@ export default function App() {
                             onQuickTrade={handleQuickTrade}
                             onChartStock={handleChartStock}
                             onNavigate={handleViewChange}
+                            onSelectPortfolioId={setSelectedPortfolioId}
                             selectedPortfolioId={selectedPortfolio?.id}
                         />
                     </Suspense>

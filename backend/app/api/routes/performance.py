@@ -949,6 +949,46 @@ def get_asset_class_attribution(
         }
     }
 
+# ============================================================================
+# NEW: PERIOD VALUATION (start/end values)
+# ============================================================================
+
+@router.get("/portfolios/{portfolio_id}/performance/valuation/period")
+def get_portfolio_period_valuation(
+        portfolio_id: str,
+        current_user: CurrentUser,
+        session: SessionDep,
+        period: str = Query("1W", regex="^(1D|1W|1M|3M|6M|YTD|1Y|3Y|5Y|ALL)$")
+):
+    """
+    Return start and end portfolio values for a period and derived P/L.
+
+    - start_value: Portfolio value at period start (on or before start_date)
+    - end_value: Portfolio value at period end (on or before end_date)
+    - absolute_pl: end_value - start_value
+    - percent_pl: (absolute_pl / max(1, start_value)) * 100
+    """
+    verify_portfolio_access(session, portfolio_id, current_user)
+    start_date, end_date = get_date_range_from_period(period)
+
+    calc = PerformanceCalculator(session)
+    start_value = calc._get_portfolio_value_on_date(portfolio_id, start_date)
+    end_value = calc._get_portfolio_value_on_date(portfolio_id, end_date)
+
+    absolute_pl = float(end_value - start_value)
+    percent_pl = float(absolute_pl / (start_value if start_value != 0 else 1) * 100)
+
+    return {
+        "portfolio_id": portfolio_id,
+        "period": period,
+        "start_date": start_date,
+        "end_date": end_date,
+        "start_value": float(start_value),
+        "end_value": float(end_value),
+        "absolute_pl": float(absolute_pl),
+        "percent_pl": float(percent_pl),
+    }
+
 
 # ============================================================================
 # API #7: SECTOR ATTRIBUTION (Priority 2)

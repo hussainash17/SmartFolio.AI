@@ -88,5 +88,10 @@ public interface StockDataRepository extends JpaRepository<StockData, UUID> {
      * @return count of records
      */
     long count();
+
+    /**
+     * Find latest stock data for a company by timestamp
+     */
+    Optional<StockData> findTopByCompanyIdOrderByTimestampDesc(UUID companyId);
 }
 
