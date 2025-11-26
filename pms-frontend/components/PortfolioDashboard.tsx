@@ -1,11 +1,11 @@
-import {Card, CardContent, CardHeader, CardTitle} from "./ui/card";
-import {Badge} from "./ui/badge";
-import {Button} from "./ui/button";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "./ui/table";
-import {BarChart3, DollarSign, Plus, ShoppingCart, TrendingDown, TrendingUp, Upload} from "lucide-react";
-import {Portfolio, PortfolioSummary} from "../types/portfolio";
-import {useEffect, useState} from "react";
-import {OpenAPI} from "../src/client";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
+import { BarChart3, DollarSign, Plus, ShoppingCart, TrendingDown, TrendingUp, Upload } from "lucide-react";
+import { Portfolio, PortfolioSummary } from "../types/portfolio";
+import { useEffect, useState } from "react";
+import { OpenAPI } from "../src/client";
 
 interface PortfolioDashboardProps {
     onCreatePortfolio: () => void;
@@ -19,15 +19,15 @@ interface PortfolioDashboardProps {
 }
 
 export function PortfolioDashboard({
-                                       onCreatePortfolio,
-                                       onUploadPortfolio,
-                                       onSelectPortfolio,
-                                       onQuickTrade,
-                                       onChartStock,
-                                       portfolios,
-                                       portfolioSummary,
-                                       selectedPortfolio
-                                   }: PortfolioDashboardProps) {
+    onCreatePortfolio,
+    onUploadPortfolio,
+    onSelectPortfolio,
+    onQuickTrade,
+    onChartStock,
+    portfolios,
+    portfolioSummary,
+    selectedPortfolio
+}: PortfolioDashboardProps) {
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
@@ -56,7 +56,7 @@ export function PortfolioDashboard({
                 setAggLoading(true);
                 const base = (OpenAPI.BASE || '').replace(/\/$/, '');
                 const res = await fetch(`${base}/api/v1/portfolio/aggregates`, {
-                    headers: OpenAPI.TOKEN ? {Authorization: `Bearer ${OpenAPI.TOKEN as unknown as string}`} : undefined,
+                    headers: OpenAPI.TOKEN ? { Authorization: `Bearer ${OpenAPI.TOKEN as unknown as string}` } : undefined,
                     credentials: OpenAPI.WITH_CREDENTIALS ? 'include' : 'omit',
                 });
                 if (!res.ok) {
@@ -93,12 +93,12 @@ export function PortfolioDashboard({
                 <div className="flex items-center gap-2">
                     {onUploadPortfolio && (
                         <Button onClick={onUploadPortfolio} variant="outline" size="lg">
-                            <Upload className="h-5 w-5 mr-2"/>
+                            <Upload className="h-5 w-5 mr-2" />
                             Upload Portfolio
                         </Button>
                     )}
                     <Button onClick={onCreatePortfolio} size="lg">
-                        <Plus className="h-5 w-5 mr-2"/>
+                        <Plus className="h-5 w-5 mr-2" />
                         Create Portfolio
                     </Button>
                 </div>
@@ -109,7 +109,7 @@ export function PortfolioDashboard({
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm">Total Value (All)</CardTitle>
-                        <DollarSign className="h-4 w-4 text-muted-foreground"/>
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl">
@@ -122,16 +122,16 @@ export function PortfolioDashboard({
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm">Total Gain/Loss (All)</CardTitle>
                         {(aggregates?.total_gain_loss ?? 0) >= 0 ? (
-                            <TrendingUp className="h-4 w-4 text-green-600"/>
+                            <TrendingUp className="h-4 w-4 text-green-600" />
                         ) : (
-                            <TrendingDown className="h-4 w-4 text-red-600"/>
+                            <TrendingDown className="h-4 w-4 text-red-600" />
                         )}
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl">
-              <span className={(aggregates?.total_gain_loss ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
-                {aggregates ? formatCurrency(aggregates.total_gain_loss) : (aggLoading ? '…' : '-')}
-              </span>
+                            <span className={(aggregates?.total_gain_loss ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                {aggregates ? formatCurrency(aggregates.total_gain_loss) : (aggLoading ? '…' : '-')}
+                            </span>
                         </div>
                     </CardContent>
                 </Card>
@@ -139,7 +139,7 @@ export function PortfolioDashboard({
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm">Available Cash (All)</CardTitle>
-                        <DollarSign className="h-4 w-4 text-muted-foreground"/>
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl">
@@ -152,16 +152,16 @@ export function PortfolioDashboard({
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm">Day Change (All)</CardTitle>
                         {(aggregates?.total_day_change ?? 0) >= 0 ? (
-                            <TrendingUp className="h-4 w-4 text-green-600"/>
+                            <TrendingUp className="h-4 w-4 text-green-600" />
                         ) : (
-                            <TrendingDown className="h-4 w-4 text-red-600"/>
+                            <TrendingDown className="h-4 w-4 text-red-600" />
                         )}
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl">
-              <span className={(aggregates?.total_day_change ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
-                {aggregates ? formatCurrency(aggregates.total_day_change) : (aggLoading ? '…' : '-')}
-              </span>
+                            <span className={(aggregates?.total_day_change ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                {aggregates ? formatCurrency(aggregates.total_day_change) : (aggLoading ? '…' : '-')}
+                            </span>
                         </div>
                     </CardContent>
                 </Card>
@@ -169,7 +169,7 @@ export function PortfolioDashboard({
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm">Invested Amount (All)</CardTitle>
-                        <DollarSign className="h-4 w-4 text-muted-foreground"/>
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl">
@@ -186,12 +186,11 @@ export function PortfolioDashboard({
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {portfolios.map((portfolio) => {
-                    const gainLoss = portfolio.totalValue - portfolio.totalCost;
+                    const gainLoss = portfolio.totalValue - portfolio.totalCost - portfolio.cash;
                     const gainLossPercent = portfolio.totalCost > 0 ? (gainLoss / portfolio.totalCost) * 100 : 0;
-
                     return (
                         <Card key={portfolio.id} className="cursor-pointer hover:shadow-md transition-shadow"
-                              onClick={() => onSelectPortfolio(portfolio)}>
+                            onClick={() => onSelectPortfolio(portfolio)}>
                             <CardHeader>
                                 <div className="flex justify-between items-start">
                                     <CardTitle className="text-lg">{portfolio.name}</CardTitle>
@@ -212,8 +211,8 @@ export function PortfolioDashboard({
                                     <div className="flex justify-between">
                                         <span className="text-sm text-muted-foreground">Gain/Loss</span>
                                         <span className={gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}>
-                      {formatCurrency(gainLoss)}
-                    </span>
+                                            {formatCurrency(gainLoss)}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-sm text-muted-foreground">Holdings</span>
@@ -275,7 +274,7 @@ export function PortfolioDashboard({
                                                     <span className="font-medium">{stock.symbol}</span>
                                                     {stock.sector && stock.sector !== 'Unknown' && (
                                                         <Badge variant="outline"
-                                                               className="text-xs">{stock.sector}</Badge>
+                                                            className="text-xs">{stock.sector}</Badge>
                                                     )}
                                                 </div>
                                             </TableCell>
@@ -289,8 +288,8 @@ export function PortfolioDashboard({
                                             <TableCell
                                                 className={`text-right ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                 <div className="flex items-center justify-end gap-1">
-                                                    {gainLoss >= 0 ? <TrendingUp className="h-3 w-3"/> :
-                                                        <TrendingDown className="h-3 w-3"/>}
+                                                    {gainLoss >= 0 ? <TrendingUp className="h-3 w-3" /> :
+                                                        <TrendingDown className="h-3 w-3" />}
                                                     {formatCurrency(gainLoss)}
                                                 </div>
                                             </TableCell>
@@ -309,7 +308,7 @@ export function PortfolioDashboard({
                                                         }}
                                                         className="h-8 w-8 p-0"
                                                     >
-                                                        <BarChart3 className="h-3 w-3"/>
+                                                        <BarChart3 className="h-3 w-3" />
                                                     </Button>
                                                     <Button
                                                         variant="ghost"
@@ -320,7 +319,7 @@ export function PortfolioDashboard({
                                                         }}
                                                         className="h-8 w-8 p-0"
                                                     >
-                                                        <ShoppingCart className="h-3 w-3"/>
+                                                        <ShoppingCart className="h-3 w-3" />
                                                     </Button>
                                                 </div>
                                             </TableCell>

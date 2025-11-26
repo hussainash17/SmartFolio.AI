@@ -18,6 +18,8 @@ export interface Portfolio {
   totalCost: number;
   stocks: Stock[];
   cash: number;
+  unrealizedPnl?: number;
+  realizedPnl?: number;
 }
 
 export interface PortfolioSummary {

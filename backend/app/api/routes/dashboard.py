@@ -91,6 +91,7 @@ def get_dashboard_summary(
     # Sum values
     total_investment = sum(_safe_decimal(pos.total_investment) for pos in positions)
     cash_balance = sum(_safe_decimal(p.cash_balance) for p in portfolios)
+    total_realized_gains = sum(_safe_decimal(p.realized_pnl) for p in portfolios)
 
     # Build map of stock_id -> total quantity and current value for weighting
     from collections import defaultdict
@@ -243,4 +244,5 @@ def get_dashboard_summary(
         "risk_level": risk_level,
         "active_goals": len(active_goals),
         "buying_power": float(buying_power_value),
+        "total_realized_gains": float(total_realized_gains),
     }

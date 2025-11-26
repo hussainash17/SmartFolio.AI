@@ -88,11 +88,19 @@ export function ComprehensiveDashboard({
     };
     const {
         data: dashboardSummary = {
+            portfolio_count: 0,
             total_portfolio_value: 0,
+            total_investment: 0,
+            cash_balance: 0,
+            stock_value: 0,
+            day_change: 0,
+            day_change_percent: 0,
             ytd_return_percent: 0,
             risk_score: 0,
             risk_level: 'LOW',
-            active_goals: 0
+            active_goals: 0,
+            buying_power: 0,
+            total_realized_gains: 0,
         }
     } = useQuery({
         queryKey: queryKeys.dashboardSummary,
@@ -103,21 +111,35 @@ export function ComprehensiveDashboard({
                 credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
             });
             if (!res.ok) return {
+                portfolio_count: 0,
                 total_portfolio_value: 0,
+                total_investment: 0,
+                cash_balance: 0,
+                stock_value: 0,
+                day_change: 0,
+                day_change_percent: 0,
                 ytd_return_percent: 0,
                 risk_score: 0,
                 risk_level: 'LOW',
-                active_goals: 0
+                active_goals: 0,
+                buying_power: 0,
+                total_realized_gains: 0,
             };
             const data = await res.json();
             return {
+                portfolio_count: Number(data.portfolio_count || 0),
                 total_portfolio_value: Number(data.total_portfolio_value || 0),
+                total_investment: Number(data.total_investment || 0),
+                cash_balance: Number(data.cash_balance || 0),
+                stock_value: Number(data.stock_value || 0),
+                day_change: Number(data.day_change || 0),
+                day_change_percent: Number(data.day_change_percent || 0),
                 ytd_return_percent: Number(data.ytd_return_percent || 0),
                 risk_score: Number(data.risk_score || 0),
                 risk_level: String(data.risk_level || 'LOW'),
                 active_goals: Number(data.active_goals || 0),
-                day_change: Number(data.day_change || 0),
-                day_change_percent: Number(data.day_change_percent || 0),
+                buying_power: Number(data.buying_power || 0),
+                total_realized_gains: Number(data.total_realized_gains || 0),
             };
         },
         staleTime: 60 * 1000,
@@ -535,45 +557,8 @@ export function ComprehensiveDashboard({
         }))
     });
 
-    const realizedYTD = useMemo(() => {
-        let total = 0;
-        decompositionYTDQueries.forEach((q) => {
-            const data = q.data as any;
-            if (!data) return;
-            const candidates = [
-                (data as any).realized,
-                (data as any).realized_pnl,
-                (data as any).realized_profit,
-                (data as any).realized_gain,
-                (data as any).realized_gains,
-                (data as any).capital_gains_realized,
-                (data as any).capital_gain_realized,
-                (data as any).capital_realized,
-            ];
-            let val = candidates.find((v: any) => typeof v === 'number');
-            if (typeof val !== 'number') {
-                const comp = Array.isArray((data as any).components)
-                    ? (data as any).components
-                    : Array.isArray((data as any).decomposition)
-                        ? (data as any).decomposition
-                        : [];
-                if (comp.length) {
-                    let s = 0;
-                    comp.forEach((c: any) => {
-                        const key = String((c as any).type || (c as any).name || '').toLowerCase();
-                        if (key.includes('realized') || (key.includes('capital') && key.includes('gain') && key.includes('realized'))) {
-                            s += Number((c as any).value || (c as any).amount || 0);
-                        }
-                    });
-                    val = s;
-                } else {
-                    val = 0;
-                }
-            }
-            total += Number(val || 0);
-        });
-        return total;
-    }, [decompositionYTDQueries]);
+    // Use aggregated realized gains from dashboard API
+    const realizedYTD = dashboardSummary.total_realized_gains || 0;
 
     const realizedToday = useMemo(() => {
         let total = 0;
@@ -1109,7 +1094,7 @@ export function ComprehensiveDashboard({
                             <CardContent>
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                                     {enrichedPortfolios.map((p) => {
-                                        const gainLoss = (p as any).totalValue - (p as any).totalCost;
+                                        const gainLoss = (p as any).totalValue - (p as any).totalCost - (p as any).cash;
                                         const gainLossPercent = (p as any).totalCost > 0 ? (gainLoss / (p as any).totalCost) * 100 : 0;
                                         return (
                                             <Card key={p.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => { (onSelectPortfolioId ? onSelectPortfolioId(String(p.id)) : setGlobalSelectedPortfolioId(String(p.id))); onNavigate('portfolio-detail'); }}>

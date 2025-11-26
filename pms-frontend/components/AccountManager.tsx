@@ -4,12 +4,12 @@ import { Badge } from "./ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Progress } from "./ui/progress";
-import { 
-  DollarSign, 
-  CreditCard, 
-  TrendingUp, 
-  Shield, 
-  User, 
+import {
+  DollarSign,
+  CreditCard,
+  TrendingUp,
+  Shield,
+  User,
   Settings,
   Download,
   ArrowUpCircle,
@@ -186,7 +186,7 @@ export function AccountManager({ user, accountBalance, transactions, portfolios,
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(accountBalance.totalValue)}</div>
             <p className="text-xs text-muted-foreground">
-              Cash: {formatCurrency(accountBalance.cashBalance)} | 
+              Cash: {formatCurrency(accountBalance.cashBalance)} |
               Stocks: {formatCurrency(accountBalance.stockValue)}
             </p>
           </CardContent>
@@ -294,7 +294,7 @@ export function AccountManager({ user, accountBalance, transactions, portfolios,
             (() => {
               const p = portfolios.find(x => x.id === detailPortfolioId);
               const stockValue = Math.max((p?.totalValue || 0) - (p?.cash || 0), 0);
-              const gainLoss = (p?.totalValue || 0) - (p?.totalCost || 0);
+              const gainLoss = stockValue - (p?.totalCost || 0);
               const gainLossPercent = (p && p.totalCost > 0) ? (gainLoss / p.totalCost) * 100 : 0;
               return (
                 <div className="space-y-6">
@@ -392,68 +392,68 @@ export function AccountManager({ user, accountBalance, transactions, portfolios,
                     <CardTitle>Balance Breakdown</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                  {hasPortfolios ? (
-                    <div className="space-y-3">
-                      {portfolios.map((portfolio) => {
-                        const stockValue = Math.max(portfolio.totalValue - portfolio.cash, 0);
-                        const gainLoss = portfolio.totalValue - portfolio.totalCost;
-                        const gainLossPercent = portfolio.totalCost > 0 ? (gainLoss / portfolio.totalCost) * 100 : 0;
-                        return (
-                          <button
-                            key={portfolio.id}
-                            type="button"
-                            onClick={() => setDetailPortfolioId(portfolio.id)}
-                            className="rounded-lg border bg-muted/20 p-3 text-left w-full hover:border-foreground/20 hover:shadow-sm"
-                          >
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm font-medium">{portfolio.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  Created {new Date(portfolio.createdDate).toLocaleDateString()}
-                                </p>
+                    {hasPortfolios ? (
+                      <div className="space-y-3">
+                        {portfolios.map((portfolio) => {
+                          const stockValue = Math.max(portfolio.totalValue - portfolio.cash, 0);
+                          const gainLoss = stockValue - portfolio.totalCost;
+                          const gainLossPercent = portfolio.totalCost > 0 ? (gainLoss / portfolio.totalCost) * 100 : 0;
+                          return (
+                            <button
+                              key={portfolio.id}
+                              type="button"
+                              onClick={() => setDetailPortfolioId(portfolio.id)}
+                              className="rounded-lg border bg-muted/20 p-3 text-left w-full hover:border-foreground/20 hover:shadow-sm"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-medium">{portfolio.name}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Created {new Date(portfolio.createdDate).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-xs text-muted-foreground">Total Value</p>
+                                  <p className="text-sm font-semibold">
+                                    {formatCurrency(portfolio.totalValue)}
+                                  </p>
+                                </div>
                               </div>
-                              <div className="text-right">
-                                <p className="text-xs text-muted-foreground">Total Value</p>
-                                <p className="text-sm font-semibold">
-                                  {formatCurrency(portfolio.totalValue)}
-                                </p>
+                              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Cash Balance</p>
+                                  <p className="font-medium">
+                                    {formatCurrency(portfolio.cash)}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Stock Value</p>
+                                  <p className="font-medium">
+                                    {formatCurrency(stockValue)}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Invested Capital</p>
+                                  <p className="font-medium">
+                                    {formatCurrency(portfolio.totalCost)}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Unrealized P/L</p>
+                                  <p className={`font-medium ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {formatCurrency(gainLoss)} ({formatPercentage(gainLossPercent)})
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                            <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                              <div>
-                                <p className="text-xs text-muted-foreground">Cash Balance</p>
-                                <p className="font-medium">
-                                  {formatCurrency(portfolio.cash)}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-muted-foreground">Stock Value</p>
-                                <p className="font-medium">
-                                  {formatCurrency(stockValue)}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-muted-foreground">Invested Capital</p>
-                                <p className="font-medium">
-                                  {formatCurrency(portfolio.totalCost)}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-muted-foreground">Unrealized P/L</p>
-                                <p className={`font-medium ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                  {formatCurrency(gainLoss)} ({formatPercentage(gainLossPercent)})
-                                </p>
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      No portfolios available yet. Create a portfolio to see detailed breakdowns.
-                    </p>
-                  )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No portfolios available yet. Create a portfolio to see detailed breakdowns.
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -615,7 +615,7 @@ export function AccountManager({ user, accountBalance, transactions, portfolios,
                   </div>
                   <Button variant="outline">Enable</Button>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-medium">Email Notifications</h4>
@@ -623,7 +623,7 @@ export function AccountManager({ user, accountBalance, transactions, portfolios,
                   </div>
                   <Button variant="outline">Configure</Button>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-medium">API Access</h4>
@@ -631,8 +631,8 @@ export function AccountManager({ user, accountBalance, transactions, portfolios,
                   </div>
                   <Button variant="outline">Manage</Button>
                 </div>
-                
-                
+
+
 
                 <div className="flex items-center justify-between">
                   <div>

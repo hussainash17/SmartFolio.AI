@@ -134,13 +134,22 @@ export function PortfolioDetail({
       />
 
       {/* Performance Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Total Value</CardTitle>
+            <CardTitle className="text-sm">Total Portfolio Value</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl">{formatCurrency(totalValue)}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Totol Cost</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl">{formatCurrency(totalCost)}</div>
           </CardContent>
         </Card>
 
@@ -155,6 +164,24 @@ export function PortfolioDetail({
             <p className={`text-xs ${totalGainLossPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {formatPercent(totalGainLossPercent)}
             </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Unrealized PnL</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl">{formatCurrency(portfolio.unrealizedPnl)}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Realized PnL</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl">{formatCurrency(portfolio.realizedPnl)}</div>
           </CardContent>
         </Card>
 
