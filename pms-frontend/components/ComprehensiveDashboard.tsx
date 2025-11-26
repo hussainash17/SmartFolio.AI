@@ -17,10 +17,10 @@ import {
     TrendingUp
 } from "lucide-react";
 import { Bar, BarChart as RBarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { AccountBalance, MarketData as MarketDataType, NewsItem, Order, Transaction } from "../types/trading";
+import { AccountBalance, MarketData, NewsItem, Order, Transaction } from "../types/trading";
 import { useEffect, useMemo, useState } from "react";
 import { AnalyticsService, KycService, OpenAPI, RiskManagementService } from "../src/client";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "../hooks/queryKeys";
 import { usePortfolios } from "../hooks/usePortfolios";
 import { useRiskAlerts, useRiskOverview } from "../hooks/useRisk";
@@ -31,13 +31,30 @@ import {
     usePerformanceReturns,
     usePerformanceRiskMetrics,
 } from "../hooks/usePerformance";
+import { useDashboardSummary, useInvestmentGoals, useGoalProgress } from "../hooks/useDashboardSummary";
+import { useDashboardPortfolios } from "../hooks/useDashboardPortfolios";
+import { useMarketIndices, useBenchmarkData, useMarketTopMovers, useMarketMostActive, useSectorAnalysis } from "../hooks/useDashboardMarket";
+import {
+    useWeeklyAttributionQueries,
+    useMonthlyAttributionQueries,
+    useWeeklyValuationQueries,
+    useMonthlyValuationQueries,
+    useYTDDecompositionQueries,
+    useDailyDecompositionQueries,
+    useCalculatedRealizedYTD,
+    useCalculatedRealizedToday,
+    useWeeklyPLTotal,
+    useMonthlyPLTotal,
+    useWeeklyPLPercent,
+    useMonthlyPLPercent,
+} from "../hooks/useDashboardContributions";
 
 interface ComprehensiveDashboardProps {
     accountBalance: AccountBalance;
     recentOrders: Order[];
     recentTransactions: Transaction[];
     news: NewsItem[];
-    marketData: MarketDataType[];
+    marketData: MarketData[];
     onQuickTrade: (symbol?: string, side?: 'buy' | 'sell') => void;
     onChartStock: (symbol: string) => void;
     onNavigate: (view: string) => void;
@@ -57,7 +74,7 @@ export function ComprehensiveDashboard({
     onSelectPortfolioId,
     selectedPortfolioId: initialPortfolioId,
 }: ComprehensiveDashboardProps) {
-    // Portfolio selection state
+    // ========== State Management ==========
     const { portfolios, setSelectedPortfolioId: setGlobalSelectedPortfolioId } = usePortfolios();
     const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | undefined>(initialPortfolioId);
     const [contributionView, setContributionView] = useState<'daily' | 'weekly' | 'unrealized'>('daily');
@@ -68,6 +85,124 @@ export function ComprehensiveDashboard({
             setSelectedPortfolioId(portfolios[0].id);
         }
     }, [portfolios, selectedPortfolioId]);
+
+    // ========== Dashboard Summary & Goals ==========
+    const { data: dashboardSummary = { portfolio_count: 0, total_portfolio_value: 0, total_investment: 0, cash_balance: 0, stock_value: 0, day_change: 0, day_change_percent: 0, ytd_return_percent: 0, risk_score: 0, risk_level: 'LOW', active_goals: 0, buying_power: 0, total_realized_gains: 0 } } = useDashboardSummary();
+    console.log(dashboardSummary);
+    const { data: investmentGoals = [] } = useInvestmentGoals();
+    const goalIds = useMemo(() => investmentGoals.map(g => g.id), [investmentGoals]);
+    const { data: goalProgressMap = {} } = useGoalProgress(goalIds);
+
+    // ========== Portfolio Aggregation ==========
+    const { enrichedPortfolios, aggregates, marketOverview, topMovers, sectorExposure } = useDashboardPortfolios(marketData);
+
+    // ========== Performance Data ==========
+    const { data: currentValue } = useCurrentValue(selectedPortfolioId);
+    const { data: returnsYTD } = usePerformanceReturns(selectedPortfolioId, 'YTD');
+    const { data: returns1Y } = usePerformanceReturns(selectedPortfolioId, '1Y');
+    const { data: returns3Y } = usePerformanceReturns(selectedPortfolioId, '3Y');
+    const { data: returnsAll } = usePerformanceReturns(selectedPortfolioId, 'ALL');
+    const { data: riskMetrics1Y } = usePerformanceRiskMetrics(selectedPortfolioId, '1Y');
+    const { data: bestWorstYTD } = useBestWorstPeriods(selectedPortfolioId, 'YTD');
+    const { data: cashFlowsYTD } = useCashFlows(selectedPortfolioId, 'YTD');
+
+    // Aggregate performance data
+    const portfolioPerformance = useMemo(() => {
+        return {
+            totalReturn: returnsAll?.time_weighted_return || 0,
+            yearToDate: returnsYTD?.time_weighted_return || 0,
+            oneYear: returns1Y?.annualized_return || 0,
+            threeYear: returns3Y?.annualized_return || 0,
+            sharpeRatio: riskMetrics1Y?.sharpe_ratio || 0,
+            volatility: riskMetrics1Y?.volatility || 0,
+            maxDrawdown: riskMetrics1Y?.max_drawdown || 0,
+        };
+    }, [returnsAll, returnsYTD, returns1Y, returns3Y, riskMetrics1Y]);
+
+    // ========== Market Data ==========
+    const { data: marketIndices } = useMarketIndices();
+    const { data: benchmarkData } = useBenchmarkData();
+    const { data: marketTopMovers } = useMarketTopMovers();
+    const { data: marketMostActive = [] } = useMarketMostActive();
+    const { data: sectorAnalysis } = useSectorAnalysis();
+
+    // ========== Contribution & Attribution Data ==========
+    const weeklyAttributionQueries = useWeeklyAttributionQueries(portfolios.map(p => p.id));
+    const monthlyAttributionQueries = useMonthlyAttributionQueries(portfolios.map(p => p.id));
+    const weeklyValuationQueries = useWeeklyValuationQueries(portfolios.map(p => p.id));
+    const monthlyValuationQueries = useMonthlyValuationQueries(portfolios.map(p => p.id));
+    const ytdDecompositionQueries = useYTDDecompositionQueries(portfolios.map(p => p.id));
+    const dailyDecompositionQueries = useDailyDecompositionQueries(portfolios.map(p => p.id));
+
+    // Calculate P/L metrics
+    const weeklyPLTotal = useWeeklyPLTotal(weeklyValuationQueries);
+    const monthlyPLTotal = useMonthlyPLTotal(monthlyValuationQueries);
+    const weeklyPLPercent = useWeeklyPLPercent(weeklyPLTotal, weeklyValuationQueries);
+    const monthlyPLPercent = useMonthlyPLPercent(monthlyPLTotal, monthlyValuationQueries);
+
+    // Calculate realized gains
+    const calculatedRealizedYTD = useCalculatedRealizedYTD(ytdDecompositionQueries);
+    const realizedYTD = dashboardSummary.total_realized_gains || calculatedRealizedYTD;
+    const realizedToday = useCalculatedRealizedToday(dailyDecompositionQueries);
+
+    // ========== Risk Data ==========
+    const { data: riskAlertsData = [], isLoading: riskAlertsLoading } = useRiskAlerts(selectedPortfolioId, true);
+    const { data: riskOverview, isLoading: riskOverviewLoading } = useRiskOverview(selectedPortfolioId, '1M');
+    const { data: riskProfile } = useQuery({
+        queryKey: ['risk', 'profile'],
+        queryFn: async () => {
+            try {
+                const profile = await RiskManagementService.getUserRiskProfile();
+                return profile as any;
+            } catch (error) {
+                if ((error as any)?.status === 404) {
+                    return null;
+                }
+                console.error('[Dashboard] Failed to fetch risk profile:', error);
+                return null;
+            }
+        },
+        staleTime: 10 * 60 * 1000,
+        retry: false,
+    });
+
+    // Transform risk alerts
+    const riskAlerts = useMemo(() => {
+        return (riskAlertsData as any[]).map((a) => ({
+            type: String(a.alert_type || 'info'),
+            message: String(a.message || ''),
+            severity: String((a.severity || 'LOW')).toLowerCase() as 'low' | 'medium' | 'high',
+        }));
+    }, [riskAlertsData]);
+
+    // ========== Portfolio Allocation ==========
+    const { data: assetAllocation = [] } = useQuery({
+        queryKey: queryKeys.portfolioAllocation(selectedPortfolioId || 'none'),
+        enabled: !!selectedPortfolioId,
+        queryFn: async () => {
+            if (!selectedPortfolioId) return [];
+            try {
+                const alloc = await AnalyticsService.getPortfolioAllocation({ portfolioId: selectedPortfolioId });
+                const sectors = ((alloc as any).sector_wise_allocation || []) as Array<any>;
+
+                if (!Array.isArray(sectors)) {
+                    console.warn('[ComprehensiveDashboard] sector_wise_allocation is not an array:', sectors);
+                    return [];
+                }
+
+                const palette = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#6b7280", "#8b5cf6", "#14b8a6", "#f97316"];
+                return sectors.map((s, idx) => ({
+                    type: String(s.sector || 'Unknown'),
+                    value: Number(s.value || 0),
+                    percentage: Number(s.allocation_percent || 0),
+                    color: palette[idx % palette.length],
+                }));
+            } catch (error) {
+                console.error('[ComprehensiveDashboard] Failed to fetch asset allocation:', error);
+                return [];
+            }
+        },
+    });
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-US', {
@@ -86,362 +221,8 @@ export function ComprehensiveDashboard({
         if (!Number.isFinite(num)) return 0;
         return num >= 10000 ? num / 1_000_000 : num;
     };
-    const {
-        data: dashboardSummary = {
-            portfolio_count: 0,
-            total_portfolio_value: 0,
-            total_investment: 0,
-            cash_balance: 0,
-            stock_value: 0,
-            day_change: 0,
-            day_change_percent: 0,
-            ytd_return_percent: 0,
-            risk_score: 0,
-            risk_level: 'LOW',
-            active_goals: 0,
-            buying_power: 0,
-            total_realized_gains: 0,
-        }
-    } = useQuery({
-        queryKey: queryKeys.dashboardSummary,
-        queryFn: async () => {
-            const base = (OpenAPI as any).BASE || '';
-            const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/dashboard/summary`, {
-                headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
-                credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-            });
-            if (!res.ok) return {
-                portfolio_count: 0,
-                total_portfolio_value: 0,
-                total_investment: 0,
-                cash_balance: 0,
-                stock_value: 0,
-                day_change: 0,
-                day_change_percent: 0,
-                ytd_return_percent: 0,
-                risk_score: 0,
-                risk_level: 'LOW',
-                active_goals: 0,
-                buying_power: 0,
-                total_realized_gains: 0,
-            };
-            const data = await res.json();
-            return {
-                portfolio_count: Number(data.portfolio_count || 0),
-                total_portfolio_value: Number(data.total_portfolio_value || 0),
-                total_investment: Number(data.total_investment || 0),
-                cash_balance: Number(data.cash_balance || 0),
-                stock_value: Number(data.stock_value || 0),
-                day_change: Number(data.day_change || 0),
-                day_change_percent: Number(data.day_change_percent || 0),
-                ytd_return_percent: Number(data.ytd_return_percent || 0),
-                risk_score: Number(data.risk_score || 0),
-                risk_level: String(data.risk_level || 'LOW'),
-                active_goals: Number(data.active_goals || 0),
-                buying_power: Number(data.buying_power || 0),
-                total_realized_gains: Number(data.total_realized_gains || 0),
-            };
-        },
-        staleTime: 60 * 1000,
-    });
 
-    // Use new optimized split APIs for performance data
-    const { data: currentValue } = useCurrentValue(selectedPortfolioId);
-    const { data: returnsYTD } = usePerformanceReturns(selectedPortfolioId, 'YTD');
-    const { data: returns1Y } = usePerformanceReturns(selectedPortfolioId, '1Y');
-    const { data: returns3Y } = usePerformanceReturns(selectedPortfolioId, '3Y');
-    const { data: returnsAll } = usePerformanceReturns(selectedPortfolioId, 'ALL');
-    const { data: riskMetrics1Y } = usePerformanceRiskMetrics(selectedPortfolioId, '1Y');
-    const { data: bestWorstYTD } = useBestWorstPeriods(selectedPortfolioId, 'YTD');
-    const { data: cashFlowsYTD } = useCashFlows(selectedPortfolioId, 'YTD');
-
-    // Aggregate performance data from split APIs
-    const portfolioPerformance = useMemo(() => {
-        return {
-            totalReturn: returnsAll?.time_weighted_return || 0,
-            yearToDate: returnsYTD?.time_weighted_return || 0,
-            oneYear: returns1Y?.annualized_return || 0,
-            threeYear: returns3Y?.annualized_return || 0,
-            sharpeRatio: riskMetrics1Y?.sharpe_ratio || 0,
-            volatility: riskMetrics1Y?.volatility || 0,
-            maxDrawdown: riskMetrics1Y?.max_drawdown || 0,
-        };
-    }, [returnsAll, returnsYTD, returns1Y, returns3Y, riskMetrics1Y]);
-
-    const { data: assetAllocation = [] } = useQuery({
-        queryKey: queryKeys.portfolioAllocation(selectedPortfolioId || 'none'),
-        enabled: !!selectedPortfolioId,
-        queryFn: async () => {
-            if (!selectedPortfolioId) return [] as Array<{
-                type: string;
-                value: number;
-                percentage: number;
-                color: string
-            }>;
-            try {
-                const alloc = await AnalyticsService.getPortfolioAllocation({ portfolioId: selectedPortfolioId });
-                const sectors = ((alloc as any).sector_wise_allocation || []) as Array<any>;
-
-                // Ensure sectors is an array
-                if (!Array.isArray(sectors)) {
-                    console.warn('[ComprehensiveDashboard] sector_wise_allocation is not an array:', sectors);
-                    return [] as Array<{ type: string; value: number; percentage: number; color: string }>;
-                }
-
-                const palette = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#6b7280", "#8b5cf6", "#14b8a6", "#f97316"];
-                return sectors.map((s, idx) => ({
-                    type: String(s.sector || 'Unknown'),
-                    value: Number(s.value || 0),
-                    percentage: Number(s.allocation_percent || 0),
-                    color: palette[idx % palette.length],
-                }));
-            } catch (error) {
-                console.error('[ComprehensiveDashboard] Failed to fetch asset allocation:', error);
-                return [] as Array<{ type: string; value: number; percentage: number; color: string }>;
-            }
-        },
-    });
-
-    const { data: investmentGoals = [] } = useQuery({
-        queryKey: queryKeys.investmentGoals,
-        queryFn: async () => {
-            try {
-                const goals = await KycService.getInvestmentGoals();
-                return (goals as any[]).map((g) => ({
-                    id: String(g.id),
-                    name: String(g.goal_type || 'Goal'),
-                    target: Number(g.target_amount || 0),
-                    current: 0,
-                    progress: 0,
-                    timeframe: g.target_date ? new Date(g.target_date).toLocaleDateString() : '—',
-                    priority: (Number(g.priority || 1) <= 1 ? 'High' : Number(g.priority || 1) <= 2 ? 'Medium' : 'Low'),
-                    status: String(g.status || 'ACTIVE'),
-                }));
-            } catch (error) {
-                console.error('[Dashboard] Failed to fetch investment goals:', error);
-                return [];
-            }
-        },
-        staleTime: 5 * 60 * 1000, // 5 minutes
-    });
-
-    const { data: goalProgressMap = {} } = useQuery({
-        queryKey: ['kyc', 'goals', 'progress', investmentGoals.map(g => g.id).join(',')],
-        queryFn: async () => {
-            const result: Record<string, number> = {};
-            for (const g of investmentGoals) {
-                try {
-                    const contribs = await KycService.listGoalContributions({ goalId: g.id });
-                    const sum = (contribs as any[]).reduce((acc: number, c: any) => acc + Number(c.amount || 0), 0);
-                    const target = Number(g.target || 0);
-                    result[g.id] = target > 0 ? Math.min(100, (sum / target) * 100) : 0;
-                } catch (error) {
-                    console.error(`[Dashboard] Failed to fetch contributions for goal ${g.id}:`, error);
-                    result[g.id] = 0;
-                }
-            }
-            return result;
-        },
-        enabled: investmentGoals.length > 0,
-        staleTime: 2 * 60 * 1000, // 2 minutes
-    });
-
-    // Fetch active risk alerts
-    const { data: riskAlertsData = [], isLoading: riskAlertsLoading } = useRiskAlerts(selectedPortfolioId, true);
-
-    // Transform raw alerts to display format
-    const riskAlerts = useMemo(() => {
-        return (riskAlertsData as any[]).map((a) => ({
-            type: String(a.alert_type || 'info'),
-            message: String(a.message || ''),
-            severity: String((a.severity || 'LOW')).toLowerCase() as 'low' | 'medium' | 'high',
-        }));
-    }, [riskAlertsData]);
-
-    // Fetch risk overview metrics
-    const { data: riskOverview, isLoading: riskOverviewLoading } = useRiskOverview(selectedPortfolioId, '1M');
-
-    // Fetch user risk profile
-    const { data: riskProfile } = useQuery({
-        queryKey: ['risk', 'profile'],
-        queryFn: async () => {
-            try {
-                const profile = await RiskManagementService.getUserRiskProfile();
-                return profile as any;
-            } catch (error) {
-                // 404 means user hasn't created a risk profile yet - this is normal
-                if ((error as any)?.status === 404) {
-                    return null;
-                }
-                console.error('[Dashboard] Failed to fetch risk profile:', error);
-                return null;
-            }
-        },
-        staleTime: 10 * 60 * 1000, // 10 minutes
-        retry: false, // Don't retry on 404
-    });
-
-    const dashboardSummaryMemo = useMemo(() => dashboardSummary, [dashboardSummary]);
-
-    const marketPriceMap = useMemo(() => {
-        const map = new Map<string, number>();
-        marketData.forEach((quote) => {
-            const symbol = String(quote.symbol || '').toUpperCase();
-            if (!symbol) return;
-            const price = Number(quote.currentPrice ?? quote.change ?? 0);
-            if (!Number.isFinite(price)) return;
-            map.set(symbol, price);
-        });
-        return map;
-    }, [marketData]);
-
-    const enrichedPortfolios = useMemo(() => {
-        return portfolios.map((p) => {
-            const stocks = p.stocks.map((s) => {
-                const live = marketPriceMap.get(String(s.symbol || '').toUpperCase()) ?? s.currentPrice;
-                return { ...s, currentPrice: live };
-            });
-            const stocksMarketValue = stocks.reduce((sum, s) => sum + s.quantity * s.currentPrice, 0);
-            const totalCost = stocks.reduce((sum, s) => sum + s.quantity * s.purchasePrice, 0);
-            const totalValue = stocksMarketValue + p.cash;
-            return { ...p, stocks, stocksMarketValue, totalCost, totalValue };
-        });
-    }, [portfolios, marketPriceMap]);
-
-    const aggregates = useMemo(() => {
-        const totalValue = enrichedPortfolios.reduce((sum, p) => sum + (p as any).totalValue, 0);
-        const totalCost = enrichedPortfolios.reduce((sum, p) => sum + (p as any).totalCost, 0);
-        const totalCash = enrichedPortfolios.reduce((sum, p) => sum + p.cash, 0);
-        const totalStocksValue = enrichedPortfolios.reduce((sum, p) => sum + Number((p as any).stocksMarketValue || 0), 0);
-        const unrealizedPL = totalStocksValue - totalCost;
-        return { totalValue, totalCost, totalCash, unrealizedPL };
-    }, [enrichedPortfolios]);
-
-    const marketOverview = useMemo(() => {
-        let advancers = 0, decliners = 0, unchanged = 0;
-        let totalVolume = 0;
-        marketData.forEach((q) => {
-            totalVolume += Number(q.volume || 0);
-            const cp = Number(q.changePercent || 0);
-            if (cp > 0) advancers++; else if (cp < 0) decliners++; else unchanged++;
-        });
-        return { advancers, decliners, unchanged, totalVolume };
-    }, [marketData]);
-
-    const topMovers = useMemo(() => {
-        const items: Array<{
-            symbol: string;
-            name: string;
-            price: number;
-            changePercent: number;
-            volume: number;
-            contribution: number;
-        }> = [];
-        const bySymbolHoldings = new Map<string, { quantity: number; companyName: string }>();
-        enrichedPortfolios.forEach((p) => p.stocks.forEach((s) => {
-            const key = String(s.symbol || '').toUpperCase();
-            const prev = bySymbolHoldings.get(key) || { quantity: 0, companyName: s.companyName };
-            bySymbolHoldings.set(key, { quantity: prev.quantity + s.quantity, companyName: prev.companyName });
-        }));
-        marketData.forEach((q) => {
-            const key = String(q.symbol || '').toUpperCase();
-            const holding = bySymbolHoldings.get(key);
-            if (!holding) return;
-            const price = Number(q.currentPrice || 0);
-            const changePct = Number(q.changePercent || 0);
-            const contrib = holding.quantity * price * (changePct / 100);
-            items.push({
-                symbol: key,
-                name: holding.companyName,
-                price,
-                changePercent: changePct,
-                volume: Number(q.volume || 0),
-                contribution: contrib
-            });
-        });
-        return items.sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution)).slice(0, 8);
-    }, [enrichedPortfolios, marketData]);
-
-    const sectorExposure = useMemo(() => {
-        const map = new Map<string, number>();
-        enrichedPortfolios.forEach((p) => p.stocks.forEach((s) => {
-            const sector = String(s.sector || 'Unknown');
-            const value = s.quantity * s.currentPrice;
-            map.set(sector, (map.get(sector) || 0) + value);
-        }));
-        const total = Array.from(map.values()).reduce((a, b) => a + b, 0) || 1;
-        return Array.from(map.entries()).map(([sector, value]) => ({ sector, value, percent: (value / total) * 100 }))
-            .sort((a, b) => b.value - a.value).slice(0, 8);
-    }, [enrichedPortfolios]);
-
-    const weeklyAttributionQueries = useQueries({
-        queries: portfolios.map((p) => ({
-            queryKey: ['dashboard', 'security-attribution', '1W', p.id],
-            enabled: !!(OpenAPI as any).TOKEN,
-            staleTime: 5 * 60 * 1000,
-            queryFn: async () => {
-                const base = (OpenAPI as any).BASE || '';
-                const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolios/${p.id}/performance/attribution/securities?period=1W&limit=15`, {
-                    headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
-                    credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-                });
-                if (!res.ok) return null;
-                return await res.json();
-            }
-        }))
-    });
-
-    const monthlyAttributionQueries = useQueries({
-        queries: portfolios.map((p) => ({
-            queryKey: ['dashboard', 'security-attribution', '1M', p.id],
-            enabled: !!(OpenAPI as any).TOKEN,
-            staleTime: 5 * 60 * 1000,
-            queryFn: async () => {
-                const base = (OpenAPI as any).BASE || '';
-                const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolios/${p.id}/performance/attribution/securities?period=1M&limit=20`, {
-                    headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
-                    credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-                });
-                if (!res.ok) return null;
-                return await res.json();
-            }
-        }))
-    });
-
-    const weeklyValuationQueries = useQueries({
-        queries: portfolios.map((p) => ({
-            queryKey: ['dashboard', 'period-valuation', '1W', p.id],
-            enabled: !!(OpenAPI as any).TOKEN,
-            staleTime: 5 * 60 * 1000,
-            queryFn: async () => {
-                const base = (OpenAPI as any).BASE || '';
-                const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolios/${p.id}/performance/valuation/period?period=1W`, {
-                    headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
-                    credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-                });
-                if (!res.ok) return null;
-                return await res.json();
-            }
-        }))
-    });
-
-    const monthlyValuationQueries = useQueries({
-        queries: portfolios.map((p) => ({
-            queryKey: ['dashboard', 'period-valuation', '1M', p.id],
-            enabled: !!(OpenAPI as any).TOKEN,
-            staleTime: 5 * 60 * 1000,
-            queryFn: async () => {
-                const base = (OpenAPI as any).BASE || '';
-                const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolios/${p.id}/performance/valuation/period?period=1M`, {
-                    headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
-                    credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-                });
-                if (!res.ok) return null;
-                return await res.json();
-            }
-        }))
-    });
-
+    // ========== Contribution Data ==========
     const contributionDaily = useMemo(() => {
         return topMovers.map((m) => ({ symbol: m.symbol, pl: m.contribution }));
     }, [topMovers]);
@@ -477,219 +258,10 @@ export function ComprehensiveDashboard({
             .sort((a, b) => Math.abs(b.pl) - Math.abs(a.pl)).slice(0, 12);
     }, [enrichedPortfolios]);
 
-    const weeklyPLTotal = useMemo(() => {
-        let startSum = 0;
-        let endSum = 0;
-        weeklyValuationQueries.forEach((q) => {
-            const data = q.data as any;
-            if (!data) return;
-            startSum += Number(data.start_value || 0);
-            endSum += Number(data.end_value || 0);
-        });
-        return endSum - startSum;
-    }, [weeklyValuationQueries]);
+    // ========== Dashboard Summary Memo ==========
+    const dashboardSummaryMemo = useMemo(() => dashboardSummary, [dashboardSummary]);
 
-    const monthlyPLTotal = useMemo(() => {
-        let startSum = 0;
-        let endSum = 0;
-        monthlyValuationQueries.forEach((q) => {
-            const data = q.data as any;
-            if (!data) return;
-            startSum += Number(data.start_value || 0);
-            endSum += Number(data.end_value || 0);
-        });
-        return endSum - startSum;
-    }, [monthlyValuationQueries]);
-
-    const weeklyPLPercent = useMemo(() => {
-        let startSum = 0;
-        weeklyValuationQueries.forEach((q) => {
-            const data = q.data as any;
-            if (!data) return;
-            startSum += Number(data.start_value || 0);
-        });
-        const base = Math.max(1, startSum);
-        return (Number(weeklyPLTotal || 0) / base) * 100;
-    }, [weeklyPLTotal, weeklyValuationQueries]);
-
-    const monthlyPLPercent = useMemo(() => {
-        let startSum = 0;
-        monthlyValuationQueries.forEach((q) => {
-            const data = q.data as any;
-            if (!data) return;
-            startSum += Number(data.start_value || 0);
-        });
-        const base = Math.max(1, startSum);
-        return (Number(monthlyPLTotal || 0) / base) * 100;
-    }, [monthlyPLTotal, monthlyValuationQueries]);
-
-    const decompositionYTDQueries = useQueries({
-        queries: portfolios.map((p) => ({
-            queryKey: ['dashboard', 'return-decomposition', 'YTD', p.id],
-            enabled: !!(OpenAPI as any).TOKEN,
-            staleTime: 5 * 60 * 1000,
-            queryFn: async () => {
-                const base = (OpenAPI as any).BASE || '';
-                const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolios/${p.id}/performance/decomposition?period=YTD`, {
-                    headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
-                    credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-                });
-                if (!res.ok) return null;
-                return await res.json();
-            }
-        }))
-    });
-
-    const decompositionDayQueries = useQueries({
-        queries: portfolios.map((p) => ({
-            queryKey: ['dashboard', 'return-decomposition', '1D', p.id],
-            enabled: !!(OpenAPI as any).TOKEN,
-            staleTime: 5 * 60 * 1000,
-            queryFn: async () => {
-                const base = (OpenAPI as any).BASE || '';
-                const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/portfolios/${p.id}/performance/decomposition?period=1D`, {
-                    headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
-                    credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-                });
-                if (!res.ok) return null;
-                return await res.json();
-            }
-        }))
-    });
-
-    // Use aggregated realized gains from dashboard API
-    const realizedYTD = dashboardSummary.total_realized_gains || 0;
-
-    const realizedToday = useMemo(() => {
-        let total = 0;
-        decompositionDayQueries.forEach((q) => {
-            const data = q.data as any;
-            if (!data) return;
-            const candidates = [
-                (data as any).realized,
-                (data as any).realized_pnl,
-                (data as any).realized_profit,
-                (data as any).realized_gain,
-                (data as any).realized_gains,
-                (data as any).capital_gains_realized,
-                (data as any).capital_gain_realized,
-                (data as any).capital_realized,
-            ];
-            let val = candidates.find((v: any) => typeof v === 'number');
-            if (typeof val !== 'number') {
-                const comp = Array.isArray((data as any).components)
-                    ? (data as any).components
-                    : Array.isArray((data as any).decomposition)
-                        ? (data as any).decomposition
-                        : [];
-                if (comp.length) {
-                    let s = 0;
-                    comp.forEach((c: any) => {
-                        const key = String((c as any).type || (c as any).name || '').toLowerCase();
-                        if (key.includes('realized') || (key.includes('capital') && key.includes('gain') && key.includes('realized'))) {
-                            s += Number((c as any).value || (c as any).amount || 0);
-                        }
-                    });
-                    val = s;
-                } else {
-                    val = 0;
-                }
-            }
-            total += Number(val || 0);
-        });
-        return total;
-    }, [decompositionDayQueries]);
-
-    const { data: marketIndices } = useQuery({
-        queryKey: queryKeys.indices,
-        enabled: !!(OpenAPI as any).TOKEN,
-        staleTime: 30 * 1000,
-        queryFn: async () => {
-            const base = (OpenAPI as any).BASE || '';
-            const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/market/indices`, {
-                headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
-                credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-            });
-            if (!res.ok) return null;
-            return await res.json();
-        }
-    });
-
-    const { data: marketSummary } = useQuery({
-        queryKey: ['market', 'summary'],
-        enabled: !!(OpenAPI as any).TOKEN,
-        staleTime: 30 * 1000,
-        queryFn: async () => {
-            const base = (OpenAPI as any).BASE || '';
-            const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/market/summary`, {
-                headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
-                credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-            });
-            if (!res.ok) return null;
-            return await res.json();
-        }
-    });
-
-    const { data: benchmarkData } = useQuery({
-        queryKey: ['market', 'benchmark', 'DSEX'],
-        enabled: !!(OpenAPI as any).TOKEN,
-        staleTime: 30 * 1000,
-        queryFn: async () => {
-            const base = (OpenAPI as any).BASE || '';
-            const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/market/benchmark/DSEX`, {
-                headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
-                credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-            });
-            if (!res.ok) return null;
-            return await res.json();
-        }
-    });
-
-    const { data: marketMostActive = [] } = useQuery({
-        queryKey: queryKeys.mostActive,
-        enabled: !!(OpenAPI as any).TOKEN,
-        staleTime: 30 * 1000,
-        queryFn: async () => {
-            const base = (OpenAPI as any).BASE || '';
-            const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/market/most-active?limit=5`, {
-                headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
-                credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-            });
-            if (!res.ok) return [];
-            return await res.json();
-        }
-    });
-
-    const { data: marketTopMovers } = useQuery({
-        queryKey: ['market', 'top-movers'],
-        enabled: !!(OpenAPI as any).TOKEN,
-        staleTime: 30 * 1000,
-        queryFn: async () => {
-            const base = (OpenAPI as any).BASE || '';
-            const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/market/top-movers?limit=5`, {
-                headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
-                credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-            });
-            if (!res.ok) return { gainers: [], losers: [] };
-            return await res.json();
-        }
-    });
-
-    const { data: sectorAnalysis } = useQuery({
-        queryKey: queryKeys.sectorAnalysis,
-        enabled: !!(OpenAPI as any).TOKEN,
-        staleTime: 5 * 60 * 1000,
-        queryFn: async () => {
-            const base = (OpenAPI as any).BASE || '';
-            const res = await fetch(`${String(base).replace(/\/$/, '')}/api/v1/research/market/sectors`, {
-                headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
-                credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-            });
-            if (!res.ok) return null;
-            return await res.json();
-        }
-    });
-
+    // ========== Index Comparison ==========
     const vsIndex1D = useMemo(() => {
         const port = Number(dashboardSummaryMemo?.day_change_percent || 0);
         const idx = Number(marketIndices?.DSEX?.change_percent || 0);

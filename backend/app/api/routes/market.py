@@ -96,6 +96,120 @@ def get_benchmark_data(benchmark_id: str, session: SessionDep) -> Dict[str, Any]
     }
 
 
+@router.get("/benchmark/{benchmark_id}/performance")
+def get_benchmark_performance(benchmark_id: str, session: SessionDep) -> Dict[str, Any]:
+    """Get benchmark performance over multiple time periods.
+    
+    Returns benchmark index performance changes over 1 day, 1 week, 1 month, and YTD.
+    Useful for comparing portfolio performance against market benchmarks.
+    
+    Args:
+        benchmark_id: The benchmark identifier (e.g., 'DSEX', 'DSES', 'DS30')
+        session: Database session
+    
+    Returns:
+        Dict containing benchmark info and performance metrics for each period
+    """
+    from datetime import date as date_type
+    from app.model.performance import Benchmark
+    
+    # Verify benchmark exists
+    benchmark = session.get(Benchmark, benchmark_id)
+    if not benchmark:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Benchmark '{benchmark_id}' not found"
+        )
+    
+    # Get the most recent data point (current value)
+    latest_data = session.exec(
+        select(BenchmarkData)
+        .where(BenchmarkData.benchmark_id == benchmark_id)
+        .order_by(BenchmarkData.date.desc())
+        .limit(1)
+    ).first()
+    
+    if not latest_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No data found for benchmark '{benchmark_id}'"
+        )
+    
+    current_value = float(latest_data.close_value)
+    current_date = latest_data.date
+    
+    # Helper function to get data point closest to target date
+    def get_data_point(target_date: date_type) -> Optional[BenchmarkData]:
+        # Try exact date first
+        data = session.exec(
+            select(BenchmarkData)
+            .where(BenchmarkData.benchmark_id == benchmark_id)
+            .where(BenchmarkData.date == target_date)
+        ).first()
+        
+        if data:
+            return data
+        
+        # If exact date not found, get the most recent date before target
+        data = session.exec(
+            select(BenchmarkData)
+            .where(BenchmarkData.benchmark_id == benchmark_id)
+            .where(BenchmarkData.date <= target_date)
+            .order_by(BenchmarkData.date.desc())
+            .limit(1)
+        ).first()
+        
+        return data
+    
+    # Helper function to calculate performance metrics
+    def calculate_performance(start_data: Optional[BenchmarkData]) -> Optional[Dict[str, Any]]:
+        if not start_data:
+            return None
+        
+        start_value = float(start_data.close_value)
+        change = current_value - start_value
+        change_percent = (change / start_value * 100) if start_value > 0 else 0.0
+        
+        return {
+            "change": round(change, 2),
+            "change_percent": round(change_percent, 2),
+            "start_value": round(start_value, 2),
+            "end_value": round(current_value, 2),
+            "start_date": start_data.date,
+            "end_date": current_date
+        }
+    
+    # Calculate target dates
+    today = current_date
+    one_day_ago = today - timedelta(days=1)
+    one_week_ago = today - timedelta(days=7)
+    one_month_ago = today - timedelta(days=30)
+    
+    # Calculate YTD start (January 1st of current year)
+    ytd_start = date_type(today.year, 1, 1)
+    
+    # Get data points for each period
+    data_1d = get_data_point(one_day_ago)
+    data_1w = get_data_point(one_week_ago)
+    data_1m = get_data_point(one_month_ago)
+    data_ytd = get_data_point(ytd_start)
+    
+    # Build response
+    performance = {
+        "1d": calculate_performance(data_1d),
+        "1w": calculate_performance(data_1w),
+        "1m": calculate_performance(data_1m),
+        "ytd": calculate_performance(data_ytd)
+    }
+    
+    return {
+        "benchmark_id": benchmark_id,
+        "benchmark_name": benchmark.name,
+        "current_value": round(current_value, 2),
+        "as_of_date": current_date,
+        "performance": performance
+    }
+
 
 @router.get("/summary")
 def get_market_summary(session: SessionDep) -> Dict[str, Any]:

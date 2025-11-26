@@ -165,7 +165,7 @@ export function useTrading() {
   });
 
   const { data: dashboard = { total_portfolio_value: 0, cash_balance: 0, stock_value: 0, buying_power: 0, day_change: 0, day_change_percent: 0 } } = useQuery({
-    queryKey: queryKeys.dashboardSummary,
+    queryKey: ['trading', 'dashboard-summary'],
     enabled: !!(OpenAPI as any).TOKEN,
     queryFn: async () => {
       const base = (OpenAPI as any).BASE || '';
