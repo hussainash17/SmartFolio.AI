@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Badge } from "./ui/badge";
 import { CheckCircle2, AlertCircle, TrendingUp, TrendingDown, Edit2, Check, X, Maximize2, Minimize2, Loader2 } from "lucide-react";
 import { ParsedPortfolioData, ParsedHolding } from "./UploadPortfolioDialog";
+import { formatCurrency, formatPercent } from "../lib/utils";
 
 interface ParsedPortfolioReviewDialogProps {
   open: boolean;
@@ -31,19 +32,6 @@ export function ParsedPortfolioReviewDialog({
   const [editingHolding, setEditingHolding] = useState<ParsedHolding | null>(null);
   const [isFullWidth, setIsFullWidth] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'BDT',
-      currencyDisplay: 'symbol'
-    }).format(amount).replace('BDT', '৳');
-  };
-
-  const formatPercent = (percent: number) => {
-    return `${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`;
-  };
-
   const handleEditHolding = (index: number) => {
     setEditingIndex(index);
     setEditingHolding({ ...editableData.holdings[index] });

@@ -9,11 +9,11 @@ import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
-import { 
-  Shield, 
-  AlertTriangle, 
-  TrendingDown, 
-  BarChart3, 
+import {
+  Shield,
+  AlertTriangle,
+  TrendingDown,
+  BarChart3,
   Activity,
   Target,
   RefreshCw,
@@ -29,9 +29,9 @@ import {
   X
 } from "lucide-react";
 import { usePortfolios } from "../hooks/usePortfolios";
-import { 
-  useRiskOverview, 
-  useRiskMetrics, 
+import {
+  useRiskOverview,
+  useRiskMetrics,
   useRiskMetricsTimeseries,
   useSectorConcentration,
   useCorrelationAnalysis,
@@ -41,6 +41,7 @@ import {
   useCreateRiskAlert
 } from "../hooks/useRisk";
 import { useQueryClient } from "@tanstack/react-query";
+import { formatCurrency, formatPercent } from "../lib/utils";
 
 interface RiskAnalysisProps {
   onNavigate: (view: string) => void;
@@ -60,7 +61,7 @@ interface RiskMetric {
 export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: initialPortfolioId }: RiskAnalysisProps) {
   const [selectedTimeframe, setSelectedTimeframe] = useState('1Y');
   const queryClient = useQueryClient();
-  
+
   // Create alert modal state
   const [showCreateAlert, setShowCreateAlert] = useState(false);
   const [alertForm, setAlertForm] = useState({
@@ -71,32 +72,26 @@ export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: in
     threshold_value: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // Get portfolios list
   const { portfolios, loading: portfoliosLoading } = usePortfolios();
-  
+
   // Manage selected portfolio internally - default to passed portfolio or first portfolio
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(initialPortfolioId || null);
-  
+
   // Initialize with passed portfolio, default portfolio, or first portfolio when portfolios load
   useEffect(() => {
     if (initialPortfolioId) {
       setSelectedPortfolioId(initialPortfolioId);
     } else if (!selectedPortfolioId && portfolios.length > 0) {
-      // Try to find default portfolio first
-      const defaultPortfolio = portfolios.find(p => (p as any).isDefault);
-      if (defaultPortfolio) {
-        setSelectedPortfolioId(defaultPortfolio.id);
-      } else {
-        // Otherwise use first portfolio
-        setSelectedPortfolioId(portfolios[0].id);
-      }
+      // Always default to the first portfolio as per user request
+      setSelectedPortfolioId(portfolios[0].id);
     }
   }, [portfolios, initialPortfolioId]);
-  
+
   // Use selected portfolio for queries
   const portfolioId = selectedPortfolioId;
-  
+
   // Get selected portfolio details
   const selectedPortfolio = portfolios.find(p => p.id === portfolioId);
 
@@ -105,40 +100,40 @@ export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: in
     portfolioId,
     selectedTimeframe
   );
-  
+
   const { data: riskMetrics, isLoading: metricsLoading } = useRiskMetrics(
     portfolioId,
     selectedTimeframe
   );
-  
+
   const { data: sectorData, isLoading: sectorLoading } = useSectorConcentration(
     portfolioId,
     selectedTimeframe
   );
-  
+
   const { data: correlationData, isLoading: correlationLoading } = useCorrelationAnalysis(
     portfolioId,
     selectedTimeframe,
     10
   );
-  
+
   const { data: stressTests, isLoading: stressLoading } = useStressTests(
     portfolioId
   );
-  
+
   const { data: riskAlertsData, isLoading: alertsLoading } = useRiskAlerts(portfolioId, true);
-  
+
   const { data: riskProfile } = useUserRiskProfile();
-  
+
   // Create risk alert mutation
   const createAlertMutation = useCreateRiskAlert();
-  
+
   const handleCreateAlert = async () => {
     if (!alertForm.alert_type.trim() || !alertForm.message.trim()) {
       alert('Please fill in Alert Type and Message');
       return;
     }
-    
+
     setIsSubmitting(true);
     try {
       await createAlertMutation.mutateAsync({
@@ -149,7 +144,7 @@ export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: in
         metric_value: alertForm.metric_value ? Number(alertForm.metric_value) : undefined,
         threshold_value: alertForm.threshold_value ? Number(alertForm.threshold_value) : undefined,
       });
-      
+
       // Reset form and close modal
       setAlertForm({
         alert_type: '',
@@ -159,7 +154,7 @@ export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: in
         threshold_value: '',
       });
       setShowCreateAlert(false);
-      
+
       // Refresh alerts
       queryClient.invalidateQueries({ queryKey: ['risk', 'alerts'] });
     } catch (error) {
@@ -169,25 +164,11 @@ export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: in
       setIsSubmitting(false);
     }
   };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const formatPercent = (percent: number) => {
-    return `${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`;
-  };
-
   // Determine risk status based on value vs target
   const getRiskStatus = (value: number, target: number, lowerIsBetter: boolean = false): 'low' | 'medium' | 'high' => {
     const deviation = Math.abs(value - target);
     const percentDeviation = target !== 0 ? (deviation / Math.abs(target)) * 100 : 0;
-    
+
     if (lowerIsBetter) {
       // For metrics where lower is better (like drawdown)
       if (value <= target) return 'low';
@@ -204,9 +185,9 @@ export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: in
   // Build risk metrics from API data
   const riskMetricsList: RiskMetric[] = useMemo(() => {
     if (!riskMetrics || !riskProfile) return [];
-    
+
     const profile = riskProfile;
-    
+
     return [
       {
         name: 'Portfolio Volatility',
@@ -286,7 +267,7 @@ export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: in
   };
 
   const highConcentrationSectors = useMemo(() => {
-    return sectorData?.items.filter(sector => 
+    return sectorData?.items.filter(sector =>
       Math.abs(sector.deviationPct) > 5
     ) || [];
   }, [sectorData]);
@@ -345,8 +326,8 @@ export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: in
           {/* Portfolio Selector */}
           <div className="flex items-center gap-2">
             <Briefcase className="h-4 w-4 text-muted-foreground" />
-            <Select 
-              value={selectedPortfolioId || ''} 
+            <Select
+              value={selectedPortfolioId || ''}
               onValueChange={setSelectedPortfolioId}
             >
               <SelectTrigger className="w-[200px]">
@@ -362,7 +343,7 @@ export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: in
               </SelectContent>
             </Select>
           </div>
-          
+
           <Button variant="outline" onClick={() => onNavigate('risk-profile')}>
             <Settings className="h-4 w-4 mr-2" />
             Risk Settings
@@ -403,8 +384,8 @@ export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: in
                 </div>
                 <div className="flex items-center gap-2 mt-2">
                   <Badge variant="outline" className="text-orange-600 border-orange-200">
-                    {riskOverview?.riskScore && riskOverview.riskScore < 5 ? 'Low' : 
-                     riskOverview?.riskScore && riskOverview.riskScore < 7.5 ? 'Moderate' : 'High'}
+                    {riskOverview?.riskScore && riskOverview.riskScore < 5 ? 'Low' :
+                      riskOverview?.riskScore && riskOverview.riskScore < 7.5 ? 'Moderate' : 'High'}
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
@@ -474,10 +455,10 @@ export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: in
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  {riskProfile && riskOverview?.volatility ? 
-                    (riskOverview.volatility > Number(riskProfile.max_portfolio_volatility) ? 
-                      `Above target of ${riskProfile.max_portfolio_volatility}%` : 
-                      `Within target of ${riskProfile.max_portfolio_volatility}%`) : 
+                  {riskProfile && riskOverview?.volatility ?
+                    (riskOverview.volatility > Number(riskProfile.max_portfolio_volatility) ?
+                      `Above target of ${riskProfile.max_portfolio_volatility}%` :
+                      `Within target of ${riskProfile.max_portfolio_volatility}%`) :
                     'Portfolio volatility'}
                 </p>
               </CardContent>
@@ -495,16 +476,15 @@ export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: in
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <AlertTriangle className={`h-4 w-4 ${
-                              alert.severity?.toLowerCase() === 'high' || alert.severity?.toLowerCase() === 'critical' ? 'text-red-600' : 
+                            <AlertTriangle className={`h-4 w-4 ${alert.severity?.toLowerCase() === 'high' || alert.severity?.toLowerCase() === 'critical' ? 'text-red-600' :
                               alert.severity?.toLowerCase() === 'medium' ? 'text-yellow-600' : 'text-blue-600'
-                            }`} />
+                              }`} />
                             <h4 className="font-medium">{alert.alert_type || 'Risk Alert'}</h4>
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">{alert.message}</p>
                         </div>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => handleAlertAction(alert)}
                         >
@@ -558,21 +538,21 @@ export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: in
                         </div>
                         <div className="flex items-center justify-between text-sm">
                           <span>
-                            Current: {metric.name.includes('VaR') || metric.name.includes('$') ? 
-                              formatCurrency(metric.value) : 
-                              metric.name.includes('%') || metric.name.includes('Ratio') ? 
-                              formatPercent(metric.value) : metric.value.toFixed(2)}
+                            Current: {metric.name.includes('VaR') || metric.name.includes('$') ?
+                              formatCurrency(metric.value) :
+                              metric.name.includes('%') || metric.name.includes('Ratio') ?
+                                formatPercent(metric.value) : metric.value.toFixed(2)}
                           </span>
                           <span className="text-muted-foreground">
-                            Target: {metric.name.includes('VaR') || metric.name.includes('$') ? 
+                            Target: {metric.name.includes('VaR') || metric.name.includes('$') ?
                               formatCurrency(metric.target) :
                               metric.name.includes('%') || metric.name.includes('Ratio') ?
-                              formatPercent(metric.target) : metric.target.toFixed(2)}
+                                formatPercent(metric.target) : metric.target.toFixed(2)}
                           </span>
                         </div>
-                        <Progress 
-                          value={Math.min(100, (Math.abs(metric.value) / Math.abs(metric.target || 1)) * 100)} 
-                          className="h-2" 
+                        <Progress
+                          value={Math.min(100, (Math.abs(metric.value) / Math.abs(metric.target || 1)) * 100)}
+                          className="h-2"
                         />
                         <p className="text-xs text-muted-foreground">{metric.description}</p>
                       </div>
@@ -660,7 +640,7 @@ export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: in
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>High Concentration Warning</AlertTitle>
                   <AlertDescription>
-                    Your {sector.sector} allocation ({sector.weightPct.toFixed(1)}%) is significantly different 
+                    Your {sector.sector} allocation ({sector.weightPct.toFixed(1)}%) is significantly different
                     from the benchmark ({sector.benchmarkWeightPct.toFixed(1)}%). Consider diversifying to reduce concentration risk.
                   </AlertDescription>
                 </Alert>
@@ -706,8 +686,8 @@ export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: in
                             </TableCell>
                             <TableCell className="text-right">
                               {item.risk === 'high' && (
-                                <Button 
-                                  variant="outline" 
+                                <Button
+                                  variant="outline"
                                   size="sm"
                                   onClick={() => onNavigate('rebalancing')}
                                 >
@@ -749,7 +729,7 @@ export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: in
                         const bgClass = isNegative ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200';
                         const textClass = isNegative ? 'text-red-800' : 'text-green-800';
                         const textLightClass = isNegative ? 'text-red-600' : 'text-green-600';
-                        
+
                         return (
                           <div key={scenario.key} className={`p-4 ${bgClass} border rounded-lg`}>
                             <h4 className={`font-medium ${textClass}`}>{scenario.label}</h4>

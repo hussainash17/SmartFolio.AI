@@ -37,6 +37,7 @@ import {
 import { useWatchlist } from "../hooks/useWatchlist";
 import type { WatchlistPublic } from "../src/client";
 import { MarketService } from "../src/client";
+import { formatCurrency, formatPercent } from "../lib/utils";
 
 interface WatchlistManagerProps {
   onQuickTrade?: (symbol?: string, side?: 'buy' | 'sell') => void;
@@ -211,18 +212,6 @@ export function WatchlistManager({ onQuickTrade, onChartStock }: WatchlistManage
       });
     };
   }, []);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
-  const formatPercent = (percent: number) => {
-    return `${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`;
-  };
-
   return (
     <div className="space-y-6">
       {/* Error Display */}

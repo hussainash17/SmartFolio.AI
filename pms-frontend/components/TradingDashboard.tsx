@@ -15,6 +15,7 @@ import {
   ShoppingCart
 } from "lucide-react";
 import { AccountBalance, Order, Transaction, NewsItem, MarketData } from "../types/trading";
+import { formatCurrency, formatPercent } from "../lib/utils";
 
 interface TradingDashboardProps {
   accountBalance: AccountBalance;
@@ -35,17 +36,6 @@ export function TradingDashboard({
   onQuickTrade,
   onChartStock
 }: TradingDashboardProps) {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
-  const formatPercent = (percent: number) => {
-    return `${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`;
-  };
-
   const formatTime = (dateString: string) => {
     return new Date(dateString).toLocaleTimeString('en-US', {
       hour: '2-digit',

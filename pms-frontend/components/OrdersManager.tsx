@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { X, Clock, CheckCircle, XCircle, TrendingUp, TrendingDown } from "lucide-react";
 import { Order, Trade } from "../types/trading";
+import { formatCurrency } from "../lib/utils";
 
 interface OrdersManagerProps {
   orders: Order[];
@@ -13,13 +14,6 @@ interface OrdersManagerProps {
 }
 
 export function OrdersManager({ orders, trades, onCancelOrder }: OrdersManagerProps) {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
   const formatDateTime = (dateString: string) => {
     return new Date(dateString).toLocaleString('en-US', {
       month: 'short',

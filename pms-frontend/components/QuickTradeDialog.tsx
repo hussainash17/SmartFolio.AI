@@ -10,6 +10,7 @@ import { Separator } from "./ui/separator";
 import { TrendingUp, TrendingDown, Search } from "lucide-react";
 import { MarketData, Order } from "../types/trading";
 import { Portfolio } from "../types/portfolio";
+import { formatCurrency, formatPercent } from "../lib/utils";
 
 interface QuickTradeDialogProps {
   open: boolean;
@@ -90,18 +91,6 @@ export function QuickTradeDialog({
       });
     }
   }, [open]);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
-  const formatPercent = (percent: number) => {
-    return `${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`;
-  };
-
   const filteredStocks = marketData.filter(stock =>
     stock.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
     stock.companyName.toLowerCase().includes(searchTerm.toLowerCase())

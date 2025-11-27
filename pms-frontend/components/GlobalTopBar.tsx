@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { AccountBalance } from "../types/trading";
 import { SymbolSearchDropdown } from "./SymbolSearchDropdown";
+import { formatCurrency } from "../lib/utils";
 
 interface GlobalTopBarProps {
   accountBalance: AccountBalance;
@@ -59,16 +60,6 @@ export function GlobalTopBar({ accountBalance, onQuickTrade, onOpenChart, onOpen
     }
   })();
   const timeLabel = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'medium' }).format(now);
-  
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
   const formatCompactCurrency = (amount: number) => {
     if (amount >= 1e6) return `$${(amount / 1e6).toFixed(1)}M`;
     if (amount >= 1e3) return `$${(amount / 1e3).toFixed(1)}K`;

@@ -33,6 +33,7 @@ import {
   useUserRiskProfile
 } from "../hooks/useRisk";
 import { useQueryClient } from "@tanstack/react-query";
+import { formatCurrency, formatPercent } from "../lib/utils";
 
 interface RiskManagementProps {
   onNavigate: (view: string) => void;
@@ -109,20 +110,6 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
   const { data: rebalancingData, isLoading: rebalancingLoading } = useRebalancingRecommendations(portfolioId);
   
   const { data: riskProfile } = useUserRiskProfile();
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const formatPercent = (percent: number) => {
-    return `${percent >= 0 ? '' : ''}${percent.toFixed(2)}%`;
-  };
-
   // Determine risk status
   const getRiskStatus = (value: number, target: number, lowerIsBetter: boolean = false): 'low' | 'medium' | 'high' => {
     const deviation = Math.abs(value - target);

@@ -1,8 +1,8 @@
-import {useEffect, useMemo, useState} from 'react';
-import {Portfolio, PortfolioSummary, Stock} from '../types/portfolio';
-import {OpenAPI, PortfolioService} from '../src/client';
-import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
-import {queryKeys} from './queryKeys';
+import { useEffect, useMemo, useState } from 'react';
+import { Portfolio, PortfolioSummary, Stock } from '../types/portfolio';
+import { OpenAPI, PortfolioService } from '../src/client';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from './queryKeys';
 
 export function usePortfolios() {
     const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(null);
@@ -40,7 +40,7 @@ export function usePortfolios() {
     const fetchPositionsWithDetailsSafe = async (portfolioId: string) => {
         try {
             const res = await fetch(`${(OpenAPI.BASE || '').replace(/\/$/, '')}/api/v1/portfolio/${portfolioId}/positions/with-details`, {
-                headers: OpenAPI.TOKEN ? {Authorization: `Bearer ${OpenAPI.TOKEN as unknown as string}`} : undefined,
+                headers: OpenAPI.TOKEN ? { Authorization: `Bearer ${OpenAPI.TOKEN as unknown as string}` } : undefined,
                 credentials: OpenAPI.WITH_CREDENTIALS ? 'include' : 'omit',
             });
             if (!res.ok) return null;
@@ -50,7 +50,7 @@ export function usePortfolios() {
         }
     };
 
-    const {data: portfoliosRaw = [], isLoading: loading} = useQuery({
+    const { data: portfoliosRaw = [], isLoading: loading } = useQuery({
         queryKey: queryKeys.portfolios,
         enabled: !!(OpenAPI as any).TOKEN,
         queryFn: async () => {
@@ -58,7 +58,7 @@ export function usePortfolios() {
             const mapped: Portfolio[] = await Promise.all(
                 (apiPortfolios as any[]).map(async (p: any) => {
                     const [summary, details] = await Promise.all([
-                        PortfolioService.getPortfolioSummary({portfolioId: p.id}),
+                        PortfolioService.getPortfolioSummary({ portfolioId: p.id }),
                         fetchPositionsWithDetailsSafe(String(p.id)),
                     ]);
                     const stocks: Stock[] = (details || []).map((row: any) => ({
@@ -89,6 +89,7 @@ export function usePortfolios() {
                         cash,
                         realizedPnl,
                         unrealizedPnl,
+                        isDefault: p.is_default || false,
                     } as Portfolio;
                 })
             );
@@ -117,7 +118,7 @@ export function usePortfolios() {
         const totalGainLossPercent = totalCost > 0 ? (totalGainLoss / totalCost) * 100 : 0;
         const dayChange = totalValue * 0.0;
         const dayChangePercent = 0;
-        return {totalValue, totalGainLoss, totalGainLossPercent, dayChange, dayChangePercent};
+        return { totalValue, totalGainLoss, totalGainLossPercent, dayChange, dayChangePercent };
     }, [portfolios]);
 
     const addPortfolioMutation = useMutation({
@@ -133,20 +134,20 @@ export function usePortfolios() {
             try {
                 await PortfolioService.updatePortfolio({
                     portfolioId: created.id,
-                    requestBody: ({cash_balance: portfolio.cash} as unknown) as any,
+                    requestBody: ({ cash_balance: portfolio.cash } as unknown) as any,
                 });
             } catch {
             }
             return created;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({queryKey: queryKeys.portfolios});
-            queryClient.invalidateQueries({queryKey: queryKeys.dashboardSummary});
+            queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
+            queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
         },
     });
 
     const updatePortfolioMutation = useMutation({
-        mutationFn: async ({id, updates}: { id: string; updates: Partial<Portfolio> }) => {
+        mutationFn: async ({ id, updates }: { id: string; updates: Partial<Portfolio> }) => {
             await PortfolioService.updatePortfolio({
                 portfolioId: id,
                 requestBody: {
@@ -154,25 +155,25 @@ export function usePortfolios() {
                     description: updates.description,
                     is_default: undefined,
                     is_active: undefined,
-                    ...(updates.cash != null ? ({cash_balance: updates.cash} as any) : {}),
+                    ...(updates.cash != null ? ({ cash_balance: updates.cash } as any) : {}),
                 } as any,
             });
-            return {id, updates};
+            return { id, updates };
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({queryKey: queryKeys.portfolios});
-            queryClient.invalidateQueries({queryKey: queryKeys.dashboardSummary});
+            queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
+            queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
         },
     });
 
     const deletePortfolioMutation = useMutation({
         mutationFn: async (id: string) => {
-            await PortfolioService.deletePortfolio({portfolioId: id});
+            await PortfolioService.deletePortfolio({ portfolioId: id });
             return id;
         },
         onSuccess: (id) => {
-            queryClient.invalidateQueries({queryKey: queryKeys.portfolios});
-            queryClient.invalidateQueries({queryKey: queryKeys.dashboardSummary});
+            queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
+            queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
             if (selectedPortfolioId === id) {
                 const next = portfolios.find((p) => p.id !== id);
                 setSelectedPortfolioId(next ? next.id : null);
@@ -181,7 +182,7 @@ export function usePortfolios() {
     });
 
     const addStockMutation = useMutation({
-        mutationFn: async ({portfolioId, stock}: { portfolioId: string; stock: Omit<Stock, 'id'> }) => {
+        mutationFn: async ({ portfolioId, stock }: { portfolioId: string; stock: Omit<Stock, 'id'> }) => {
             await PortfolioService.addPosition({
                 portfolioId,
                 stockSymbol: stock.symbol,
@@ -191,16 +192,16 @@ export function usePortfolios() {
             return portfolioId;
         },
         onSuccess: (portfolioId) => {
-            queryClient.invalidateQueries({queryKey: queryKeys.portfolios});
+            queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
             if (selectedPortfolioId === portfolioId) {
-                queryClient.invalidateQueries({queryKey: queryKeys.portfolio(portfolioId)});
+                queryClient.invalidateQueries({ queryKey: queryKeys.portfolio(portfolioId) });
             }
-            queryClient.invalidateQueries({queryKey: queryKeys.dashboardSummary});
+            queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
         },
     });
 
     const updateStockMutation = useMutation({
-        mutationFn: async ({portfolioId, stockId, updates}: {
+        mutationFn: async ({ portfolioId, stockId, updates }: {
             portfolioId: string;
             stockId: string;
             updates: Partial<Stock>
@@ -214,25 +215,25 @@ export function usePortfolios() {
             return portfolioId;
         },
         onSuccess: (portfolioId) => {
-            queryClient.invalidateQueries({queryKey: queryKeys.portfolios});
+            queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
             if (selectedPortfolioId === portfolioId) {
-                queryClient.invalidateQueries({queryKey: queryKeys.portfolio(portfolioId)});
+                queryClient.invalidateQueries({ queryKey: queryKeys.portfolio(portfolioId) });
             }
-            queryClient.invalidateQueries({queryKey: queryKeys.dashboardSummary});
+            queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
         },
     });
 
     const removeStockMutation = useMutation({
-        mutationFn: async ({portfolioId, stockId}: { portfolioId: string; stockId: string }) => {
-            await PortfolioService.removePosition({portfolioId, positionId: stockId});
+        mutationFn: async ({ portfolioId, stockId }: { portfolioId: string; stockId: string }) => {
+            await PortfolioService.removePosition({ portfolioId, positionId: stockId });
             return portfolioId;
         },
         onSuccess: (portfolioId) => {
-            queryClient.invalidateQueries({queryKey: queryKeys.portfolios});
+            queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
             if (selectedPortfolioId === portfolioId) {
-                queryClient.invalidateQueries({queryKey: queryKeys.portfolio(portfolioId)});
+                queryClient.invalidateQueries({ queryKey: queryKeys.portfolio(portfolioId) });
             }
-            queryClient.invalidateQueries({queryKey: queryKeys.dashboardSummary});
+            queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
         },
     });
 
@@ -241,7 +242,7 @@ export function usePortfolios() {
     };
 
     const updatePortfolio = async (id: string, updates: Partial<Portfolio>) => {
-        await updatePortfolioMutation.mutateAsync({id, updates});
+        await updatePortfolioMutation.mutateAsync({ id, updates });
     };
 
     const deletePortfolio = async (id: string) => {
@@ -249,15 +250,15 @@ export function usePortfolios() {
     };
 
     const addStock = async (portfolioId: string, stock: Omit<Stock, 'id'>) => {
-        await addStockMutation.mutateAsync({portfolioId, stock});
+        await addStockMutation.mutateAsync({ portfolioId, stock });
     };
 
     const updateStock = async (portfolioId: string, stockId: string, updates: Partial<Stock>) => {
-        await updateStockMutation.mutateAsync({portfolioId, stockId, updates});
+        await updateStockMutation.mutateAsync({ portfolioId, stockId, updates });
     };
 
     const removeStock = async (portfolioId: string, stockId: string) => {
-        await removeStockMutation.mutateAsync({portfolioId, stockId});
+        await removeStockMutation.mutateAsync({ portfolioId, stockId });
     };
 
     const getAvailableStocks = () => {
@@ -280,7 +281,7 @@ export function usePortfolios() {
             const response = await fetch(
                 `${(OpenAPI.BASE || '').replace(/\/$/, '')}/api/v1/portfolio/positions/by-symbol/${symbol}`,
                 {
-                    headers: OpenAPI.TOKEN ? {Authorization: `Bearer ${OpenAPI.TOKEN as unknown as string}`} : undefined,
+                    headers: OpenAPI.TOKEN ? { Authorization: `Bearer ${OpenAPI.TOKEN as unknown as string}` } : undefined,
                     credentials: OpenAPI.WITH_CREDENTIALS ? 'include' : 'omit',
                 }
             );
@@ -299,13 +300,13 @@ export function usePortfolios() {
                 `${(OpenAPI.BASE || '').replace(/\/$/, '')}/api/v1/portfolio/${portfolioId}/positions/${positionId}`,
                 {
                     method: 'DELETE',
-                    headers: OpenAPI.TOKEN ? {Authorization: `Bearer ${OpenAPI.TOKEN as unknown as string}`} : undefined,
+                    headers: OpenAPI.TOKEN ? { Authorization: `Bearer ${OpenAPI.TOKEN as unknown as string}` } : undefined,
                     credentials: OpenAPI.WITH_CREDENTIALS ? 'include' : 'omit',
                 }
             );
             if (!response.ok) throw new Error('Failed to close position');
             // Refresh portfolios after closing position
-            await queryClient.invalidateQueries({queryKey: queryKeys.portfolios});
+            await queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
             return await response.json();
         } catch (error) {
             console.error('Error closing position:', error);

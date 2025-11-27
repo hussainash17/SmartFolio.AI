@@ -35,6 +35,7 @@ import {queryKeys} from "../hooks/queryKeys";
 import {useWatchlist} from "../hooks/useWatchlist";
 import {AddToWatchlistDialog} from "./AddToWatchlistDialog";
 import {toast} from "sonner";
+import { formatCurrency, formatPercent } from "../lib/utils";
 
 interface MarketDataProps {
     marketData: MarketDataType[];
@@ -344,18 +345,6 @@ export function MarketData({
             setIsCreatingWatchlist(false);
         }
     };
-
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-        }).format(amount);
-    };
-
-    const formatPercent = (percent: number) => {
-        return `${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`;
-    };
-
     const formatNumber = (num: number) => {
         if (num >= 1e9) return `${(num / 1e9).toFixed(1)}B`;
         if (num >= 1e6) return `${(num / 1e6).toFixed(1)}M`;

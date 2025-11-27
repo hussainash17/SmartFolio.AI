@@ -45,6 +45,7 @@ import {
     YAxis
 } from "recharts";
 import {usePortfolios} from "../hooks/usePortfolios";
+import { formatCurrency, formatPercent } from "../lib/utils";
 import {
     useAvailableBenchmarks,
     useBenchmarkComparison,
@@ -182,20 +183,6 @@ export function PortfolioPerformance({
     // Check if any data is loading
     const isLoadingPerformanceData = valueLoading || returnsLoading || riskLoading || bestWorstLoading ||
         cashFlowsLoading || valueHistoryLoading || benchmarkLoading || monthlyLoading || securityLoading || sectorLoading;
-
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0
-        }).format(amount);
-    };
-
-    const formatPercent = (percent: number) => {
-        return `${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`;
-    };
-
     const formatNumber = (num: number, decimals = 2) => {
         return num.toFixed(decimals);
     };

@@ -21,6 +21,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Portfolio } from "../types/portfolio";
+import { formatCurrency } from "../lib/utils";
 
 interface AccountManagerProps {
   user: AuthUser | null;
@@ -53,14 +54,6 @@ export function AccountManager({ user, accountBalance, transactions, portfolios,
   }, [portfolios, selectedPortfolioId]);
 
   const hasPortfolios = portfolios.length > 0;
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',

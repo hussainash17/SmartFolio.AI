@@ -6,6 +6,7 @@ import { BarChart3, DollarSign, Plus, ShoppingCart, TrendingDown, TrendingUp, Up
 import { Portfolio, PortfolioSummary } from "../types/portfolio";
 import { useEffect, useState } from "react";
 import { OpenAPI } from "../src/client";
+import { formatCurrency, formatPercent } from "../lib/utils";
 
 interface PortfolioDashboardProps {
     onCreatePortfolio: () => void;
@@ -28,17 +29,6 @@ export function PortfolioDashboard({
     portfolioSummary,
     selectedPortfolio
 }: PortfolioDashboardProps) {
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-        }).format(amount);
-    };
-
-    const formatPercent = (percent: number) => {
-        return `${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`;
-    };
-
     type Aggregates = {
         total_portfolio_value: number;
         total_invested_amount: number;

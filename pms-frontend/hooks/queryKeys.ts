@@ -16,19 +16,19 @@ export const queryKeys = {
   goalProductRecommendations: (goalId: string) => ['kyc', 'goals', goalId, 'recommendations'] as const,
   goalAlerts: (goalId: string) => ['kyc', 'goals', goalId, 'alerts'] as const,
   riskAlerts: (portfolioId?: string) => ['risk', 'alerts', portfolioId ?? 'none'] as const,
-  riskOverview: (portfolioId: string, period: string, benchmarkId?: string) => 
+  riskOverview: (portfolioId: string, period: string, benchmarkId?: string) =>
     ['risk', 'overview', portfolioId, period, benchmarkId ?? 'none'] as const,
-  riskMetricsDetailed: (portfolioId: string, period: string, benchmarkId?: string) => 
+  riskMetricsDetailed: (portfolioId: string, period: string, benchmarkId?: string) =>
     ['risk', 'metrics', portfolioId, period, benchmarkId ?? 'none'] as const,
-  riskMetricsTimeseries: (portfolioId: string, period: string, benchmarkId?: string) => 
+  riskMetricsTimeseries: (portfolioId: string, period: string, benchmarkId?: string) =>
     ['risk', 'metrics', 'timeseries', portfolioId, period, benchmarkId ?? 'none'] as const,
-  sectorConcentration: (portfolioId: string, period: string, benchmarkId?: string) => 
+  sectorConcentration: (portfolioId: string, period: string, benchmarkId?: string) =>
     ['risk', 'concentration', 'sector', portfolioId, period, benchmarkId ?? 'none'] as const,
-  correlationAnalysis: (portfolioId: string, period: string, top: number) => 
+  correlationAnalysis: (portfolioId: string, period: string, top: number) =>
     ['risk', 'correlation', portfolioId, period, top] as const,
-  stressTests: (portfolioId: string, scenarios?: string[], benchmarkId?: string) => 
+  stressTests: (portfolioId: string, scenarios?: string[], benchmarkId?: string) =>
     ['risk', 'stress-tests', portfolioId, scenarios?.join(',') ?? 'all', benchmarkId ?? 'none'] as const,
-  rebalancingRecommendations: (portfolioId: string, targets?: Record<string, number>) => 
+  rebalancingRecommendations: (portfolioId: string, targets?: Record<string, number>) =>
     ['risk', 'rebalancing', 'recommendations', portfolioId, targets ? JSON.stringify(targets) : 'default'] as const,
   userRiskProfile: ['risk', 'profile'] as const,
 
@@ -67,7 +67,7 @@ export const queryKeys = {
   fundamentalDividends: (tradingCode: string, limit?: number) => ['fundamentals', 'dividends', tradingCode, limit ?? 10] as const,
   fundamentalRatios: (tradingCode: string, years?: number) => ['fundamentals', 'ratios', tradingCode, years ?? 5] as const,
   fundamentalComparison: (codes: string) => ['fundamentals', 'compare', codes] as const,
-  fundamentalSearch: (params: { sector?: string; category?: string; minPe?: number; maxPe?: number; minDividendYield?: number }) => 
+  fundamentalSearch: (params: { sector?: string; category?: string; minPe?: number; maxPe?: number; minDividendYield?: number }) =>
     ['fundamentals', 'search', params] as const,
   fundamentalDataAvailability: (tradingCode: string) => ['fundamentals', 'data-availability', tradingCode] as const,
 
@@ -75,13 +75,14 @@ export const queryKeys = {
   performanceSummary: (portfolioId: string, period: string) => ['performance', 'summary', portfolioId, period] as const,
   valueHistory: (portfolioId: string, period: string, benchmarkId?: string, frequency?: string) =>
     ['performance', 'value-history', portfolioId, period, benchmarkId ?? 'none', frequency ?? 'daily'] as const,
+  portfolioHistory: (portfolioId: string) => ['portfolio', portfolioId, 'history'] as const,
   benchmarkComparison: (portfolioId: string, benchmarkId: string) => ['performance', 'benchmark-comparison', portfolioId, benchmarkId] as const,
   benchmarks: ['performance', 'benchmarks'] as const,
   monthlyReturns: (portfolioId: string, year?: number) => ['performance', 'monthly-returns', portfolioId, year ?? 'current'] as const,
   securityAttribution: (portfolioId: string, period: string, limit: number) => ['performance', 'security-attribution', portfolioId, period, limit] as const,
   sectorAttribution: (portfolioId: string, period: string, benchmarkId?: string) => ['performance', 'sector-attribution', portfolioId, period, benchmarkId ?? 'none'] as const,
   riskMetrics: (portfolioId: string, period: string, benchmarkId?: string) => ['performance', 'risk-metrics', portfolioId, period, benchmarkId ?? 'none'] as const,
-  
+
   // New Optimized Split APIs
   currentValue: (portfolioId: string) => ['performance', 'current-value', portfolioId] as const,
   performanceReturns: (portfolioId: string, period: string) => ['performance', 'returns', portfolioId, period] as const,

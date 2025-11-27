@@ -20,6 +20,7 @@ export interface Portfolio {
   cash: number;
   unrealizedPnl?: number;
   realizedPnl?: number;
+  isDefault?: boolean;
 }
 
 export interface PortfolioSummary {

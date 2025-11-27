@@ -22,6 +22,8 @@ from app.model.portfolio_statement import (
 from app.model.stock import StockData
 from app.model.trade import Trade, TradeCreate, TradeUpdate, TradePublic, TradeWithDetails
 from app.services.holdings_service import HoldingsService
+from app.model.performance import PortfolioDailyValuation
+from datetime import date, timedelta
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
@@ -833,6 +835,7 @@ def update_trade(
             detail="Trade not found"
         )
 
+    # Update fields
     update_data = trade_update.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(trade, field, value)
@@ -878,9 +881,74 @@ def delete_trade(
             detail="Trade not found"
         )
 
+    # Revert cash impact if needed (simplified)
+    # Ideally we should reverse the transaction logic from add_trade
+    # For now, just delete the record
+
     session.delete(trade)
     session.commit()
     return {"message": "Trade deleted successfully"}
+
+
+@router.get("/{portfolio_id}/history")
+def get_portfolio_history(
+        portfolio_id: UUID,
+        current_user: CurrentUser,
+        session: SessionDep
+):
+    """
+    Get portfolio value history for the last 12 months, aggregated weekly.
+    Returns the last valuation of each week.
+    """
+    # Verify portfolio belongs to user
+    portfolio = session.exec(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        )
+    ).first()
+
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portfolio not found"
+        )
+
+    # Calculate start date (12 months ago)
+    end_date = date.today()
+    start_date = end_date - timedelta(days=365)
+
+    # Fetch daily valuations
+    valuations = session.exec(
+        select(PortfolioDailyValuation)
+        .where(
+            PortfolioDailyValuation.portfolio_id == portfolio_id,
+            PortfolioDailyValuation.valuation_date >= start_date
+        )
+        .order_by(PortfolioDailyValuation.valuation_date)
+    ).all()
+
+    if not valuations:
+        return []
+
+    # Aggregate by week (take the last available data point for each week)
+    weekly_data = {}
+    for val in valuations:
+        # Get year and week number
+        year, week, _ = val.valuation_date.isocalendar()
+        key = (year, week)
+        # Overwrite with latest valuation for that week (since list is sorted by date)
+        weekly_data[key] = {
+            "date": val.valuation_date,
+            "total_value": float(val.total_value)
+        }
+
+    # Convert to list and sort
+    result = sorted(weekly_data.values(), key=lambda x: x["date"])
+
+    return result
+
+
 
 
 # Portfolio Summary API

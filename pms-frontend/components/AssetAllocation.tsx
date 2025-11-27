@@ -27,6 +27,7 @@ import { queryKeys } from '../hooks/queryKeys'
 import { usePortfolios } from '../hooks/usePortfolios'
 import { toast } from 'sonner'
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
+import { formatCurrency } from "../lib/utils";
 
 interface AssetAllocationProps {
 	portfolioId?: string
@@ -429,14 +430,6 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 	}, [stocks, driftRows, editableTargets, allocation.total_value, liquidStocksMap.data]);
 
 	const totalTarget = editableTargets.reduce((sum, t) => sum + Number(t.target_percent || 0), 0)
-
-	const formatCurrency = (amount: number) => {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD',
-		}).format(amount);
-	};
-
 	const formatNumber = (num: number) => {
 		if (num >= 1e9) return `${(num / 1e9).toFixed(1)}B`;
 		if (num >= 1e6) return `${(num / 1e6).toFixed(1)}M`;

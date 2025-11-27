@@ -30,6 +30,7 @@ import { toast } from 'sonner';
 import { usePortfolios } from '../hooks/usePortfolios';
 import { useRebalancing } from '../hooks/useRebalancing';
 import type { RebalancingSuggestion } from '../types/rebalancing';
+import { formatCurrency, formatPercent } from "../lib/utils";
 
 interface RebalancingManagerProps {
   onNavigate: (view: string) => void;
@@ -184,20 +185,6 @@ export function RebalancingManager({ onNavigate, onQuickTrade, portfolioId }: Re
       return await res.json();
     },
   });
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const formatPercent = (percent: number) => {
-    return `${percent >= 0 ? '+' : ''}${percent.toFixed(1)}%`;
-  };
-
   const formatDateTime = (date: Date) => {
     return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
   };

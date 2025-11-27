@@ -34,6 +34,7 @@ import {
 import { useDashboardSummary, useInvestmentGoals, useGoalProgress } from "../hooks/useDashboardSummary";
 import { useDashboardPortfolios } from "../hooks/useDashboardPortfolios";
 import { useMarketIndices, useBenchmarkData, useMarketTopMovers, useMarketMostActive, useSectorAnalysis } from "../hooks/useDashboardMarket";
+import { formatCurrency, formatPercent } from "../lib/utils";
 import {
     useWeeklyAttributionQueries,
     useMonthlyAttributionQueries,
@@ -203,19 +204,6 @@ export function ComprehensiveDashboard({
             }
         },
     });
-
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-        }).format(amount);
-    };
-
-    const formatPercent = (percent: number) => {
-        return `${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`;
-    };
     const toMillions = (value: unknown) => {
         const num = typeof value === 'string' ? parseFloat(value) : Number(value);
         if (!Number.isFinite(num)) return 0;
@@ -425,19 +413,19 @@ export function ComprehensiveDashboard({
                                 <div className="mt-3 space-y-1.5">
                                     {benchmarkData?.trades != null && (
                                         <div className="flex items-center justify-between">
-                                            <span className="text-xs text-muted-foreground">Trades</span>
+                                            <span className="text-xs font-medium text-foreground">Trades</span>
                                             <span className="text-sm font-semibold text-foreground">{Number(benchmarkData.trades).toLocaleString()}</span>
                                         </div>
                                     )}
                                     {benchmarkData?.total_value != null && (
                                         <div className="flex items-center justify-between">
-                                            <span className="text-xs text-muted-foreground">Turnover</span>
+                                            <span className="text-xs font-medium text-foreground">Turnover</span>
                                             <span className="text-sm font-semibold text-foreground">{toMillions(benchmarkData.total_value).toFixed(2)}M</span>
                                         </div>
                                     )}
                                     {benchmarkData?.volume != null && (
                                         <div className="flex items-center justify-between">
-                                            <span className="text-xs text-muted-foreground">Volume</span>
+                                            <span className="text-xs font-medium text-foreground">Volume</span>
                                             <span className="text-sm font-semibold text-foreground">{toMillions(benchmarkData.volume).toFixed(2)}M</span>
                                         </div>
                                     )}
@@ -447,37 +435,37 @@ export function ComprehensiveDashboard({
 
                         {/* Top Gainers Card */}
                         <div
-                            className="bg-white dark:bg-slate-950 rounded-xl p-5 border hover:shadow-lg transition-shadow">
+                            className="bg-white dark:bg-slate-950 rounded-xl p-4 border hover:shadow-lg transition-shadow">
                             <div className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
                                 Top Gainers
                             </div>
-                            <ul className="space-y-2">
+                            <ul className="space-y-1">
                                 {marketTopMovers?.gainers && marketTopMovers.gainers.length > 0 ? (
-                                    marketTopMovers.gainers.slice(0, 3).map((stock: any) => {
+                                    marketTopMovers.gainers.slice(0, 5).map((stock: any) => {
                                         const change = Number(stock.change_percent || 0);
                                         return (
                                             <li key={stock.symbol}
-                                                className="flex items-center justify-between py-2 border-b border-muted last:border-0">
+                                                className="flex items-center justify-between py-1 border-b border-muted last:border-0">
                                                 <span
-                                                    className="text-sm font-medium text-foreground">{stock.symbol}</span>
+                                                    className="text-xs font-semibold text-foreground">{stock.symbol}</span>
                                                 <span
-                                                    className="text-sm font-semibold text-green-600">+{change.toFixed(2)}%</span>
+                                                    className="text-xs font-medium text-green-700">+{change.toFixed(2)}%</span>
                                             </li>
                                         );
                                     })
                                 ) : (
                                     <>
-                                        <li className="flex items-center justify-between py-2 border-b border-muted">
-                                            <span className="text-sm font-medium">FASFIN</span>
-                                            <span className="text-sm font-semibold text-green-600">+10.10%</span>
+                                        <li className="flex items-center justify-between py-1 border-b border-muted">
+                                            <span className="text-xs font-medium">FASFIN</span>
+                                            <span className="text-xs font-medium text-green-600">+10.10%</span>
                                         </li>
-                                        <li className="flex items-center justify-between py-2 border-b border-muted">
-                                            <span className="text-sm font-medium">NBL</span>
-                                            <span className="text-sm font-semibold text-green-600">+10.00%</span>
+                                        <li className="flex items-center justify-between py-1 border-b border-muted">
+                                            <span className="text-xs font-medium">NBL</span>
+                                            <span className="text-xs font-medium text-green-600">+10.00%</span>
                                         </li>
-                                        <li className="flex items-center justify-between py-2">
-                                            <span className="text-sm font-medium">CNATEX</span>
-                                            <span className="text-sm font-semibold text-green-600">+10.00%</span>
+                                        <li className="flex items-center justify-between py-1">
+                                            <span className="text-xs font-medium">CNATEX</span>
+                                            <span className="text-xs font-semibold text-green-600">+10.00%</span>
                                         </li>
                                     </>
                                 )}
@@ -486,35 +474,35 @@ export function ComprehensiveDashboard({
 
                         {/* Top Losers Card */}
                         <div
-                            className="bg-white dark:bg-slate-950 rounded-xl p-5 border hover:shadow-lg transition-shadow">
+                            className="bg-white dark:bg-slate-950 rounded-xl p-4 border hover:shadow-lg transition-shadow">
                             <div className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
                                 Top Losers
                             </div>
-                            <ul className="space-y-2">
+                            <ul className="space-y-1">
                                 {marketTopMovers?.losers && marketTopMovers.losers.length > 0 ? (
-                                    marketTopMovers.losers.slice(0, 3).map((stock: any) => {
+                                    marketTopMovers.losers.slice(0, 5).map((stock: any) => {
                                         const change = Number(stock.change_percent || 0);
                                         return (
                                             <li key={stock.symbol}
-                                                className="flex items-center justify-between py-2 border-b border-muted last:border-0">
+                                                className="flex items-center justify-between py-1 border-b border-muted last:border-0">
                                                 <span
-                                                    className="text-sm font-medium text-foreground">{stock.symbol}</span>
+                                                    className="text-xs font-medium text-foreground">{stock.symbol}</span>
                                                 <span
-                                                    className="text-sm font-semibold text-red-600">{change.toFixed(2)}%</span>
+                                                    className="text-xs font-semibold text-red-600">{change.toFixed(2)}%</span>
                                             </li>
                                         );
                                     })
                                 ) : (
                                     <>
-                                        <li className="flex items-center justify-between py-2 border-b border-muted">
+                                        <li className="flex items-center justify-between py-1 border-b border-muted">
                                             <span className="text-sm font-medium">SIMTEX</span>
                                             <span className="text-sm font-semibold text-red-600">-9.84%</span>
                                         </li>
-                                        <li className="flex items-center justify-between py-2 border-b border-muted">
+                                        <li className="flex items-center justify-between py-1 border-b border-muted">
                                             <span className="text-sm font-medium">PRAGATILIFE</span>
                                             <span className="text-sm font-semibold text-red-600">-7.89%</span>
                                         </li>
-                                        <li className="flex items-center justify-between py-2">
+                                        <li className="flex items-center justify-between py-1">
                                             <span className="text-sm font-medium">PRIMETEX</span>
                                             <span className="text-sm font-semibold text-red-600">-6.98%</span>
                                         </li>
@@ -525,13 +513,13 @@ export function ComprehensiveDashboard({
 
                         {/* Most Active Card */}
                         <div
-                            className="bg-white dark:bg-slate-950 rounded-xl p-5 border hover:shadow-lg transition-shadow">
+                            className="bg-white dark:bg-slate-950 rounded-xl p-4 border hover:shadow-lg transition-shadow">
                             <div className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
                                 Most Active
                             </div>
-                            <ul className="space-y-2">
+                            <ul className="space-y-1">
                                 {marketMostActive && marketMostActive.length > 0 ? (
-                                    marketMostActive.slice(0, 3).map((stock: any) => {
+                                    marketMostActive.slice(0, 5).map((stock: any) => {
                                         const volume = Number(stock.volume || 0);
                                         const volumeText = volume >= 1000000
                                             ? `${(volume / 1000000).toFixed(2)}M`
@@ -540,27 +528,27 @@ export function ComprehensiveDashboard({
                                                 : volume.toString();
                                         return (
                                             <li key={stock.symbol}
-                                                className="flex items-center justify-between py-2 border-b border-muted last:border-0">
+                                                className="flex items-center justify-between py-1 border-b border-muted last:border-0">
                                                 <span
-                                                    className="text-sm font-medium text-foreground">{stock.symbol}</span>
+                                                    className="text-xs font-medium text-foreground">{stock.symbol}</span>
                                                 <span
-                                                    className="text-sm font-semibold text-muted-foreground">{volumeText}</span>
+                                                    className="text-xs font-semibold text-muted-foreground">{volumeText}</span>
                                             </li>
                                         );
                                     })
                                 ) : (
                                     <>
-                                        <li className="flex items-center justify-between py-2 border-b border-muted">
-                                            <span className="text-sm font-medium">BPPL</span>
-                                            <span className="text-sm font-semibold text-muted-foreground">9.84M</span>
+                                        <li className="flex items-center justify-between py-1 border-b border-muted">
+                                            <span className="text-xs font-medium">BPPL</span>
+                                            <span className="text-xs font-semibold text-muted-foreground">9.84M</span>
                                         </li>
-                                        <li className="flex items-center justify-between py-2 border-b border-muted">
-                                            <span className="text-sm font-medium">IFIC</span>
-                                            <span className="text-sm font-semibold text-muted-foreground">8.71M</span>
+                                        <li className="flex items-center justify-between py-1 border-b border-muted">
+                                            <span className="text-xs font-medium">IFIC</span>
+                                            <span className="text-xs font-semibold text-muted-foreground">8.71M</span>
                                         </li>
-                                        <li className="flex items-center justify-between py-2">
-                                            <span className="text-sm font-medium">NBL</span>
-                                            <span className="text-sm font-semibold text-muted-foreground">4.91M</span>
+                                        <li className="flex items-center justify-between py-1">
+                                            <span className="text-xs font-medium">NBL</span>
+                                            <span className="text-xs font-semibold text-muted-foreground">4.91M</span>
                                         </li>
                                     </>
                                 )}
