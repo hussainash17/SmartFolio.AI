@@ -200,7 +200,7 @@ export const TradingViewChart = memo(({
   const fetchPositions = useCallback(async (sym: string) => {
     if (!sym || sym.trim() === '') return;
     const normalizedSymbol = sym.trim().toUpperCase();
-    
+
     try {
       const apiUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
       const response = await fetch(`${apiUrl}/api/v1/tradingview/positions/${normalizedSymbol}`);
@@ -341,9 +341,6 @@ export const TradingViewChart = memo(({
           datafeed: datafeedInstance,
           library_path: '/charting_library/',
           locale: 'en',
-          disabled_features: [
-            'use_localstorage_for_settings',
-          ],
           enabled_features: ['study_templates', 'move_logo_to_main_pane'],
           charts_storage_url: 'https://saveload.tradingview.com',
           charts_storage_api_version: '1.1',
@@ -436,7 +433,7 @@ export const TradingViewChart = memo(({
         const chartingLibScript = document.createElement('script');
         chartingLibScript.src = '/charting_library/charting_library.standalone.js';
         chartingLibScript.async = true;
-        
+
         // Load datafeed script
         const datafeedScript = document.createElement('script');
         datafeedScript.src = '/charting_library/datafeeds/udf/dist/bundle.js';
@@ -546,7 +543,7 @@ export const TradingViewChart = memo(({
             .setBodyTextColor(position.unrealized_pnl >= 0 ? '#26a69a' : '#ef5350')
             .setTooltip(`Portfolio: ${position.portfolio_name}\nQuantity: ${position.quantity}\nAvg Price: ${position.price}\nP&L: ${position.unrealized_pnl.toFixed(2)}`)
             .setProtectTooltip(true);
-          
+
           newLines.push(positionLine);
         } catch (error) {
           console.error('Error creating position line:', error);
@@ -599,11 +596,11 @@ export const TradingViewChart = memo(({
         minHeight: autosize ? '360px' : `${Math.max(height, 360)}px`,
       }}
     >
-      <div 
-        ref={containerRef} 
+      <div
+        ref={containerRef}
         className="tradingview-chart-container"
-        style={{ 
-          width: '100%', 
+        style={{
+          width: '100%',
           height: '100%',
         }}
       />

@@ -1,45 +1,47 @@
-import {lazy, startTransition, Suspense, useEffect, useMemo, useState} from "react";
-import {TradingSidebar} from "./components/TradingSidebar";
-import {GlobalTopBar} from "./components/GlobalTopBar";
-import {Toaster} from "./components/ui/sonner";
-import {toast} from "sonner";
-import {usePortfolios} from "./hooks/usePortfolios";
-import {useTrading} from "./hooks/useTrading";
-import {useAuth} from "./hooks/useAuth";
-import {Portfolio, PortfolioSummary, Stock} from "./types/portfolio";
-import {Activity, FileText, HelpCircle, Receipt, Settings, ShieldCheck, TrendingUp, User,} from "lucide-react";
-import {MarketService, PortfolioService} from "./src/client";
-import {useQueryClient} from "@tanstack/react-query";
-import {queryKeys} from "./hooks/queryKeys";
+import { lazy, startTransition, Suspense, useEffect, useMemo, useState } from "react";
+import { TradingSidebar } from "./components/TradingSidebar";
+import { GlobalTopBar } from "./components/GlobalTopBar";
+import { Toaster } from "./components/ui/sonner";
+import { toast } from "sonner";
+import { usePortfolios } from "./hooks/usePortfolios";
+import { useTrading } from "./hooks/useTrading";
+import { useAuth } from "./hooks/useAuth";
+import { Portfolio, PortfolioSummary, Stock } from "./types/portfolio";
+import { Activity, FileText, HelpCircle, Receipt, Settings, ShieldCheck, TrendingUp, User, } from "lucide-react";
+import { MarketService, PortfolioService } from "./src/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "./hooks/queryKeys";
 
 // Lazy-loaded page components to reduce initial bundle size
-const ComprehensiveDashboard = lazy(() => import("./components/ComprehensiveDashboard").then(m => ({default: m.ComprehensiveDashboard})));
-const TradingInterface = lazy(() => import("./components/TradingInterface").then(m => ({default: m.TradingInterface})));
-const MarketData = lazy(() => import("./components/MarketData").then(m => ({default: m.MarketData})));
-const OrdersManager = lazy(() => import("./components/OrdersManager").then(m => ({default: m.OrdersManager})));
-const AccountManager = lazy(() => import("./components/AccountManager").then(m => ({default: m.AccountManager})));
-const PortfolioDashboard = lazy(() => import("./components/PortfolioDashboard").then(m => ({default: m.PortfolioDashboard})));
-const PortfolioDetail = lazy(() => import("./components/PortfolioDetail").then(m => ({default: m.PortfolioDetail})));
-const PortfolioForm = lazy(() => import("./components/PortfolioForm").then(m => ({default: m.PortfolioForm})));
-const UploadPortfolioDialog = lazy(() => import("./components/UploadPortfolioDialog").then(m => ({default: m.UploadPortfolioDialog})));
-const StockForm = lazy(() => import("./components/StockForm").then(m => ({default: m.StockForm})));
-const QuickTradeDialog = lazy(() => import("./components/QuickTradeDialog").then(m => ({default: m.QuickTradeDialog})));
-const PortfolioPerformance = lazy(() => import("./components/PortfolioPerformance").then(m => ({default: m.PortfolioPerformance})));
-const StockScreener = lazy(() => import("./components/StockScreener").then(m => ({default: m.StockScreener})));
-const RiskAnalysis = lazy(() => import("./components/RiskAnalysis").then(m => ({default: m.RiskAnalysis})));
-const RebalancingManager = lazy(() => import("./components/RebalancingManager").then(m => ({default: m.RebalancingManager})));
-const RiskManagement = lazy(() => import("./components/RiskManagement").then(m => ({default: m.RiskManagement})));
-const RiskSettings = lazy(() => import("./components/RiskSettings").then(m => ({default: m.RiskSettings})));
-const SignupPage = lazy(() => import("./components/SignupPage").then(m => ({default: m.SignupPage})));
-const LoginPage = lazy(() => import("./components/LoginPage").then(m => ({default: m.LoginPage})));
-const MarketNewsInsights = lazy(() => import("./components/MarketNewsInsights").then(m => ({default: m.default})));
-const InvestmentGoalsEnhanced = lazy(() => import("./components/InvestmentGoalsEnhanced").then(m => ({default: m.InvestmentGoalsEnhanced})));
-const AssetAllocation = lazy(() => import("./components/AssetAllocation").then(m => ({default: m.AssetAllocation})));
-const WatchlistManager = lazy(() => import("./components/WatchlistManager").then(m => ({default: m.WatchlistManager})));
-const AddToWatchlistDialog = lazy(() => import("./components/AddToWatchlistDialog").then(m => ({default: m.AddToWatchlistDialog})));
-const Fundamentals = lazy(() => import("./components/Fundamentals").then(m => ({default: m.Fundamentals})));
-const TradingViewChart = lazy(() => import("./components/TradingViewChart").then(m => ({default: m.TradingViewChart})));
-const ResearchWorkspace = lazy(() => import("./components/ResearchWorkspace").then(m => ({default: m.ResearchWorkspace})));
+const ComprehensiveDashboard = lazy(() => import("./components/ComprehensiveDashboard").then(m => ({ default: m.ComprehensiveDashboard })));
+const TradingInterface = lazy(() => import("./components/TradingInterface").then(m => ({ default: m.TradingInterface })));
+const MarketData = lazy(() => import("./components/MarketData").then(m => ({ default: m.MarketData })));
+const OrdersManager = lazy(() => import("./components/OrdersManager").then(m => ({ default: m.OrdersManager })));
+const AccountManager = lazy(() => import("./components/AccountManager").then(m => ({ default: m.AccountManager })));
+const PortfolioDashboard = lazy(() => import("./components/PortfolioDashboard").then(m => ({ default: m.PortfolioDashboard })));
+const PortfolioDetail = lazy(() => import("./components/PortfolioDetail").then(m => ({ default: m.PortfolioDetail })));
+const PortfolioForm = lazy(() => import("./components/PortfolioForm").then(m => ({ default: m.PortfolioForm })));
+const UploadPortfolioDialog = lazy(() => import("./components/UploadPortfolioDialog").then(m => ({ default: m.UploadPortfolioDialog })));
+const StockForm = lazy(() => import("./components/StockForm").then(m => ({ default: m.StockForm })));
+const QuickTradeDialog = lazy(() => import("./components/QuickTradeDialog").then(m => ({ default: m.QuickTradeDialog })));
+const PortfolioPerformance = lazy(() => import("./components/PortfolioPerformance").then(m => ({ default: m.PortfolioPerformance })));
+const StockScreener = lazy(() => import("./components/StockScreener").then(m => ({ default: m.StockScreener })));
+const RiskAnalysis = lazy(() => import("./components/RiskAnalysis").then(m => ({ default: m.RiskAnalysis })));
+const RebalancingManager = lazy(() => import("./components/RebalancingManager").then(m => ({ default: m.RebalancingManager })));
+const RiskManagement = lazy(() => import("./components/RiskManagement").then(m => ({ default: m.RiskManagement })));
+const RiskSettings = lazy(() => import("./components/RiskSettings").then(m => ({ default: m.RiskSettings })));
+const SignupPage = lazy(() => import("./components/SignupPage").then(m => ({ default: m.SignupPage })));
+const LoginPage = lazy(() => import("./components/LoginPage").then(m => ({ default: m.LoginPage })));
+const MarketNewsInsights = lazy(() => import("./components/MarketNewsInsights").then(m => ({ default: m.default })));
+const InvestmentGoalsEnhanced = lazy(() => import("./components/InvestmentGoalsEnhanced").then(m => ({ default: m.InvestmentGoalsEnhanced })));
+const AssetAllocation = lazy(() => import("./components/AssetAllocation").then(m => ({ default: m.AssetAllocation })));
+const WatchlistManager = lazy(() => import("./components/WatchlistManager").then(m => ({ default: m.WatchlistManager })));
+const AddToWatchlistDialog = lazy(() => import("./components/AddToWatchlistDialog").then(m => ({ default: m.AddToWatchlistDialog })));
+const Fundamentals = lazy(() => import("./components/Fundamentals").then(m => ({ default: m.Fundamentals })));
+const TradingViewChart = lazy(() => import("./components/TradingViewChart").then(m => ({ default: m.TradingViewChart })));
+const ResearchWorkspace = lazy(() => import("./components/ResearchWorkspace").then(m => ({ default: m.ResearchWorkspace })));
+const AnalyticsToolLayout = lazy(() => import("./components/analytics").then(m => ({ default: m.AnalyticsToolLayout })));
+
 type View =
     | "dashboard"
     | "portfolios"
@@ -67,13 +69,14 @@ type View =
     | "profile"
     | "settings"
     | "help"
-    | "chart";
+    | "chart"
+    | "analytics";
 
 type AuthView = "login" | "signup";
 
 export default function App() {
     // Authentication state
-    const {user, isAuthenticated, isLoading: authLoading, error: authError, logout} = useAuth();
+    const { user, isAuthenticated, isLoading: authLoading, error: authError, logout } = useAuth();
     const [authView, setAuthView] = useState<AuthView>("login");
 
     // Debug logging
@@ -242,7 +245,7 @@ export default function App() {
             <div className="min-h-screen bg-background flex items-center justify-center">
                 <div className="text-center space-y-4">
                     <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mx-auto">
-                        <TrendingUp className="h-7 w-7 text-primary-foreground animate-pulse"/>
+                        <TrendingUp className="h-7 w-7 text-primary-foreground animate-pulse" />
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-foreground">SmartFolio.AI</h1>
@@ -255,17 +258,17 @@ export default function App() {
 
     // Show authentication pages if user is not logged in
     if (!isAuthenticated) {
-        console.log('🔐 Showing auth pages:', {authView, hasUser: !!user, isAuthenticated});
+        console.log('🔐 Showing auth pages:', { authView, hasUser: !!user, isAuthenticated });
         if (authView === "signup") {
             return (
                 <Suspense fallback={<div>Loading sign up...</div>}>
-                    <SignupPage onSwitchToLogin={() => setAuthView("login")}/>
+                    <SignupPage onSwitchToLogin={() => setAuthView("login")} />
                 </Suspense>
             );
         }
         return (
             <Suspense fallback={<div>Loading login...</div>}>
-                <LoginPage onSwitchToSignup={() => setAuthView("signup")}/>
+                <LoginPage onSwitchToSignup={() => setAuthView("signup")} />
             </Suspense>
         );
     }
@@ -356,13 +359,13 @@ export default function App() {
         try {
             // Place order - backend will auto-fill simulated orders immediately
             await placeOrder(orderData);
-            
+
             // Invalidate queries to refresh data
-            queryClient.invalidateQueries({queryKey: queryKeys.ordersList});
-            queryClient.invalidateQueries({queryKey: queryKeys.portfolios});
-            queryClient.invalidateQueries({queryKey: queryKeys.dashboardSummary});
-            queryClient.invalidateQueries({queryKey: queryKeys.fundsSummary});
-            queryClient.invalidateQueries({queryKey: queryKeys.transactions});
+            queryClient.invalidateQueries({ queryKey: queryKeys.ordersList });
+            queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
+            queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
+            queryClient.invalidateQueries({ queryKey: queryKeys.fundsSummary });
+            queryClient.invalidateQueries({ queryKey: queryKeys.transactions });
 
             // Success notification
             toast.success(
@@ -458,7 +461,7 @@ export default function App() {
             case "performance":
                 return (
                     <Suspense fallback={<div>Loading Performance Analytics...</div>}>
-                        <PortfolioPerformance/>
+                        <PortfolioPerformance />
                     </Suspense>
                 );
 
@@ -475,7 +478,7 @@ export default function App() {
             case "goals":
                 return (
                     <Suspense fallback={<div>Loading Investment Goals...</div>}>
-                        <InvestmentGoalsEnhanced/>
+                        <InvestmentGoalsEnhanced />
                     </Suspense>
                 );
 
@@ -494,7 +497,7 @@ export default function App() {
             case "orders":
                 return (
                     <Suspense fallback={<div>Loading Orders Manager...</div>}>
-                        <OrdersManager orders={orders} trades={trades} onCancelOrder={handleCancelOrder}/>
+                        <OrdersManager orders={orders} trades={trades} onCancelOrder={handleCancelOrder} />
                     </Suspense>
                 );
 
@@ -551,24 +554,34 @@ export default function App() {
                     </Suspense>
                 );
 
+            case "analytics":
+                return (
+                    <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading Analytics Tool...</div>}>
+                        <AnalyticsToolLayout
+                            initialSymbol={researchChartSymbol || "GP"}
+                            onPlaceOrder={handlePlaceOrder}
+                        />
+                    </Suspense>
+                );
+
             case "fundamentals":
                 return (
                     <Suspense fallback={<div>Loading Fundamentals...</div>}>
-                        <Fundamentals defaultSymbol={fundamentalsSymbol}/>
+                        <Fundamentals defaultSymbol={fundamentalsSymbol} />
                     </Suspense>
                 );
 
             case "news":
                 return (
                     <Suspense fallback={<div>Loading Market News & Insights...</div>}>
-                        <MarketNewsInsights/>
+                        <MarketNewsInsights />
                     </Suspense>
                 );
 
             case "risk-analysis":
                 return (
                     <Suspense fallback={<div>Loading Risk Analysis...</div>}>
-                        <RiskAnalysis onNavigate={handleViewChange} onQuickTrade={handleQuickTrade} selectedPortfolioId={selectedPortfolio?.id}/>
+                        <RiskAnalysis onNavigate={handleViewChange} onQuickTrade={handleQuickTrade} selectedPortfolioId={selectedPortfolio?.id} />
                     </Suspense>
                 );
 
@@ -612,7 +625,7 @@ export default function App() {
                         <div className="text-center py-12">
                             <div
                                 className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <FileText className="h-8 w-8 text-primary"/>
+                                <FileText className="h-8 w-8 text-primary" />
                             </div>
                             <p className="text-muted-foreground max-w-md mx-auto">
                                 Automated report generation with customizable templates and scheduling coming soon.
@@ -632,7 +645,7 @@ export default function App() {
                         <div className="text-center py-12">
                             <div
                                 className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <Receipt className="h-8 w-8 text-primary"/>
+                                <Receipt className="h-8 w-8 text-primary" />
                             </div>
                             <p className="text-muted-foreground max-w-md mx-auto">
                                 Advanced tax optimization tools with automated harvesting and gain-loss analysis
@@ -653,7 +666,7 @@ export default function App() {
                         <div className="text-center py-12">
                             <div
                                 className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <FileText className="h-8 w-8 text-primary"/>
+                                <FileText className="h-8 w-8 text-primary" />
                             </div>
                             <p className="text-muted-foreground max-w-md mx-auto">
                                 Digital statement management with download and email delivery options coming soon.
@@ -673,7 +686,7 @@ export default function App() {
                         <div className="text-center py-12">
                             <div
                                 className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <Activity className="h-8 w-8 text-primary"/>
+                                <Activity className="h-8 w-8 text-primary" />
                             </div>
                             <p className="text-muted-foreground max-w-md mx-auto">
                                 Advanced transaction search and filtering with export capabilities coming soon.
@@ -686,8 +699,8 @@ export default function App() {
                 return (
                     <Suspense fallback={<div>Loading Account Manager...</div>}>
                         <AccountManager user={user} accountBalance={accountBalance} transactions={transactions} portfolios={portfoliosWithLivePricing}
-                                        onDeposit={deposit} onWithdraw={withdraw}
-                                        onUpdateCreditLimit={updateCreditLimit}/>
+                            onDeposit={deposit} onWithdraw={withdraw}
+                            onUpdateCreditLimit={updateCreditLimit} />
                     </Suspense>
                 );
 
@@ -702,7 +715,7 @@ export default function App() {
                         <div className="text-center py-12">
                             <div
                                 className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <User className="h-8 w-8 text-primary"/>
+                                <User className="h-8 w-8 text-primary" />
                             </div>
                             <p className="text-muted-foreground max-w-md mx-auto">
                                 Comprehensive profile management with document upload and KYC verification coming
@@ -723,7 +736,7 @@ export default function App() {
                         <div className="text-center py-12">
                             <div
                                 className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <Settings className="h-8 w-8 text-primary"/>
+                                <Settings className="h-8 w-8 text-primary" />
                             </div>
                             <p className="text-muted-foreground max-w-md mx-auto">
                                 Personalized platform settings with notification preferences and theme customization
@@ -744,7 +757,7 @@ export default function App() {
                         <div className="text-center py-12">
                             <div
                                 className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <HelpCircle className="h-8 w-8 text-primary"/>
+                                <HelpCircle className="h-8 w-8 text-primary" />
                             </div>
                             <p className="text-muted-foreground max-w-md mx-auto">
                                 Interactive help center with live chat support and comprehensive documentation coming
@@ -783,8 +796,8 @@ export default function App() {
             />
 
             <div className="flex-1 overflow-hidden flex flex-col">
-                <GlobalTopBar 
-                    accountBalance={accountBalance} 
+                <GlobalTopBar
+                    accountBalance={accountBalance}
                     onQuickTrade={handleQuickTrade}
                     onOpenChart={handleOpenChart}
                     onOpenFundamentals={handleOpenFundamentals}
@@ -844,7 +857,7 @@ export default function App() {
                 />
             </Suspense>
 
-            <Toaster/>
+            <Toaster />
         </div>
     );
 }

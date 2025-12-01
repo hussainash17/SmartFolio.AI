@@ -5,8 +5,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { TradingViewChart } from './TradingViewChart'
+import { WatchlistPanel } from './WatchlistPanel'
+import { SymbolInfoPanel } from './SymbolInfoPanel'
+import { OrdersPositionsPanel } from './OrdersPositionsPanel'
+import { MultiChartGrid } from './MultiChartGrid'
 import type { MarketData } from '../types/trading'
-import { Plus, Minus } from 'lucide-react'
+import { Plus, Minus, ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface ResearchWorkspaceProps {
   defaultSymbol?: string
@@ -43,7 +47,7 @@ export function ResearchWorkspace({ defaultSymbol, marketData, onQuickTrade }: R
   }, [marketData, defaultSymbol])
 
   const initialDefault = sanitizeSymbol(defaultSymbol) || availableSymbols[0] || ''
-  const [viewMode, setViewMode] = useState<'single' | 'multi'>('single')
+  const [viewMode, setViewMode] = useState<'analytics' | 'multi'>('analytics')
   const [layoutCount, setLayoutCount] = useState<number>(4)
   const [interval, setInterval] = useState<string>('1D')
   const [symbols, setSymbols] = useState<string[]>(() => {
@@ -51,6 +55,14 @@ export function ResearchWorkspace({ defaultSymbol, marketData, onQuickTrade }: R
     const others = availableSymbols.filter((sym) => sym !== initialDefault)
     return [...base, ...others.slice(0, MAX_LAYOUT - 1)]
   })
+
+  // Analytics mode state
+  const [leftPanelVisible, setLeftPanelVisible] = useState(true)
+  const [rightPanelVisible, setRightPanelVisible] = useState(true)
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(240)
+
+  const MIN_BOTTOM_HEIGHT = 180
+  const MAX_BOTTOM_HEIGHT = 400
 
   useEffect(() => {
     setSymbols((prev) => {
@@ -96,6 +108,13 @@ export function ResearchWorkspace({ defaultSymbol, marketData, onQuickTrade }: R
 
   const handleRemoveChart = () => {
     setLayoutCount((prev) => Math.max(prev - 1, 1))
+  }
+
+  const handleBottomPanelResize = (deltaY: number) => {
+    setBottomPanelHeight(prev => {
+      const newHeight = prev - deltaY
+      return Math.min(Math.max(newHeight, MIN_BOTTOM_HEIGHT), MAX_BOTTOM_HEIGHT)
+    })
   }
 
   const renderMultiCharts = () => (
@@ -224,21 +243,106 @@ export function ResearchWorkspace({ defaultSymbol, marketData, onQuickTrade }: R
     </div>
   )
 
+  const renderAnalytics = () => (
+    <div className="flex flex-col h-full">
+      {/* Main Content Area */}
+      <div className="flex flex-1 overflow-hidden gap-4">
+        {/* Left Panel */}
+        <div className={`relative transition-all duration-300 ease-in-out ${leftPanelVisible ? 'w-[280px]' : 'w-0'}`}>
+          {leftPanelVisible && (
+            <WatchlistPanel
+              currentSymbol={symbols[0] || initialDefault}
+              onSymbolSelect={(symbol) => handleSymbolChange(0, symbol)}
+            />
+          )}
+
+          <button
+            onClick={() => setLeftPanelVisible(!leftPanelVisible)}
+            className="absolute -right-3 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-6 h-8 bg-card border rounded-md shadow-sm hover:bg-accent transition-colors"
+          >
+            {leftPanelVisible ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {/* Chart + Right Panel Container */}
+        <div className="flex flex-1 flex-col overflow-hidden gap-4">
+          {/* Chart + Right Panel Row */}
+          <div className="flex flex-1 overflow-hidden gap-4">
+            {/* Chart Area */}
+            <div className="flex-1 border rounded-lg overflow-hidden">
+              <TradingViewChart
+                key={`analytics-${symbols[0] || initialDefault}-${interval}`}
+                symbol={symbols[0] || initialDefault}
+                interval={interval}
+                theme="light"
+                autosize
+              />
+            </div>
+
+            {/* Right Panel */}
+            <div className={`relative transition-all duration-300 ease-in-out ${rightPanelVisible ? 'w-[320px]' : 'w-0'}`}>
+              {rightPanelVisible && (
+                <SymbolInfoPanel
+                  currentSymbol={symbols[0] || initialDefault}
+                  onPlaceOrder={onQuickTrade}
+                />
+              )}
+
+              <button
+                onClick={() => setRightPanelVisible(!rightPanelVisible)}
+                className="absolute -left-3 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-6 h-8 bg-card border rounded-md shadow-sm hover:bg-accent transition-colors"
+              >
+                {rightPanelVisible ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Bottom Panel */}
+          <div className="relative" style={{ height: `${bottomPanelHeight}px` }}>
+            {/* Resize Handle */}
+            <div
+              className="absolute top-0 left-0 right-0 h-1 cursor-ns-resize hover:bg-accent transition-colors z-10"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                const startY = e.clientY
+
+                const handleMouseMove = (moveEvent: MouseEvent) => {
+                  const deltaY = startY - moveEvent.clientY
+                  handleBottomPanelResize(deltaY)
+                }
+
+                const handleMouseUp = () => {
+                  document.removeEventListener('mousemove', handleMouseMove)
+                  document.removeEventListener('mouseup', handleMouseUp)
+                }
+
+                document.addEventListener('mousemove', handleMouseMove)
+                document.addEventListener('mouseup', handleMouseUp)
+              }}
+            />
+
+            <OrdersPositionsPanel currentSymbol={symbols[0] || initialDefault} />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <div
       className="p-4 h-full"
       style={{ height: 'calc(100vh - 64px)', width: '100%' }}
     >
-      <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'single' | 'multi')} className="h-full flex flex-col">
+      <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as typeof viewMode)} className="h-full flex flex-col">
         <TabsList className="w-fit">
-          <TabsTrigger value="single">Single Chart</TabsTrigger>
-          <TabsTrigger value="multi">Multi-Chart</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="multi">Multi Chart</TabsTrigger>
         </TabsList>
-        <TabsContent value="single" className="flex-1 min-h-0">
-          {renderSingleChart()}
+        <TabsContent value="analytics" className="flex-1 min-h-0">
+          {renderAnalytics()}
         </TabsContent>
         <TabsContent value="multi" className="flex-1 min-h-0">
-          {renderMultiCharts()}
+          <MultiChartGrid />
         </TabsContent>
       </Tabs>
     </div>
