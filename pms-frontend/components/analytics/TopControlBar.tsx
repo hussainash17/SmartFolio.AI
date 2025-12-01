@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Search, Sun, Moon, Settings, TrendingUp, BarChart3, LineChart } from 'lucide-react';
-import { MarketService } from '@/src/client';
+import { MarketService } from '../../src/client';
 
 interface TopControlBarProps {
     currentSymbol: string;
@@ -58,9 +58,9 @@ export function TopControlBar({
         const timer = setTimeout(async () => {
             setIsSearching(true);
             try {
-                const results = await MarketService.getStocks({
+                const results = await MarketService.listStocks({
                     limit: 10,
-                    skip: 0,
+                    offset: 0,
                 });
 
                 // Filter results based on search query

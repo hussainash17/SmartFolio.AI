@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent } from './ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { OrdersService } from '../src/client'
+import { formatPrice, formatPnL, getPnLColor, getStatusColor } from '../lib/formatting-utils'
 
 interface OrdersPositionsPanelProps {
     currentSymbol: string
@@ -87,36 +88,6 @@ export function OrdersPositionsPanel({ currentSymbol }: OrdersPositionsPanelProp
     }
 
 
-    const formatPrice = (price?: number | string) => {
-        if (price === undefined || price === null) return '--'
-        const numPrice = typeof price === 'string' ? parseFloat(price) : price
-        return isNaN(numPrice) ? '--' : numPrice.toFixed(2)
-    }
-
-    const formatPnL = (pnl?: number | string) => {
-        if (pnl === undefined || pnl === null) return '--'
-        const numPnL = typeof pnl === 'string' ? parseFloat(pnl) : pnl
-        if (isNaN(numPnL)) return '--'
-        const sign = numPnL >= 0 ? '+' : ''
-        return `${sign}${numPnL.toFixed(2)}`
-    }
-
-    const getPnLColor = (pnl?: number | string) => {
-        if (!pnl) return 'text-muted-foreground'
-        const numPnL = typeof pnl === 'string' ? parseFloat(pnl) : pnl
-        return isNaN(numPnL) ? 'text-muted-foreground' : numPnL >= 0 ? 'text-emerald-500' : 'text-rose-500'
-    }
-
-    const getStatusColor = (status: string) => {
-        switch (status.toLowerCase()) {
-            case 'filled': return 'text-emerald-500'
-            case 'open':
-            case 'pending': return 'text-blue-500'
-            case 'cancelled':
-            case 'rejected': return 'text-rose-500'
-            default: return 'text-muted-foreground'
-        }
-    }
 
     return (
         <Card className="h-full flex flex-col">

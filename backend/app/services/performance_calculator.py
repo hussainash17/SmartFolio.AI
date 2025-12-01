@@ -88,6 +88,9 @@ class PerformanceCalculator:
 
         MWR accounts for the timing and size of cash flows, representing
         the actual investor experience.
+        
+        For very short periods or when IRR produces unrealistic results,
+        falls back to simple return calculation.
         """
         cash_flows = self._get_all_cash_flows(portfolio_id, start_date, end_date)
         # Use optimized single-date valuations
@@ -96,6 +99,21 @@ class PerformanceCalculator:
 
         if not cash_flows and initial_value == 0:
             return 0.0
+
+        # Calculate simple return as fallback
+        simple_return = (final_value - initial_value) / initial_value if initial_value > 0 else 0.0
+        
+        # For very short periods (< 30 days) or when cash flows are negligible,
+        # use simple return to avoid unrealistic IRR values
+        days = (end_date - start_date).days
+        total_cash_flow = sum(abs(cf['amount']) for cf in cash_flows)
+        cash_flow_ratio = total_cash_flow / initial_value if initial_value > 0 else 0.0
+        
+        # Use simple return if:
+        # 1. Period is very short (< 30 days) AND cash flows are small (< 5% of initial value)
+        # 2. No significant cash flows relative to portfolio size
+        if days < 30 and cash_flow_ratio < 0.05:
+            return simple_return
 
         # Add initial investment as negative cash flow
         all_flows = [{'date': start_date, 'amount': -initial_value}]
@@ -120,24 +138,44 @@ class PerformanceCalculator:
             # Prefer a bracketed solver to keep (1 + rate) > 0
             low, high = -0.9999, 10.0
             f_low, f_high = npv_at(low), npv_at(high)
+            
             if np.sign(f_low) == np.sign(f_high):
                 # Attempt to expand the upper bound to find a sign change
                 # while keeping 1 + rate > 0
-                for high in [20.0, 50.0, 100.0]:
-                    f_high = npv_at(high)
+                bracket_found = False
+                for high_bound in [20.0, 50.0, 100.0]:
+                    f_high = npv_at(high_bound)
                     if np.sign(f_low) != np.sign(f_high):
+                        bracket_found = True
+                        high = high_bound
                         break
-                else:
-                    # Fall back to Newton from a reasonable initial guess if no bracket
-                    irr = newton(npv_at, 0.1, maxiter=100)
-                    return float(irr)
+                
+                if not bracket_found:
+                    # Try Newton method, but validate the result
+                    try:
+                        irr = newton(npv_at, 0.1, maxiter=100)
+                        # Validate IRR is in reasonable range (-99% to 1000%)
+                        if -0.99 <= irr <= 10.0:
+                            return float(irr)
+                        else:
+                            # IRR is unrealistic, use simple return
+                            return simple_return
+                    except (RuntimeError, ValueError, OverflowError, ZeroDivisionError):
+                        return simple_return
+            
+            # Use bracketed solver
             irr = brentq(npv_at, low, high, maxiter=200)
-            return float(irr)
+            
+            # Validate IRR is in reasonable range
+            if -0.99 <= irr <= 10.0:
+                return float(irr)
+            else:
+                # IRR is unrealistic, use simple return
+                return simple_return
+                
         except (RuntimeError, ValueError, OverflowError, ZeroDivisionError):
             # If solving fails, return simple return as a fallback
-            if initial_value > 0:
-                return (final_value - initial_value) / initial_value
-            return 0.0
+            return simple_return
 
     def calculate_cumulative_returns(
         self,
