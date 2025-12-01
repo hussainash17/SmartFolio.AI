@@ -425,7 +425,7 @@ export function ComprehensiveDashboard({
                                     )}
                                     {benchmarkData?.volume != null && (
                                         <div className="flex items-center justify-between">
-                                            <span className="text-xs font-medium text-foreground">Volume</span>
+                                            <span className="text-xs fo text-foreground">Volume</span>
                                             <span className="text-sm font-semibold text-foreground">{toMillions(benchmarkData.volume).toFixed(2)}M</span>
                                         </div>
                                     )}

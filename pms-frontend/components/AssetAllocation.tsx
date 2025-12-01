@@ -7,19 +7,19 @@ import { Badge } from './ui/badge'
 import { Progress } from './ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
-import { 
-  PieChart as PieIcon, 
-  Target, 
-  AlertTriangle, 
-  TrendingUp, 
-  TrendingDown,
-  BarChart3,
-  Settings,
-  RefreshCw,
-  ArrowRight,
-  Info,
-  Trash2,
-  Plus
+import {
+	PieChart as PieIcon,
+	Target,
+	AlertTriangle,
+	TrendingUp,
+	TrendingDown,
+	BarChart3,
+	Settings,
+	RefreshCw,
+	ArrowRight,
+	Info,
+	Trash2,
+	Plus
 } from 'lucide-react'
 import { OpenAPI, AnalyticsService } from '../src/client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -72,7 +72,7 @@ interface RebalancingSuggestion {
 	suggestedValue: number
 }
 
-const PALETTE = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#14b8a6','#f97316','#22c55e','#eab308','#06b6d4']
+const PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#f97316', '#22c55e', '#eab308', '#06b6d4']
 
 const SECTOR_MAP: Record<string, string> = {
 	'1': 'Banking',
@@ -106,20 +106,20 @@ function normalizeSector(value: any): string {
 export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: AssetAllocationProps) {
 	const queryClient = useQueryClient()
 	const [activeTab, setActiveTab] = useState('overview')
-	
+
 	// Get portfolios list
 	const { portfolios, loading: portfoliosLoading } = usePortfolios()
-	
+
 	// Manage selected portfolio internally, default to first portfolio or prop
 	const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(null)
-	
+
 	// Initialize with prop when it changes
 	useEffect(() => {
 		if (propPortfolioId) {
 			setSelectedPortfolioId(propPortfolioId)
 		}
 	}, [propPortfolioId])
-	
+
 	// Auto-select first portfolio when portfolios load (if no portfolio selected)
 	useEffect(() => {
 		if (!selectedPortfolioId && !propPortfolioId && portfolios.length > 0) {
@@ -127,7 +127,7 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 			setSelectedPortfolioId(portfolios[0].id)
 		}
 	}, [portfolios, propPortfolioId, selectedPortfolioId])
-	
+
 	// Use selected portfolio for queries
 	const portfolioId = selectedPortfolioId
 
@@ -221,13 +221,15 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 					...(OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : {},
 				},
 				credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-				body: JSON.stringify({ targets: editableTargets.map(t => ({
-					category: t.category,
-					category_type: t.category_type || 'SECTOR',
-					target_percent: Number(t.target_percent || 0),
-					min_percent: t.min_percent ?? null,
-					max_percent: t.max_percent ?? null,
-				})) }),
+				body: JSON.stringify({
+					targets: editableTargets.map(t => ({
+						category: t.category,
+						category_type: t.category_type || 'SECTOR',
+						target_percent: Number(t.target_percent || 0),
+						min_percent: t.min_percent ?? null,
+						max_percent: t.max_percent ?? null,
+					}))
+				}),
 			})
 			if (!res.ok) {
 				const errorData = await res.json().catch(() => ({ detail: 'Failed to save targets' }))
@@ -256,30 +258,30 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 		}))
 	}, [JSON.stringify((allocation as any)?.stock_wise_allocation)])
 
-	const donutData = useMemo(() => sectors.map((s, idx) => ({ 
-		name: s.sector, 
-		value: Number(s.allocation_percent || 0), 
-		fill: PALETTE[idx % PALETTE.length] 
+	const donutData = useMemo(() => sectors.map((s, idx) => ({
+		name: s.sector,
+		value: Number(s.allocation_percent || 0),
+		fill: PALETTE[idx % PALETTE.length]
 	})), [JSON.stringify(sectors)])
 
 	const driftRows = useMemo(() => {
 		const targetMap = new Map<string, number>()
 		const sectorMap = new Map<string, SectorAlloc>()
-		
+
 		// Map current sectors
 		for (const s of sectors) {
 			sectorMap.set(s.sector, s)
 		}
-		
+
 		// Map targets
 		for (const t of editableTargets) {
 			const normalized = normalizeSector(t.category)
 			targetMap.set(normalized, Number(t.target_percent || 0))
 		}
-		
+
 		// Combine sectors with holdings and targets without holdings
 		const result: Array<{ sector: string; current: number; target: number; drift: number }> = []
-		
+
 		// Add sectors with current holdings
 		for (const s of sectors) {
 			result.push({
@@ -289,7 +291,7 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 				drift: Number((Number(s.allocation_percent || 0) - Number(targetMap.get(s.sector) || 0)).toFixed(2)),
 			})
 		}
-		
+
 		// Add targets that don't have current holdings
 		for (const t of editableTargets) {
 			const normalized = normalizeSector(t.category)
@@ -302,7 +304,7 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 				})
 			}
 		}
-		
+
 		return result
 	}, [JSON.stringify(sectors), JSON.stringify(editableTargets)])
 
@@ -318,7 +320,7 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 		queryFn: async () => {
 			const base = (OpenAPI as any).BASE || ''
 			const map: Record<string, any[]> = {}
-			
+
 			// Fetch liquid stocks for each empty sector
 			await Promise.all(emptySectorsWithTargets.map(async (sector) => {
 				try {
@@ -335,7 +337,7 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 					map[sector] = []
 				}
 			}))
-			
+
 			return map
 		},
 		enabled: emptySectorsWithTargets.length > 0,
@@ -345,10 +347,10 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 	// Calculate rebalancing suggestions
 	const rebalancingSuggestions = useMemo(() => {
 		if (!editableTargets.length) return [];
-		
+
 		const totalValue = allocation.total_value || 0;
 		const suggestions: RebalancingSuggestion[] = [];
-		
+
 		// Group stocks by sector
 		const stocksBySector = new Map<string, StockAlloc[]>();
 		stocks.forEach(stock => {
@@ -364,7 +366,7 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 			// For empty sectors with targets, always suggest (drift will be negative)
 			// For sectors with holdings, only suggest if drift > 1%
 			const shouldSuggest = drift.current === 0 && drift.target > 0 ? true : Math.abs(drift.drift) > 1;
-			
+
 			if (shouldSuggest) {
 				const sectorStocks = stocksBySector.get(drift.sector) || [];
 				// Use a minimum portfolio value for empty sectors if totalValue is 0
@@ -377,7 +379,7 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 				if (sectorStocks.length === 0 && drift.current === 0 && drift.target > 0) {
 					// Find liquid stocks for this sector
 					const liquidStocks = liquidStocksMap.data?.[drift.sector] || [];
-					
+
 					if (liquidStocks.length > 0) {
 						// Split target value equally across top 3 stocks
 						const valuePerStock = targetValue / liquidStocks.length;
@@ -402,10 +404,10 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 					// Existing logic for sectors with holdings
 					sectorStocks.forEach(stock => {
 						const stockValue = stock.current_value;
-						const stockProportion = sectorStocks.length > 0 
+						const stockProportion = sectorStocks.length > 0
 							? stockValue / sectorStocks.reduce((sum, s) => sum + s.current_value, 0)
 							: 1;
-						
+
 						const suggestedValueChange = difference * stockProportion;
 						const currentPrice = stock.current_value / stock.quantity;
 						const suggestedShares = Math.round(suggestedValueChange / currentPrice);
@@ -558,11 +560,11 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 								<div className="h-80">
 									<ResponsiveContainer width="100%" height="100%">
 										<RechartsPieChart>
-											<Pie 
-												data={donutData} 
-												dataKey="value" 
-												nameKey="name" 
-												innerRadius={60} 
+											<Pie
+												data={donutData}
+												dataKey="value"
+												nameKey="name"
+												innerRadius={60}
 												outerRadius={100}
 												label={(entry) => `${entry.name}: ${entry.value.toFixed(1)}%`}
 											>
@@ -619,12 +621,12 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 
 								<div className="mt-4 p-3 bg-muted rounded-lg">
 									<p className="text-xs text-muted-foreground">
-										<strong>Risk Assessment:</strong><br/>
-										{((allocation as any)?.concentration_risk?.largest_holding || 0) > 20 
-											? "High concentration risk detected" 
+										<strong>Risk Assessment:</strong><br />
+										{((allocation as any)?.concentration_risk?.largest_holding || 0) > 20
+											? "High concentration risk detected"
 											: ((allocation as any)?.concentration_risk?.top_5_holdings || 0) > 60
-											? "Moderate concentration risk"
-											: "Well diversified portfolio"}
+												? "Moderate concentration risk"
+												: "Well diversified portfolio"}
 									</p>
 								</div>
 							</CardContent>
@@ -785,10 +787,10 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 								</CardTitle>
 								<div className="flex items-center gap-2">
 									<Button variant="outline" size="sm" onClick={() => {
-										setEditableTargets(sectors.map(s => ({ 
-											category: s.sector, 
-											category_type: 'SECTOR', 
-											target_percent: Number((s.allocation_percent ?? 0).toFixed(2)) 
+										setEditableTargets(sectors.map(s => ({
+											category: s.sector,
+											category_type: 'SECTOR',
+											target_percent: Number((s.allocation_percent ?? 0).toFixed(2))
 										})))
 									}}>
 										Reset to Current
@@ -796,16 +798,16 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 									<Button variant="outline" size="sm" onClick={() => {
 										if (sectors.length === 0) return
 										const eq = Number((100 / sectors.length).toFixed(2))
-										setEditableTargets(sectors.map(s => ({ 
-											category: s.sector, 
-											category_type: 'SECTOR', 
-											target_percent: eq 
+										setEditableTargets(sectors.map(s => ({
+											category: s.sector,
+											category_type: 'SECTOR',
+											target_percent: eq
 										})))
 									}}>
 										Equal Weight
 									</Button>
-									<Button 
-										onClick={() => saveTargetsMutation.mutate()} 
+									<Button
+										onClick={() => saveTargetsMutation.mutate()}
 										disabled={saveTargetsMutation.isPending || Math.abs(100 - totalTarget) > 0.5}
 										className="gap-2"
 									>
@@ -935,7 +937,7 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 													/>
 												</TableCell>
 												<TableCell className="text-right">
-													<Badge 
+													<Badge
 														variant={Math.abs(row.drift) < 2 ? 'outline' : Math.abs(row.drift) < 5 ? 'secondary' : 'destructive'}
 													>
 														{row.drift > 0 ? '+' : ''}{row.drift.toFixed(2)}%
@@ -1014,7 +1016,7 @@ export function AssetAllocation({ portfolioId: propPortfolioId, onNavigate }: As
 												<TableRow key={`${suggestion.symbol}-${idx}`}>
 													<TableCell className="font-medium">{suggestion.symbol}</TableCell>
 													<TableCell>
-														<Badge 
+														<Badge
 															variant={suggestion.action === 'BUY' ? 'default' : 'destructive'}
 															className={suggestion.action === 'BUY' ? 'bg-green-600' : ''}
 														>
