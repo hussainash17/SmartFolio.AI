@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { OrdersService } from '@/src/client';
+import { OrdersService } from '../../src/client';
+import { formatPrice, formatPnL, getPnLColor, getStatusColor } from '../../lib/formatting-utils';
 
 interface BottomPanelProps {
     currentSymbol: string;
@@ -70,7 +71,18 @@ export function BottomPanel({ currentSymbol }: BottomPanelProps) {
         setLoading(true);
         try {
             const data = await OrdersService.getUserOrders({});
-            setOrders(data as Order[]);
+            // Transform OrderPublic to Order format
+            const transformedOrders: Order[] = data.map((order: any) => ({
+                id: order.id,
+                symbol: order.stock_id || order.symbol || '',
+                side: order.side?.toLowerCase() || '',
+                order_type: order.order_type?.toLowerCase() || '',
+                quantity: order.quantity || 0,
+                price: order.price ? parseFloat(order.price) : undefined,
+                status: order.status?.toLowerCase() || '',
+                created_at: order.placed_at || order.created_at || new Date().toISOString()
+            }));
+            setOrders(transformedOrders);
         } catch (error) {
             console.error('Error loading orders:', error);
             setOrders([]);
@@ -79,36 +91,6 @@ export function BottomPanel({ currentSymbol }: BottomPanelProps) {
         }
     };
 
-    const formatPrice = (price?: number) => {
-        if (price === undefined || price === null) return '--';
-        return price.toFixed(2);
-    };
-
-    const formatPnL = (pnl?: number) => {
-        if (pnl === undefined || pnl === null) return '--';
-        const sign = pnl >= 0 ? '+' : '';
-        return `${sign}${pnl.toFixed(2)}`;
-    };
-
-    const getPnLColor = (pnl?: number) => {
-        if (!pnl) return 'text-muted-foreground';
-        return pnl >= 0 ? 'text-emerald-500' : 'text-rose-500';
-    };
-
-    const getStatusColor = (status: string) => {
-        switch (status.toLowerCase()) {
-            case 'filled':
-                return 'text-emerald-500';
-            case 'open':
-            case 'pending':
-                return 'text-blue-500';
-            case 'cancelled':
-            case 'rejected':
-                return 'text-rose-500';
-            default:
-                return 'text-muted-foreground';
-        }
-    };
 
     return (
         <div className="flex flex-col h-full">

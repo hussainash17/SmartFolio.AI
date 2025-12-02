@@ -6,6 +6,7 @@ import { Label } from './ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
 import { MarketService } from '../src/client'
+import { formatPrice, formatNumber, getChangeColor } from '../lib/formatting-utils'
 
 interface SymbolInfoPanelProps {
     currentSymbol: string
@@ -75,27 +76,6 @@ export function SymbolInfoPanel({ currentSymbol, onPlaceOrder }: SymbolInfoPanel
     }
 
 
-    const formatPrice = (price?: number | string) => {
-        if (price === undefined || price === null) return '--'
-        const numPrice = typeof price === 'string' ? parseFloat(price) : price
-        return isNaN(numPrice) ? '--' : numPrice.toFixed(2)
-    }
-
-    const formatNumber = (num?: number | string) => {
-        if (num === undefined || num === null) return '--'
-        const numVal = typeof num === 'string' ? parseFloat(num) : num
-        if (isNaN(numVal)) return '--'
-        if (numVal >= 1e9) return `${(numVal / 1e9).toFixed(2)}B`
-        if (numVal >= 1e6) return `${(numVal / 1e6).toFixed(2)}M`
-        if (numVal >= 1e3) return `${(numVal / 1e3).toFixed(2)}K`
-        return numVal.toFixed(0)
-    }
-
-    const getChangeColor = (change?: number | string) => {
-        if (!change) return 'text-muted-foreground'
-        const numChange = typeof change === 'string' ? parseFloat(change) : change
-        return isNaN(numChange) ? 'text-muted-foreground' : numChange >= 0 ? 'text-emerald-500' : 'text-rose-500'
-    }
 
     return (
         <Card className="h-full flex flex-col overflow-hidden">

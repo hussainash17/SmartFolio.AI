@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Activity, Plus } from 'lucide-react';
-import { MarketService } from '@/src/client';
+import { Activity, Plus } from 'lucide-react';
+import { MarketService } from '../../src/client';
+import { formatPrice, formatChange, getChangeColor, getChangeIcon } from '../../lib/formatting-utils';
 
 interface LeftPanelProps {
     currentSymbol: string;
@@ -106,33 +107,6 @@ export function LeftPanel({ currentSymbol, onSymbolSelect }: LeftPanelProps) {
         }
     };
 
-    const formatPrice = (price?: number) => {
-        if (price === undefined || price === null) return '--';
-        return price.toFixed(2);
-    };
-
-    const formatChange = (change?: number, changePercent?: number) => {
-        if (change === undefined || change === null) return null;
-        const sign = change >= 0 ? '+' : '';
-        const percentStr = changePercent !== undefined && changePercent !== null
-            ? ` (${sign}${changePercent.toFixed(2)}%)`
-            : '';
-        return `${sign}${change.toFixed(2)}${percentStr}`;
-    };
-
-    const getChangeColor = (change?: number) => {
-        if (!change) return 'text-muted-foreground';
-        return change >= 0 ? 'text-emerald-500' : 'text-rose-500';
-    };
-
-    const getChangeIcon = (change?: number) => {
-        if (!change) return null;
-        return change >= 0 ? (
-            <TrendingUp className="w-3 h-3" />
-        ) : (
-            <TrendingDown className="w-3 h-3" />
-        );
-    };
 
     return (
         <div className="flex flex-col h-full">

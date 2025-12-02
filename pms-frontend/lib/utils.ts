@@ -4,6 +4,18 @@
  * Used across all components for consistent formatting throughout the application.
  */
 
+// Re-export formatting utilities from formatting-utils
+export {
+    formatPrice,
+    formatChange,
+    formatPnL,
+    formatNumber,
+    getChangeColor,
+    getChangeIcon,
+    getPnLColor,
+    getStatusColor,
+} from './formatting-utils';
+
 /**
  * Format a number as currency
  * @param amount - The amount to format
@@ -64,33 +76,6 @@ export function formatPercent(
     return `${sign}${percent.toFixed(decimals)}%`;
 }
 
-/**
- * Format a number with K/M/B/T suffixes
- * @param num - The number to format
- * @param decimals - Number of decimal places (default: 1)
- * @returns Formatted number string with suffix or '-' if invalid
- * 
- * @example
- * formatNumber(1500000000) // "1.5B"
- * formatNumber(2500000) // "2.5M"
- * formatNumber(3500) // "3.5K"
- * formatNumber(null) // "-"
- */
-export function formatNumber(
-    num?: number | null,
-    decimals: number = 1
-): string {
-    if (num === null || num === undefined || !Number.isFinite(num)) {
-        return '-';
-    }
-
-    if (num >= 1e12) return `${(num / 1e12).toFixed(decimals)}T`;
-    if (num >= 1e9) return `${(num / 1e9).toFixed(decimals)}B`;
-    if (num >= 1e6) return `${(num / 1e6).toFixed(decimals)}M`;
-    if (num >= 1e3) return `${(num / 1e3).toFixed(decimals)}K`;
-
-    return num.toFixed(decimals);
-}
 
 /**
  * Format market cap with Crore (Cr) suffix
@@ -152,20 +137,6 @@ export function formatWithCommas(num?: number | null): string {
     return new Intl.NumberFormat('en-US').format(num);
 }
 
-/**
- * Get Tailwind CSS color class for percentage change
- * @param value - The percentage value
- * @returns Tailwind CSS color class
- * 
- * @example
- * getChangeColor(5.5) // "text-green-600"
- * getChangeColor(-3.2) // "text-red-600"
- * getChangeColor(null) // "text-muted-foreground"
- */
-export function getChangeColor(value?: number | null): string {
-    if (value === null || value === undefined) return 'text-muted-foreground';
-    return value >= 0 ? 'text-green-600' : 'text-red-600';
-}
 
 /**
  * Get Tailwind CSS color classes for stock ratings

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../hooks/queryKeys'
-import { OpenAPI } from '../src/client'
+import { useApi } from '../hooks/useApi'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
@@ -24,23 +24,6 @@ const NEWS_CATEGORY_OPTIONS = [
 
 const NEWS_DAYS_OPTIONS = [1, 3, 7, 14, 30]
 const NEWS_LIMIT_OPTIONS = [10, 20, 30, 50]
-
-function useApi<T>(path: string, key: any, enabled = true) {
-	return useQuery({
-		queryKey: key,
-		enabled,
-		queryFn: async () => {
-			const base = (OpenAPI as any).BASE || ''
-			const res = await fetch(`${String(base).replace(/\/$/, '')}${path}`, {
-				headers: (OpenAPI as any).TOKEN ? { Authorization: `Bearer ${(OpenAPI as any).TOKEN as string}` } : undefined,
-				credentials: (OpenAPI as any).WITH_CREDENTIALS ? 'include' : 'omit',
-			})
-			if (!res.ok) throw new Error(`Failed ${path}`)
-			return (await res.json()) as T
-		},
-		staleTime: 30 * 1000,
-	})
-}
 
 export default function MarketNewsInsights() {
 	const queryClient = useQueryClient()

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent } from './ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
-import { TrendingUp, TrendingDown, Activity, Plus, ChevronDown, MoreVertical, Star, Trash2, Edit2, Settings } from 'lucide-react'
+import { Activity, Plus, ChevronDown, MoreVertical, Star, Trash2, Edit2, Settings } from 'lucide-react'
 import { MarketService } from '../src/client'
 import { useWatchlists } from '../hooks/useWatchlists'
 import { useWatchlistItems } from '../hooks/useWatchlistItems'
 import { Button } from './ui/button'
+import { formatPrice, formatChange, getChangeColor, getChangeIcon } from '../lib/formatting-utils'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -129,40 +130,6 @@ export function WatchlistPanel({ currentSymbol, onSymbolSelect }: WatchlistPanel
         }
     }
 
-    const formatPrice = (price?: number | string) => {
-        if (price === undefined || price === null) return '--'
-        const numPrice = typeof price === 'string' ? parseFloat(price) : price
-        return isNaN(numPrice) ? '--' : numPrice.toFixed(2)
-    }
-
-    const formatChange = (change?: number | string, changePercent?: number | string) => {
-        if (change === undefined || change === null) return null
-        const numChange = typeof change === 'string' ? parseFloat(change) : change
-        if (isNaN(numChange)) return null
-
-        const sign = numChange >= 0 ? '+' : ''
-        let percentStr = ''
-        if (changePercent !== undefined && changePercent !== null) {
-            const numPercent = typeof changePercent === 'string' ? parseFloat(changePercent) : changePercent
-            if (!isNaN(numPercent)) {
-                percentStr = ` (${sign}${numPercent.toFixed(2)}%)`
-            }
-        }
-        return `${sign}${numChange.toFixed(2)}${percentStr}`
-    }
-
-    const getChangeColor = (change?: number | string) => {
-        if (!change) return 'text-muted-foreground'
-        const numChange = typeof change === 'string' ? parseFloat(change) : change
-        return isNaN(numChange) ? 'text-muted-foreground' : numChange >= 0 ? 'text-emerald-500' : 'text-rose-500'
-    }
-
-    const getChangeIcon = (change?: number | string) => {
-        if (!change) return null
-        const numChange = typeof change === 'string' ? parseFloat(change) : change
-        if (isNaN(numChange)) return null
-        return numChange >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />
-    }
 
     const isWatchlistLoading = watchlistsLoading || itemsLoading
 

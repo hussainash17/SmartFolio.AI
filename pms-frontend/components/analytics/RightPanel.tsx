@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Info } from 'lucide-react';
-import { MarketService } from '@/src/client';
+import { MarketService } from '../../src/client';
+import { formatPrice, formatNumber, getChangeColor } from '../../lib/formatting-utils';
 
 interface RightPanelProps {
     currentSymbol: string;
@@ -78,23 +79,6 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
         }
     };
 
-    const formatPrice = (price?: number) => {
-        if (price === undefined || price === null) return '--';
-        return price.toFixed(2);
-    };
-
-    const formatNumber = (num?: number) => {
-        if (num === undefined || num === null) return '--';
-        if (num >= 1e9) return `${(num / 1e9).toFixed(2)}B`;
-        if (num >= 1e6) return `${(num / 1e6).toFixed(2)}M`;
-        if (num >= 1e3) return `${(num / 1e3).toFixed(2)}K`;
-        return num.toFixed(0);
-    };
-
-    const getChangeColor = (change?: number) => {
-        if (!change) return 'text-muted-foreground';
-        return change >= 0 ? 'text-emerald-500' : 'text-rose-500';
-    };
 
     return (
         <div className="flex flex-col h-full overflow-y-auto">
