@@ -15,6 +15,10 @@ from app.model.portfolio import AllocationTarget, AllocationTargetPublic
 from app.model.portfolio import Portfolio, PortfolioPosition
 from app.model.stock import StockData
 from app.model.trade import Trade
+from app.model.technical_indicators import DonchianChannelCache
+from app.model.stock import DailyOHLC
+from sqlalchemy import desc, and_
+from datetime import date as dt_date
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -800,3 +804,273 @@ def upsert_allocation_targets(
         session.refresh(row)
 
     return saved
+
+
+@router.get("/donchian-channel/{symbol}")
+def get_donchian_channel(
+        symbol: str,
+        session: SessionDep,
+        periods: str = Query("5,10,20", description="Comma-separated list of periods (e.g., '5,10,20')")
+):
+    """
+    Get Donchian Channel support and resistance levels for a stock symbol.
+    
+    Uses daily caching to improve performance. Calculations for periods 5, 10, and 20
+    are cached per symbol per day and reused for subsequent requests.
+    
+    Donchian Channels show the highest high and lowest low over a specified period.
+    - Resistance (Upper Channel) = Highest high over N periods
+    - Support (Lower Channel) = Lowest low over N periods
+    - Middle Channel = (Upper Channel + Lower Channel) / 2
+    
+    Args:
+        symbol: Stock trading code/symbol
+        periods: Comma-separated periods (default: 5,10,20)
+        
+    Returns:
+        Support and resistance levels for each period
+    """
+    
+    # Find company by trading code
+    company = session.exec(
+        select(Company).where(
+            Company.trading_code == symbol.upper(),
+            Company.is_active == True
+        )
+    ).first()
+    
+    if not company:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Stock with symbol '{symbol}' not found"
+        )
+    
+    # Parse periods
+    try:
+        period_list = [int(p.strip()) for p in periods.split(',')]
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid periods format. Use comma-separated integers (e.g., '5,10,20')"
+        )
+    
+    # Get today's date
+    today = dt_date.today()
+    
+    # Check if we have cached data for today
+    cached_data = session.exec(
+        select(DonchianChannelCache).where(
+            and_(
+                DonchianChannelCache.company_id == company.id,
+                DonchianChannelCache.calculation_date == today
+            )
+        )
+    ).first()
+    
+    # If cached data exists, use it
+    if cached_data:
+        # Build response from cached data
+        channels = []
+        
+        # Always include standard periods from cache
+        if 5 in period_list or not period_list:
+            channels.append({
+                "period": 5,
+                "resistance": float(cached_data.period_5_resistance),
+                "support": float(cached_data.period_5_support),
+                "middle": float(cached_data.period_5_middle),
+                "range": float(cached_data.period_5_range)
+            })
+        
+        if 10 in period_list or not period_list:
+            channels.append({
+                "period": 10,
+                "resistance": float(cached_data.period_10_resistance),
+                "support": float(cached_data.period_10_support),
+                "middle": float(cached_data.period_10_middle),
+                "range": float(cached_data.period_10_range)
+            })
+        
+        if 20 in period_list or not period_list:
+            channels.append({
+                "period": 20,
+                "resistance": float(cached_data.period_20_resistance),
+                "support": float(cached_data.period_20_support),
+                "middle": float(cached_data.period_20_middle),
+                "range": float(cached_data.period_20_range)
+            })
+        
+        # For any non-standard periods, we need to calculate on-the-fly
+        non_standard_periods = [p for p in period_list if p not in [5, 10, 20]]
+        
+        if non_standard_periods:
+            # Fetch data and calculate for non-standard periods
+            max_period = max(non_standard_periods)
+            ohlc_data = _fetch_ohlc_data(session, company.id, max_period)
+            
+            for period in non_standard_periods:
+                period_data = ohlc_data[-period:]
+                highest_high = max(d['high'] for d in period_data)
+                lowest_low = min(d['low'] for d in period_data)
+                middle_channel = (highest_high + lowest_low) / 2
+                
+                channels.append({
+                    "period": period,
+                    "resistance": round(highest_high, 2),
+                    "support": round(lowest_low, 2),
+                    "middle": round(middle_channel, 2),
+                    "range": round(highest_high - lowest_low, 2)
+                })
+        
+        return {
+            "symbol": symbol,
+            "company_name": company.company_name or company.name,
+            "current_price": float(cached_data.current_price),
+            "data_points": cached_data.data_points,
+            "latest_date": cached_data.calculation_date,
+            "includes_current_day": cached_data.includes_current_day,
+            "cached": True,
+            "channels": sorted(channels, key=lambda x: x['period'])
+        }
+    
+    # No cache found, calculate fresh values
+    # Always calculate for standard periods 5, 10, 20 for caching
+    standard_periods = [5, 10, 20]
+    all_periods_to_calculate = list(set(standard_periods + period_list))
+    max_period = max(all_periods_to_calculate)
+    
+    # Fetch OHLC data
+    ohlc_data = _fetch_ohlc_data(session, company.id, max_period)
+    
+    # Calculate channels for all periods
+    results = {}
+    for period in all_periods_to_calculate:
+        period_data = ohlc_data[-period:]
+        highest_high = max(d['high'] for d in period_data)
+        lowest_low = min(d['low'] for d in period_data)
+        middle_channel = (highest_high + lowest_low) / 2
+        
+        results[period] = {
+            "period": period,
+            "resistance": round(highest_high, 2),
+            "support": round(lowest_low, 2),
+            "middle": round(middle_channel, 2),
+            "range": round(highest_high - lowest_low, 2)
+        }
+    
+    # Get metadata
+    latest_close = ohlc_data[-1]['close']
+    latest_date = ohlc_data[-1]['date']
+    includes_current_day = ohlc_data[-1]['source'] == 'current'
+    
+    # Store in cache (only standard periods)
+    cache_entry = DonchianChannelCache(
+        company_id=company.id,
+        calculation_date=today,
+        current_price=Decimal(str(latest_close)),
+        data_points=len(ohlc_data),
+        includes_current_day=includes_current_day,
+        period_5_resistance=Decimal(str(results[5]["resistance"])),
+        period_5_support=Decimal(str(results[5]["support"])),
+        period_5_middle=Decimal(str(results[5]["middle"])),
+        period_5_range=Decimal(str(results[5]["range"])),
+        period_10_resistance=Decimal(str(results[10]["resistance"])),
+        period_10_support=Decimal(str(results[10]["support"])),
+        period_10_middle=Decimal(str(results[10]["middle"])),
+        period_10_range=Decimal(str(results[10]["range"])),
+        period_20_resistance=Decimal(str(results[20]["resistance"])),
+        period_20_support=Decimal(str(results[20]["support"])),
+        period_20_middle=Decimal(str(results[20]["middle"])),
+        period_20_range=Decimal(str(results[20]["range"])),
+    )
+    
+    session.add(cache_entry)
+    session.commit()
+    
+    # Return only requested periods
+    channels = [results[p] for p in period_list]
+    
+    return {
+        "symbol": symbol,
+        "company_name": company.company_name or company.name,
+        "current_price": round(latest_close, 2),
+        "data_points": len(ohlc_data),
+        "latest_date": latest_date,
+        "includes_current_day": includes_current_day,
+        "cached": False,
+        "channels": sorted(channels, key=lambda x: x['period'])
+    }
+
+
+def _fetch_ohlc_data(session, company_id: UUID, max_period: int) -> list:
+    """
+    Helper function to fetch OHLC data combining historical and current day data.
+    
+    Args:
+        session: Database session
+        company_id: Company UUID
+        max_period: Maximum number of periods needed
+        
+    Returns:
+        List of OHLC data dictionaries sorted by date
+    """
+    
+    # Fetch historical daily OHLC data
+    daily_data = session.exec(
+        select(DailyOHLC)
+        .where(DailyOHLC.company_id == company_id)
+        .order_by(desc(DailyOHLC.date))
+        .limit(max_period)
+    ).all()
+    
+    # Fetch current day's data from StockData
+    current_stock_data = session.exec(
+        select(StockData)
+        .where(StockData.company_id == company_id)
+        .order_by(desc(StockData.timestamp))
+        .limit(1)
+    ).first()
+    
+    # Create unified OHLC data list
+    ohlc_data = []
+    
+    # Add historical data
+    if daily_data:
+        for d in daily_data:
+            ohlc_data.append({
+                'date': d.date,
+                'high': float(d.high),
+                'low': float(d.low),
+                'close': float(d.close_price),
+                'source': 'historical'
+            })
+    
+    # Add current day's data if available
+    if current_stock_data:
+        ohlc_data.append({
+            'date': current_stock_data.timestamp,
+            'high': float(current_stock_data.high),
+            'low': float(current_stock_data.low),
+            'close': float(current_stock_data.last_trade_price),
+            'source': 'current'
+        })
+    
+    if not ohlc_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No price data found for company"
+        )
+    
+    # Sort by date (oldest first)
+    ohlc_data = sorted(ohlc_data, key=lambda x: x['date'])
+    
+    # Check if we have enough data
+    if len(ohlc_data) < max_period:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Insufficient data. Need {max_period} periods, but only {len(ohlc_data)} available."
+        )
+    
+    return ohlc_data
+
+
