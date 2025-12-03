@@ -596,33 +596,72 @@ export function ComprehensiveDashboard({
                             <div className="text-sm font-semibold text-foreground uppercase tracking-wide mb-4">
                                 Sector Performance
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
-                                {sectorAnalysis.sectors.slice(0, 12).map((sector: any) => {
-                                    const perf = sector.performance || {};
-                                    const change = Number(perf['1_day'] || perf['1_week'] || sector.change_percent || sector.change || 0);
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-2">
+                                {sectorAnalysis.sectors.slice(0, 21).map((sector: any) => {
+                                    const change = Number(sector.performance || 0);
                                     const positive = change >= 0;
+                                    const marketCap = Number(sector.market_cap || sector.market_cap_weight || 0);
+                                    const turnover = Number(sector.turnover || 0);
+                                    const peRatio = sector.pe_ratio;
+                                    const gainers = Number(sector.gainers || 0);
+                                    const losers = Number(sector.losers || 0);
+
+                                    // Format large numbers compactly
+                                    const formatNum = (num: number) => {
+                                        if (num >= 1000000000) return `${(num / 1000000000).toFixed(1)}T`;
+                                        if (num >= 1000000) return `${(num / 1000000).toFixed(1)}B`;
+                                        if (num >= 1000) return `${(num / 1000).toFixed(1)}M`;
+                                        return num.toFixed(0);
+                                    };
 
                                     return (
                                         <div
                                             key={sector.sector || sector.name}
-                                            className={`bg-white dark:bg-slate-950 rounded-lg p-4 border-l-4 hover:translate-y-[-2px] transition-transform ${positive ? 'border-l-green-600' : 'border-l-red-600'
-                                                }`}
-                                            style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}
+                                            className="relative overflow-hidden rounded-md transition-all duration-200 hover:shadow-md cursor-pointer bg-card border border-border"
                                         >
-                                            <div className="flex items-start justify-between mb-2">
-                                                <span className="text-sm font-semibold text-foreground">
+                                            {/* Header: Sector name and performance */}
+                                            <div className="flex items-center justify-between px-2 py-1.5 border-b border-border bg-muted/30">
+                                                <span className="text-[11px] font-semibold text-foreground truncate max-w-[60%]" title={sector.sector || sector.name}>
                                                     {sector.sector || sector.name}
                                                 </span>
-                                                <span
-                                                    className={`text-sm font-bold ${positive ? 'text-green-600' : 'text-red-600'}`}>
-                                                    {positive ? '+' : ''}{change.toFixed(1)}%
+                                                <span className={`text-[11px] font-bold tabular-nums ${positive ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
+                                                    {positive ? '+' : ''}{change.toFixed(2)}%
                                                 </span>
                                             </div>
-                                            {sector.market_cap_weight && (
-                                                <div className="text-sm text-muted-foreground">
-                                                    {Number(sector.market_cap_weight).toFixed(1)}% weight
+                                            
+                                            {/* Stats section */}
+                                            <div className="px-2 py-1.5">
+                                                {/* Row 1: MCap | Turn */}
+                                                <div className="flex text-[10px] pb-1 mb-1 border-b border-border/50">
+                                                    <div className="flex-1 flex justify-between pr-1.5 border-r border-border/50">
+                                                        <span className="text-muted-foreground">MCap</span>
+                                                        <span className="font-medium text-foreground">{formatNum(marketCap)}</span>
+                                                    </div>
+                                                    <div className="flex-1 flex justify-between pl-1.5">
+                                                        <span className="text-muted-foreground">Turn</span>
+                                                        <span className="font-medium text-foreground">{formatNum(turnover)}</span>
+                                                    </div>
                                                 </div>
-                                            )}
+                                                
+                                                {/* Row 2: PE | G/L */}
+                                                <div className="flex text-[10px]">
+                                                    <div className="flex-1 flex justify-between pr-1.5 border-r border-border/50">
+                                                        <span className="text-muted-foreground">P/E</span>
+                                                        <span className="font-medium text-foreground">{peRatio ? peRatio.toFixed(1) : '-'}</span>
+                                                    </div>
+                                                    <div className="flex-1 flex justify-between pl-1.5">
+                                                        <span className="text-muted-foreground">G/L</span>
+                                                        <span className="font-medium">
+                                                            <span className="text-green-600 dark:text-green-500">{gainers}</span>
+                                                            <span className="text-muted-foreground mx-0.5">/</span>
+                                                            <span className="text-red-600 dark:text-red-500">{losers}</span>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Left border accent */}
+                                            <div className={`absolute left-0 top-0 bottom-0 w-0.5 ${positive ? 'bg-green-500' : 'bg-red-500'}`} />
                                         </div>
                                     );
                                 })}

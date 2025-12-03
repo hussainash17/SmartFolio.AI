@@ -25,6 +25,7 @@ class Portfolio(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     cash_balance: Optional[Decimal] = Field(default=Decimal(0), max_digits=15, decimal_places=2)
     realized_pnl: Optional[Decimal] = Field(default=Decimal(0), max_digits=15, decimal_places=2)
+    broker_commission: Decimal = Field(default=Decimal("0.5"), max_digits=5, decimal_places=2)
 
     # Relationships
     user: "User" = Relationship(back_populates="portfolios")
@@ -87,6 +88,7 @@ class PortfolioBase(SQLModel):
     description: Optional[str] = None
     is_default: bool = False
     is_active: bool = True
+    broker_commission: Decimal = Field(default=Decimal("0.5"), max_digits=5, decimal_places=2)
 
 
 class PortfolioCreate(PortfolioBase):
@@ -99,6 +101,7 @@ class PortfolioUpdate(SQLModel):
     is_default: Optional[bool] = None
     is_active: Optional[bool] = None
     cash_balance: Optional[Decimal] = None
+    broker_commission: Optional[Decimal] = None
 
 
 class PortfolioPublic(PortfolioBase):
@@ -108,6 +111,7 @@ class PortfolioPublic(PortfolioBase):
     updated_at: datetime
     cash_balance: Optional[Decimal] = None
     realized_pnl: Optional[Decimal] = None
+    broker_commission: Decimal
 
 
 class PortfolioPositionBase(SQLModel):

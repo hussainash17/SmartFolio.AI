@@ -175,7 +175,58 @@ def get_portfolio_allocation(
         .where(PortfolioPosition.portfolio_id == portfolio_id)
     ).all()
 
-    total_value = sum(float(pos.current_value) for pos, _ in positions_query)
+    # Get latest stock prices for all positions
+    from app.model.stock import StockData
+    from sqlalchemy import desc
+
+    # Collect company IDs
+    company_ids = [stock.id for _, stock in positions_query]
+    
+    # Fetch latest stock data for these companies
+    latest_prices = {}
+    if company_ids:
+        # This is a bit inefficient (N+1), but for a portfolio with < 50 stocks it's fine
+        # A better approach would be a subquery or window function
+        for company_id in company_ids:
+            stock_data = session.exec(
+                select(StockData)
+                .where(StockData.company_id == company_id)
+                .order_by(desc(StockData.timestamp))
+                .limit(1)
+            ).first()
+            
+            if stock_data and stock_data.last_trade_price:
+                latest_prices[company_id] = float(stock_data.last_trade_price)
+
+    # Calculate total value dynamically
+    total_value = 0
+    stock_allocations = []
+    
+    for position, stock in positions_query:
+        # Use latest price if available, otherwise fallback to position's average price (or 0)
+        current_price = latest_prices.get(stock.id, float(position.average_price))
+        
+        # Calculate values
+        quantity = position.quantity
+        current_pos_value = quantity * current_price
+        total_investment = float(position.total_investment)
+        
+        unrealized_pnl = current_pos_value - total_investment
+        unrealized_pnl_percent = (unrealized_pnl / total_investment * 100) if total_investment > 0 else 0
+        
+        total_value += current_pos_value
+        
+        stock_allocations.append({
+            "stock_id": str(stock.id),
+            "symbol": stock.trading_code,
+            "name": stock.company_name,
+            "sector": stock.sector,
+            "current_value": current_pos_value,
+            "allocation_percent": 0, # Will calculate after total_value is known
+            "quantity": quantity,
+            "unrealized_pnl": unrealized_pnl,
+            "unrealized_pnl_percent": round(unrealized_pnl_percent, 2)
+        })
 
     if total_value == 0:
         return {
@@ -190,21 +241,9 @@ def get_portfolio_allocation(
             }
         }
 
-    # Stock-wise allocation
-    stock_allocations = []
-    for position, stock in positions_query:
-        allocation_percent = float(position.current_value) / total_value * 100
-        stock_allocations.append({
-            "stock_id": str(stock.id),
-            "symbol": stock.trading_code,
-            "name": stock.company_name,
-            "sector": stock.sector,
-            "current_value": float(position.current_value),
-            "allocation_percent": round(allocation_percent, 2),
-            "quantity": position.quantity,
-            "unrealized_pnl": float(position.unrealized_pnl),
-            "unrealized_pnl_percent": float(position.unrealized_pnl_percent)
-        })
+    # Update allocation percentages
+    for alloc in stock_allocations:
+        alloc["allocation_percent"] = round(alloc["current_value"] / total_value * 100, 2)
 
     # Sort by allocation percentage
     stock_allocations.sort(key=lambda x: x["allocation_percent"], reverse=True)

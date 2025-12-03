@@ -184,6 +184,20 @@ class PortfolioService(BaseService[Portfolio, PortfolioCreate, PortfolioUpdate])
             }
         }
     
+    def _calculate_commission(self, portfolio: Portfolio, total_amount: Decimal) -> Decimal:
+        """
+        Calculate commission based on portfolio's broker commission rate.
+        
+        Args:
+            portfolio: Portfolio with broker_commission field
+            total_amount: Total trade amount (quantity × price)
+            
+        Returns:
+            Commission amount
+        """
+        commission_rate = portfolio.broker_commission / Decimal('100')
+        return total_amount * commission_rate
+    
     def execute_trade(self, trade_data: TradeCreate, user_id: UUID) -> Trade:
         """
         Execute a trade and update portfolio positions.
@@ -196,22 +210,42 @@ class PortfolioService(BaseService[Portfolio, PortfolioCreate, PortfolioUpdate])
             Executed trade
         """
         try:
+            portfolio = None
             # Verify portfolio ownership if specified
             if trade_data.portfolio_id:
-                self.verify_portfolio_ownership(trade_data.portfolio_id, user_id)
+                portfolio = self.verify_portfolio_ownership(trade_data.portfolio_id, user_id)
+            
+            # Calculate commission for BUY/SELL trades only
+            commission = Decimal('0')
+            if portfolio and trade_data.trade_type.upper() in ('BUY', 'SELL'):
+                commission = self._calculate_commission(portfolio, trade_data.total_amount)
+            
+            # Update trade commission and net_amount
+            trade_dict = trade_data.dict()
+            trade_dict['commission'] = commission
+            
+            # Calculate net_amount: for both BUY and SELL, subtract commission
+            # BUY: net_amount = investment amount (excluding commission)
+            # SELL: net_amount = proceeds after commission
+            if trade_data.trade_type.upper() == 'BUY':
+                trade_dict['net_amount'] = trade_data.total_amount - commission
+            elif trade_data.trade_type.upper() == 'SELL':
+                trade_dict['net_amount'] = trade_data.total_amount - commission  # Commission reduces proceeds
+            else:
+                trade_dict['net_amount'] = trade_data.total_amount
             
             # Create trade record
-            trade = Trade(**trade_data.dict())
+            trade = Trade(**trade_dict)
             self.session.add(trade)
             
-            # Update portfolio positions if portfolio is specified
-            if trade_data.portfolio_id:
-                self._update_portfolio_position(trade)
+            # Update portfolio positions and cash balance if portfolio is specified
+            if portfolio:
+                self._update_portfolio_position(trade, portfolio)
             
             self.session.commit()
             self.session.refresh(trade)
             
-            logger.info(f"Executed trade {trade.id} for user {user_id}")
+            logger.info(f"Executed trade {trade.id} for user {user_id} with commission {commission}")
             return trade
             
         except Exception as e:
@@ -219,8 +253,8 @@ class PortfolioService(BaseService[Portfolio, PortfolioCreate, PortfolioUpdate])
             logger.error(f"Error executing trade for user {user_id}: {e}")
             raise ServiceException(f"Failed to execute trade: {str(e)}")
     
-    def _update_portfolio_position(self, trade: Trade):
-        """Update portfolio position based on trade."""
+    def _update_portfolio_position(self, trade: Trade, portfolio: Portfolio):
+        """Update portfolio position and cash balance based on trade."""
         # Get existing position
         position = self.session.exec(
             select(PortfolioPosition).where(
@@ -231,14 +265,23 @@ class PortfolioService(BaseService[Portfolio, PortfolioCreate, PortfolioUpdate])
             )
         ).first()
         
+        current_cash = portfolio.cash_balance or Decimal('0')
+        
         if trade.trade_type.upper() == "BUY":
+            # For BUY: subtract total_amount (includes commission) from cash
+            total_cost = trade.total_amount  # total_amount already includes commission
+            if current_cash < total_cost:
+                raise ServiceException(f"Insufficient cash balance. Available: {current_cash}, Required: {total_cost}")
+            
+            portfolio.cash_balance = current_cash - total_cost
+            
             if position:
                 # Update existing position
-                total_cost = position.total_investment + trade.net_amount
+                total_cost_position = position.total_investment + trade.net_amount
                 total_quantity = position.quantity + trade.quantity
-                position.average_price = total_cost / total_quantity if total_quantity > 0 else Decimal('0')
+                position.average_price = total_cost_position / total_quantity if total_quantity > 0 else Decimal('0')
                 position.quantity = total_quantity
-                position.total_investment = total_cost
+                position.total_investment = total_cost_position
             else:
                 # Create new position
                 position = PortfolioPosition(
@@ -253,6 +296,9 @@ class PortfolioService(BaseService[Portfolio, PortfolioCreate, PortfolioUpdate])
         
         elif trade.trade_type.upper() == "SELL":
             if position and position.quantity >= trade.quantity:
+                # For SELL: add net_amount (after commission) to cash
+                portfolio.cash_balance = current_cash + trade.net_amount
+                
                 # Reduce position
                 position.quantity -= trade.quantity
                 # Proportionally reduce total investment
@@ -266,6 +312,8 @@ class PortfolioService(BaseService[Portfolio, PortfolioCreate, PortfolioUpdate])
                     position.unrealized_pnl_percent = Decimal('0')
             else:
                 raise ServiceException("Insufficient quantity to sell")
+        
+        self.session.add(portfolio)
     
     def get_portfolio_trades(self, portfolio_id: UUID, user_id: UUID) -> List[Trade]:
         """Get all trades for a portfolio."""

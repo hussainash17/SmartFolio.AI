@@ -21,6 +21,7 @@ export interface Portfolio {
   unrealizedPnl?: number;
   realizedPnl?: number;
   isDefault?: boolean;
+  brokerCommission?: number;
 }
 
 export interface PortfolioSummary {

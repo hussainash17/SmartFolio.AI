@@ -103,7 +103,14 @@ export function QuickTradeDialog({
       selectedStock.currentPrice
     ) : 0;
 
-  const canAfford = orderDetails.side === 'sell' || estimatedTotal <= portfolioCash;
+  // Calculate commission based on portfolio's broker commission rate
+  const brokerCommissionRate = selectedPortfolio?.brokerCommission ?? 0.5;
+  const estimatedCommission = estimatedTotal > 0 ? (estimatedTotal * brokerCommissionRate) / 100 : 0;
+  const netAmount = orderDetails.side === 'buy' 
+    ? estimatedTotal + estimatedCommission  // For BUY: total + commission
+    : estimatedTotal - estimatedCommission; // For SELL: total - commission
+
+  const canAfford = orderDetails.side === 'sell' || netAmount <= portfolioCash;
 
   const handlePlaceOrder = () => {
     if (!selectedStock || !orderDetails.quantity || !selectedPortfolioId) return;
@@ -410,8 +417,19 @@ export function QuickTradeDialog({
                 {orderDetails.quantity && (
                   <div className="p-4 bg-muted rounded-lg space-y-2">
                     <div className="flex justify-between">
-                      <span>Estimated Total:</span>
+                      <span>Trade Amount:</span>
                       <span className="font-semibold">{formatCurrency(estimatedTotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Commission ({brokerCommissionRate.toFixed(2)}%):</span>
+                      <span className="text-muted-foreground">{formatCurrency(estimatedCommission)}</span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between">
+                      <span className="font-medium">
+                        {orderDetails.side === 'buy' ? 'Total Cost' : 'Net Proceeds'}:
+                      </span>
+                      <span className="font-semibold">{formatCurrency(Math.abs(netAmount))}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Portfolio Cash:</span>
@@ -421,10 +439,12 @@ export function QuickTradeDialog({
                     <div className="flex justify-between">
                       <span>Available After Trade:</span>
                       <span className={canAfford ? 'text-green-600' : 'text-red-600'}>
-                        {formatCurrency(portfolioCash - estimatedTotal)}
+                        {formatCurrency(orderDetails.side === 'buy' 
+                          ? portfolioCash - netAmount 
+                          : portfolioCash + Math.abs(netAmount))}
                       </span>
                     </div>
-                    {!canAfford && (
+                    {!canAfford && orderDetails.side === 'buy' && (
                       <Badge variant="destructive" className="w-full justify-center">
                         Insufficient Cash in Portfolio
                       </Badge>

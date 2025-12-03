@@ -604,23 +604,35 @@ def update_position(
 
     # If position value increased, check if there's enough cash
     if cash_difference > 0:
-        if current_cash < cash_difference:
+        # BUY scenario: calculate commission on the cash difference
+        commission_rate = portfolio.broker_commission / Decimal('100')
+        commission = abs(cash_difference) * commission_rate
+        total_cost = abs(cash_difference) + commission
+        
+        if current_cash < total_cost:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Insufficient cash balance. Available: {float(current_cash)}, Required: {float(cash_difference)}"
+                detail=f"Insufficient cash balance. Available: {float(current_cash)}, Required: {float(total_cost)} (including commission: {float(commission):.2f})"
             )
-        portfolio.cash_balance = current_cash - cash_difference
+        portfolio.cash_balance = current_cash - total_cost
         transaction_type = TransactionType.BUY
-        description = f"Position increase: {stock.trading_code if stock else 'Unknown'} - {position.quantity} shares @ {position.average_price}"
+        net_amount = abs(cash_difference)  # Net amount after commission
+        description = f"Position increase: {stock.trading_code if stock else 'Unknown'} - {position.quantity} shares @ {position.average_price} (Commission: {float(commission):.2f})"
     elif cash_difference < 0:
-        # Position value decreased, return cash
-        portfolio.cash_balance = current_cash + abs(cash_difference)
+        # SELL scenario: calculate commission on the cash difference
+        commission_rate = portfolio.broker_commission / Decimal('100')
+        commission = abs(cash_difference) * commission_rate
+        net_amount = abs(cash_difference) - commission  # Net proceeds after commission
+        
+        # Position value decreased, return cash (net of commission)
+        portfolio.cash_balance = current_cash + net_amount
         transaction_type = TransactionType.SELL
-        description = f"Position decrease: {stock.trading_code if stock else 'Unknown'} - {position.quantity} shares @ {position.average_price}"
+        description = f"Position decrease: {stock.trading_code if stock else 'Unknown'} - {position.quantity} shares @ {position.average_price} (Commission: {float(commission):.2f})"
     else:
         # No cash adjustment needed
         transaction_type = None
         description = None
+        net_amount = Decimal('0')
 
     # Create transaction record if there was a cash adjustment
     if transaction_type and cash_difference != 0:
@@ -628,7 +640,7 @@ def update_position(
             user_id=current_user.id,
             portfolio_id=portfolio.id,
             type=transaction_type,
-            amount=abs(cash_difference),
+            amount=net_amount,
             description=description
         )
         session.add(transaction)
@@ -735,32 +747,63 @@ def add_trade(
             detail="Stock not found"
         )
 
-    # Create trade
+    # Calculate commission for BUY/SELL trades only
+    commission = Decimal('0')
+    trade_type_upper = str(trade.trade_type).upper()
+    
+    if trade_type_upper in ('BUY', 'SELL'):
+        commission_rate = portfolio.broker_commission / Decimal('100')
+        commission = trade.total_amount * commission_rate
+    
+    # Calculate net_amount: for BUY subtract commission, for SELL subtract commission (reduces proceeds)
+    if trade_type_upper == 'BUY':
+        net_amount = trade.total_amount - commission
+    elif trade_type_upper == 'SELL':
+        net_amount = trade.total_amount - commission  # Commission reduces proceeds
+    else:
+        net_amount = trade.net_amount if trade.net_amount is not None else trade.total_amount
+    
+    # Create trade with calculated commission and net_amount
+    trade_dict = trade.dict()
+    trade_dict['commission'] = commission
+    trade_dict['net_amount'] = net_amount
+    
     db_trade = Trade(
         portfolio_id=portfolio_id,
-        **trade.dict()
+        **trade_dict
     )
 
     # Adjust cash and ledger
-    amount = Decimal(str(trade.net_amount)) if trade.net_amount is not None else Decimal(str(trade.total_amount))
-    amount = amount or Decimal(0)
-    if str(trade.trade_type).upper() == "BUY":
-        portfolio.cash_balance = (portfolio.cash_balance or 0) - amount
+    current_cash = portfolio.cash_balance or Decimal(0)
+    
+    if trade_type_upper == "BUY":
+        # For BUY: subtract total_amount (includes commission) from cash
+        total_cost = trade.total_amount
+        if current_cash < total_cost:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Insufficient cash balance. Available: {float(current_cash)}, Required: {float(total_cost)}"
+            )
+        portfolio.cash_balance = current_cash - total_cost
         tx_type = TransactionType.BUY
-    elif str(trade.trade_type).upper() == "SELL":
-        portfolio.cash_balance = (portfolio.cash_balance or 0) + amount
+        tx_amount = net_amount  # Record net amount in transaction
+    elif trade_type_upper == "SELL":
+        # For SELL: add net_amount (after commission) to cash
+        portfolio.cash_balance = current_cash + net_amount
         tx_type = TransactionType.SELL
+        tx_amount = net_amount  # Record net amount in transaction
     else:
         # Unknown trade type; proceed without cash impact
         tx_type = TransactionType.ADJUSTMENT
+        tx_amount = net_amount
 
     tx = AccountTransaction(
         user_id=current_user.id,
         portfolio_id=portfolio.id,
         trade_id=db_trade.id,
         type=tx_type,
-        amount=amount.copy_abs(),
-        description=f"{trade.trade_type.title()} {stock.trading_code}"
+        amount=abs(tx_amount),
+        description=f"{trade.trade_type.title()} {stock.trading_code} (Commission: {float(commission):.2f})"
     )
 
     session.add(db_trade)

@@ -425,7 +425,7 @@ export function RiskAnalysis({ onNavigate, onQuickTrade, selectedPortfolioId: in
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-blue-600">
-                  {riskOverview?.var95 ? formatCurrency(riskOverview.var95) : '$0'}
+                  {riskOverview?.var95 ? formatCurrency(riskOverview.var95) : formatCurrency(0)}
                 </div>
                 <div className="flex items-center gap-2 mt-2">
                   <Badge variant="outline" className="text-blue-600 border-blue-200">

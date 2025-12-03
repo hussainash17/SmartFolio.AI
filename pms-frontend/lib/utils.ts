@@ -17,37 +17,32 @@ export {
 } from './formatting-utils';
 
 /**
- * Format a number as currency
+ * Format a number with commas and decimals (no currency symbol)
  * @param amount - The amount to format
- * @param currency - Currency code (default: 'USD')
+ * @param currency - Currency code (kept for backward compatibility, ignored)
  * @param locale - Locale for formatting (default: 'en-US')
- * @returns Formatted currency string or '-' if invalid
+ * @returns Formatted number string or '-' if invalid
  * 
  * @example
- * formatCurrency(1234.56) // "$1,234.56"
- * formatCurrency(1000, 'BDT') // "৳1,000.00"
+ * formatCurrency(1234.56) // "1,234.56"
+ * formatCurrency(1000) // "1,000.00"
  * formatCurrency(null) // "-"
  */
 export function formatCurrency(
     amount?: number | null,
-    currency: string = 'USD',
+    currency: string = 'USD',  // Kept for backward compatibility but ignored
     locale: string = 'en-US'
 ): string {
     if (amount === null || amount === undefined || !Number.isFinite(amount)) {
         return '-';
     }
 
-    const formatted = new Intl.NumberFormat(locale, {
-        style: 'currency',
-        currency: currency,
+    // Format as decimal number with commas, no currency symbol
+    return new Intl.NumberFormat(locale, {
+        style: 'decimal',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
     }).format(amount);
-
-    // Handle BDT currency symbol replacement
-    if (currency === 'BDT') {
-        return formatted.replace('BDT', '৳');
-    }
-
-    return formatted;
 }
 
 /**
@@ -78,12 +73,12 @@ export function formatPercent(
 
 
 /**
- * Format market cap with Crore (Cr) suffix
+ * Format market cap with Crore (Cr) suffix (no currency symbol)
  * @param marketCap - Market cap value in crores
  * @returns Formatted market cap string or 'N/A' if invalid
  * 
  * @example
- * formatMarketCap(1234.56) // "৳1234.56 Cr"
+ * formatMarketCap(1234.56) // "1,234.56 Cr"
  * formatMarketCap(0) // "N/A"
  * formatMarketCap(null) // "N/A"
  */
@@ -96,8 +91,12 @@ export function formatMarketCap(marketCap?: number | null): string {
     ) {
         return 'N/A';
     }
-    // Market cap is already in crores, format with Cr suffix
-    return `৳${marketCap.toFixed(2)} Cr`;
+    // Format with commas and Cr suffix, no currency symbol
+    const formatted = new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(marketCap);
+    return `${formatted} Cr`;
 }
 
 /**

@@ -225,6 +225,7 @@ export function OrdersManager({ orders, trades, onCancelOrder }: OrdersManagerPr
                       <TableHead className="text-right">Filled</TableHead>
                       <TableHead className="text-right">Avg Price</TableHead>
                       <TableHead className="text-right">Total Value</TableHead>
+                      <TableHead className="text-right">Fees</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Fill Time</TableHead>
                     </TableRow>
@@ -259,6 +260,7 @@ export function OrdersManager({ orders, trades, onCancelOrder }: OrdersManagerPr
                             formatCurrency(order.totalValue)
                           }
                         </TableCell>
+                        <TableCell className="text-right">{formatCurrency(order.fees)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             {getStatusIcon(order.status)}

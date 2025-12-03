@@ -13,7 +13,8 @@ import {
   Settings,
   Download,
   ArrowUpCircle,
-  ArrowDownCircle
+  ArrowDownCircle,
+  Percent
 } from "lucide-react";
 import { AuthUser } from "../hooks/useAuth";
 import { AccountBalance, Transaction } from "../types/trading";
@@ -22,6 +23,7 @@ import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Portfolio } from "../types/portfolio";
 import { formatCurrency } from "../lib/utils";
+import { usePortfolios } from "../hooks/usePortfolios";
 
 interface AccountManagerProps {
   user: AuthUser | null;
@@ -40,6 +42,8 @@ export function AccountManager({ user, accountBalance, transactions, portfolios,
   const [creditLimit, setCreditLimit] = useState<string>("");
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(portfolios[0]?.id ?? null);
   const [detailPortfolioId, setDetailPortfolioId] = useState<string | null>(null);
+  const [commissionRates, setCommissionRates] = useState<Record<string, string>>({});
+  const { updatePortfolio } = usePortfolios();
 
   useEffect(() => {
     if (!portfolios.length) {
@@ -166,6 +170,34 @@ export function AccountManager({ user, accountBalance, transactions, portfolios,
     await onUpdateCreditLimit?.(amt);
     toast.success('Credit limit updated');
   };
+
+  const handleUpdateCommission = async (portfolioId: string) => {
+    const rate = Number(commissionRates[portfolioId] || 0);
+    if (rate < 0 || rate > 100) {
+      toast.error('Commission rate must be between 0 and 100%');
+      return;
+    }
+    try {
+      await updatePortfolio(portfolioId, { brokerCommission: rate });
+      toast.success('Commission rate updated');
+      // Clear the input after successful update
+      setCommissionRates(prev => ({ ...prev, [portfolioId]: '' }));
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to update commission rate');
+    }
+  };
+
+  // Initialize commission rates from portfolios
+  useEffect(() => {
+    const rates: Record<string, string> = {};
+    portfolios.forEach(p => {
+      if (p.brokerCommission != null) {
+        rates[p.id] = String(p.brokerCommission);
+      }
+    });
+    setCommissionRates(prev => ({ ...prev, ...rates }));
+  }, [portfolios]);
 
   return (
     <div className="space-y-6">
@@ -323,6 +355,13 @@ export function AccountManager({ user, accountBalance, transactions, portfolios,
                         <p className={`text-xs ${gainLossPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatPercentage(gainLossPercent)}</p>
                       </CardContent>
                     </Card>
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm">Broker Commission</CardTitle></CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">{(p?.brokerCommission ?? 0.5).toFixed(2)}%</div>
+                        <p className="text-xs text-muted-foreground">Applied to all trades</p>
+                      </CardContent>
+                    </Card>
                   </div>
 
                   <Card>
@@ -343,6 +382,45 @@ export function AccountManager({ user, accountBalance, transactions, portfolios,
                         <div className="text-sm text-muted-foreground self-center">
                           Boost buying power: Cash + Credit - Reserved
                         </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader><CardTitle>Broker Commission</CardTitle></CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="text-sm text-muted-foreground">
+                          Current commission rate: <span className="font-medium">{(p?.brokerCommission ?? 0.5).toFixed(2)}%</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            className="flex-1 border rounded px-2 py-1 text-sm"
+                            placeholder="0.5"
+                            value={commissionRates[p?.id || ''] ?? String(p?.brokerCommission ?? 0.5)}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value === '' || (!isNaN(Number(value)) && Number(value) >= 0 && Number(value) <= 100)) {
+                                setCommissionRates(prev => ({ ...prev, [p?.id || '']: value }));
+                              }
+                            }}
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={0.01}
+                          />
+                          <span className="text-sm text-muted-foreground">%</span>
+                          <Button
+                            variant="outline"
+                            onClick={() => p && handleUpdateCommission(p.id)}
+                            disabled={!p || commissionRates[p.id] === String(p.brokerCommission ?? 0.5)}
+                          >
+                            Update Commission
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Commission is applied as a percentage of the total trade amount for all BUY and SELL transactions.
+                        </p>
                       </div>
                     </CardContent>
                   </Card>
@@ -638,6 +716,68 @@ export function AccountManager({ user, accountBalance, transactions, portfolios,
                   </Button>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Percent className="h-4 w-4" />
+                Broker Commission Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Set the broker commission rate for each portfolio. Commission is applied as a percentage of the total trade amount for all BUY and SELL transactions.
+              </p>
+              {hasPortfolios ? (
+                <div className="space-y-4">
+                  {portfolios.map((portfolio) => {
+                    const currentCommission = portfolio.brokerCommission ?? 0.5;
+                    const commissionInput = commissionRates[portfolio.id] ?? String(currentCommission);
+                    return (
+                      <div key={portfolio.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex-1">
+                          <p className="font-medium">{portfolio.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Current rate: {currentCommission.toFixed(2)}%
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            className="w-24 border rounded px-2 py-1 text-sm"
+                            placeholder="0.5"
+                            value={commissionInput}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value === '' || (!isNaN(Number(value)) && Number(value) >= 0 && Number(value) <= 100)) {
+                                setCommissionRates(prev => ({ ...prev, [portfolio.id]: value }));
+                              }
+                            }}
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={0.01}
+                          />
+                          <span className="text-sm text-muted-foreground">%</span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleUpdateCommission(portfolio.id)}
+                            disabled={commissionInput === String(currentCommission) || !commissionInput}
+                          >
+                            Update
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Create a portfolio to configure commission rates.
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

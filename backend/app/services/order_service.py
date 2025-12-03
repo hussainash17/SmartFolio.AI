@@ -142,9 +142,18 @@ class OrderService:
             execution_price = _safe_decimal(latest_data.last_trade_price)
         
         # Calculate execution details
-        commission = Decimal("0")  # No commission for simulated trading
         total_amount = execution_price * _safe_decimal(order.quantity)
-        net_amount = total_amount + commission
+        
+        # Calculate commission based on portfolio's broker commission rate
+        commission = Decimal("0")
+        if order.side in (OrderSide.BUY, OrderSide.SELL):
+            commission_rate = portfolio.broker_commission / Decimal('100')
+            commission = total_amount * commission_rate
+        
+        # Calculate net amount: for both BUY and SELL, subtract commission
+        # BUY: net_amount = investment amount (excluding commission)
+        # SELL: net_amount = proceeds after commission
+        net_amount = total_amount - commission
         
         # Update order with filled status
         db_order.status = OrderStatus.FILLED
@@ -159,11 +168,20 @@ class OrderService:
         if order.side == OrderSide.BUY:
             if portfolio.cash_balance is None:
                 portfolio.cash_balance = Decimal(0)
-            portfolio.cash_balance = portfolio.cash_balance - net_amount
+            # For BUY: check if enough cash for total_amount (which includes commission in the calculation)
+            # Total cost = total_amount (price * quantity) + commission
+            total_cost = total_amount + commission
+            if portfolio.cash_balance < total_cost:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Insufficient cash balance. Available: {float(portfolio.cash_balance)}, Required: {float(total_cost)} (including commission: {float(commission):.2f})"
+                )
+            portfolio.cash_balance = portfolio.cash_balance - total_cost
             tx_type = TransactionType.BUY
         else:  # SELL
             if portfolio.cash_balance is None:
                 portfolio.cash_balance = Decimal(0)
+            # For SELL: add net_amount (after commission) to cash
             portfolio.cash_balance = portfolio.cash_balance + net_amount
             tx_type = TransactionType.SELL
         
@@ -190,7 +208,7 @@ class OrderService:
             trade_id=db_trade.id,
             type=tx_type,
             amount=net_amount.copy_abs(),
-            description=f"{order.side.value} {stock.trading_code}"
+            description=f"{order.side.value} {stock.trading_code} (Commission: {float(commission):.2f})"
         )
         self.repo.create_account_transaction(session, tx)
         
@@ -201,8 +219,8 @@ class OrderService:
         
         if order.side == OrderSide.BUY:
             if position:
-                # Update existing position
-                total_cost = position.total_investment + net_amount
+                # Update existing position - use total_amount (without commission) for cost basis
+                total_cost = position.total_investment + total_amount
                 total_quantity = position.quantity + order.quantity
                 position.average_price = total_cost / total_quantity if total_quantity > 0 else Decimal('0')
                 position.quantity = total_quantity
@@ -210,13 +228,13 @@ class OrderService:
                 position.current_value = total_quantity * execution_price
                 self.repo.update_portfolio_position(session, position)
             else:
-                # Create new position
+                # Create new position - use total_amount (without commission) for cost basis
                 position = PortfolioPosition(
                     portfolio_id=order.portfolio_id,
                     stock_id=order.stock_id,
                     quantity=order.quantity,
                     average_price=execution_price,
-                    total_investment=net_amount,
+                    total_investment=total_amount,
                     current_value=order.quantity * execution_price
                 )
                 self.repo.create_portfolio_position(session, position)

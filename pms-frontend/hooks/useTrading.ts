@@ -251,6 +251,7 @@ export function useTrading() {
         timestamp: t.trade_date,
       })) as Trade[];
     },
+    staleTime: 0, // Always refetch to ensure fresh data
   });
 
   const accountBalance: AccountBalance = useMemo(() => {
@@ -298,6 +299,8 @@ export function useTrading() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.ordersList });
+      // Invalidate all recent trades queries (regardless of limit)
+      queryClient.invalidateQueries({ queryKey: ['trades', 'recent'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
       queryClient.invalidateQueries({ queryKey: queryKeys.fundsSummary });
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions });

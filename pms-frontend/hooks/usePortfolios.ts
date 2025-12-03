@@ -77,6 +77,7 @@ export function usePortfolios() {
                     const cash = Number((p as any)?.cash_balance || 0);
                     const realizedPnl = Number((p as any)?.realized_pnl || 0);
                     const unrealizedPnl = Number((summary as any)?.unrealized_pnl || 0);
+                    const brokerCommission = Number((p as any)?.broker_commission || 0.5);
 
                     return {
                         id: String(p.id),
@@ -90,6 +91,7 @@ export function usePortfolios() {
                         realizedPnl,
                         unrealizedPnl,
                         isDefault: p.is_default || false,
+                        brokerCommission,
                     } as Portfolio;
                 })
             );
@@ -156,6 +158,7 @@ export function usePortfolios() {
                     is_default: undefined,
                     is_active: undefined,
                     ...(updates.cash != null ? ({ cash_balance: updates.cash } as any) : {}),
+                    ...(updates.brokerCommission != null ? ({ broker_commission: updates.brokerCommission } as any) : {}),
                 } as any,
             });
             return { id, updates };

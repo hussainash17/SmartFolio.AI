@@ -942,36 +942,154 @@ def get_sector_analysis(
         current_user: CurrentUser,
         session: SessionDep
 ):
-    """Get market sector performance analysis"""
+    """Get market sector performance analysis for last trading day"""
+    
+    # 1. Get latest market data timestamp
+    latest_stock_ts = session.exec(select(func.max(StockData.timestamp))).first()
+    
+    if not latest_stock_ts:
+        # Fallback if no data
+        return {
+            "total_sectors": 0,
+            "sectors": [],
+            "market_summary": {
+                "best_performing_sector": None,
+                "worst_performing_sector": None,
+                "avg_sector_performance": 0
+            }
+        }
 
-    # Get all sectors
-    sectors_query = session.exec(
-        select(Company.sector, func.count(Company.id).label("stock_count"))
-        .where(Company.sector.is_not(None))
-        .group_by(Company.sector)
+    # 2. Fetch current prices (Real-time from StockData)
+    # Fetch data from last 24 hours to ensure we get latest for all active stocks
+    start_ts = latest_stock_ts - timedelta(hours=24)
+    stock_rows = session.exec(
+        select(StockData)
+        .where(StockData.timestamp >= start_ts)
+        .order_by(StockData.timestamp.desc())
     ).all()
+    
+    # Store stock data per company
+    stock_data_map: Dict[UUID, StockData] = {}
+    for row in stock_rows:
+        if row.company_id not in stock_data_map and row.company_id is not None:
+            stock_data_map[row.company_id] = row
 
+    # 3. Fetch Companies and their latest EPS for PE calculation
+    companies = session.exec(select(Company).where(Company.sector.is_not(None))).all()
+    company_ids = [c.id for c in companies]
+    
+    # Fetch latest EPS for each company from financial_performance
+    latest_eps_map: Dict[UUID, float] = {}
+    if company_ids:
+        eps_rows = session.exec(
+            select(FinancialPerformance)
+            .where(FinancialPerformance.company_id.in_(company_ids))
+            .order_by(FinancialPerformance.company_id, FinancialPerformance.year.desc())
+        ).all()
+        for row in eps_rows:
+            if row.company_id not in latest_eps_map and row.eps_basic and float(row.eps_basic) > 0:
+                latest_eps_map[row.company_id] = float(row.eps_basic)
+    
+    sector_data: Dict[str, Dict[str, Any]] = {}
+
+    for company in companies:
+        sector = company.sector
+        if not sector:
+            continue
+
+        stock_row = stock_data_map.get(company.id)
+        if not stock_row:
+            continue
+
+        if sector not in sector_data:
+            sector_data[sector] = {
+                "total_mcap": 0.0,
+                "total_turnover": 0.0,
+                "weighted_return_1d": 0.0,
+                "weighted_pe": 0.0,
+                "pe_mcap_sum": 0.0,  # Sum of mcap for companies with valid PE
+                "stock_count": 0,
+                "gainers": 0,
+                "losers": 0,
+                "unchanged": 0
+            }
+
+        # Calculate market cap from last trading price and total outstanding securities
+        mcap = 0.0
+        current_price = float(stock_row.last_trade_price)
+        if company.total_outstanding_securities:
+            mcap = current_price * company.total_outstanding_securities / 1_000_000  # In millions
+
+        if mcap == 0:
+            continue  # Skip companies without valid market cap
+
+        change_pct = float(stock_row.change_percent)
+        turnover = float(stock_row.turnover) if stock_row.turnover else 0.0
+
+        sector_data[sector]["total_mcap"] += mcap
+        sector_data[sector]["total_turnover"] += turnover
+        sector_data[sector]["stock_count"] += 1
+        sector_data[sector]["weighted_return_1d"] += change_pct * mcap
+
+        # Calculate weighted PE (from company.pe_ratio or calculated from price/EPS)
+        pe_ratio = None
+        if company.pe_ratio and float(company.pe_ratio) > 0:
+            pe_ratio = float(company.pe_ratio)
+        else:
+            # Calculate PE from current price and latest EPS
+            eps = latest_eps_map.get(company.id)
+            if eps and eps > 0:
+                pe_ratio = current_price / eps
+        
+        # Only include reasonable PE values (0 < PE < 500)
+        if pe_ratio is not None and 0 < pe_ratio < 500:
+            sector_data[sector]["weighted_pe"] += pe_ratio * mcap
+            sector_data[sector]["pe_mcap_sum"] += mcap
+
+        # Count gainers/losers
+        if change_pct > 0:
+            sector_data[sector]["gainers"] += 1
+        elif change_pct < 0:
+            sector_data[sector]["losers"] += 1
+        else:
+            sector_data[sector]["unchanged"] += 1
+
+    # 4. Format Response
     sector_analysis = []
-    for sector, stock_count in sectors_query:
-        # Mock sector performance (in real implementation, calculate from actual data)
-        performance_1d = -2.0 + (hash(sector) % 80) / 10  # -2% to +6%
-        performance_1w = -5.0 + (hash(sector + "1w") % 150) / 10  # -5% to +10%
-        performance_1m = -10.0 + (hash(sector + "1m") % 300) / 10  # -10% to +20%
+    for sector, data in sector_data.items():
+        total_mcap = data["total_mcap"]
+        if total_mcap == 0:
+            continue
+        
+        perf_1d = (data["weighted_return_1d"] / total_mcap) if total_mcap > 0 else 0
+        
+        # Calculate market-cap weighted PE ratio
+        sector_pe = None
+        if data["pe_mcap_sum"] > 0:
+            sector_pe = round(data["weighted_pe"] / data["pe_mcap_sum"], 2)
+
+        # Determine momentum based on 1D performance
+        momentum = "neutral"
+        if perf_1d > 2:
+            momentum = "bullish"
+        elif perf_1d < -2:
+            momentum = "bearish"
 
         sector_analysis.append({
             "sector": sector,
-            "stock_count": stock_count,
-            "performance": {
-                "1_day": round(performance_1d, 2),
-                "1_week": round(performance_1w, 2),
-                "1_month": round(performance_1m, 2)
-            },
-            "market_cap_weight": round(5.0 + (hash(sector + "mcap") % 150) / 10, 2),  # Mock weight
-            "momentum": "bullish" if performance_1w > 2 else "bearish" if performance_1w < -2 else "neutral"
+            "stock_count": data["stock_count"],
+            "performance": round(perf_1d, 2),
+            "market_cap": round(total_mcap, 2),
+            "turnover": round(data["total_turnover"], 2),
+            "pe_ratio": sector_pe,
+            "gainers": data["gainers"],
+            "losers": data["losers"],
+            "unchanged": data["unchanged"],
+            "momentum": momentum
         })
 
-    # Sort by 1-week performance
-    sector_analysis.sort(key=lambda x: x["performance"]["1_week"], reverse=True)
+    # Sort by 1-day performance
+    sector_analysis.sort(key=lambda x: x["performance"], reverse=True)
 
     return {
         "total_sectors": len(sector_analysis),
@@ -980,7 +1098,7 @@ def get_sector_analysis(
             "best_performing_sector": sector_analysis[0]["sector"] if sector_analysis else None,
             "worst_performing_sector": sector_analysis[-1]["sector"] if sector_analysis else None,
             "avg_sector_performance": round(
-                sum(s["performance"]["1_week"] for s in sector_analysis) / len(sector_analysis),
+                sum(s["performance"] for s in sector_analysis) / len(sector_analysis),
                 2) if sector_analysis else 0
         }
     }
