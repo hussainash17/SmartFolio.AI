@@ -1002,6 +1002,358 @@ def get_donchian_channel(
     }
 
 
+@router.get("/profit-targets/{symbol}")
+def get_profit_targets(
+    symbol: str,
+    current_user: CurrentUser,
+    session: SessionDep,
+    entry_price: float = Query(..., description="Entry price of the position"),
+    current_price: float = Query(..., description="Current market price")
+):
+    """
+    Calculate profit targets using multiple technical analysis methods.
+    
+    Requires authentication. Returns tiered exit strategy with:
+    - Primary target based on technical resistance
+    - Tiered targets (3 levels) with probability estimates
+    - Alternative methods (risk_reward_2x, atr_3x, fibonacci_1.618)
+    - Market context analysis
+    """
+    
+    # Find company by trading code
+    company = session.exec(
+        select(Company).where(
+            Company.trading_code == symbol.upper(),
+            Company.is_active == True
+        )
+    ).first()
+    
+    if not company:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Stock with symbol '{symbol}' not found"
+        )
+    
+    # Fetch OHLC data for calculations (need at least 20 days for ATR)
+    try:
+        ohlc_data = _fetch_ohlc_data(session, company.id, 20)
+    except HTTPException:
+        # If not enough historical data, try with available data
+        daily_data = session.exec(
+            select(DailyOHLC)
+            .where(DailyOHLC.company_id == company.id)
+            .order_by(desc(DailyOHLC.date))
+            .limit(20)
+        ).all()
+        
+        current_stock_data = session.exec(
+            select(StockData)
+            .where(StockData.company_id == company.id)
+            .order_by(desc(StockData.timestamp))
+            .limit(1)
+        ).first()
+        
+        ohlc_data = []
+        if daily_data:
+            for d in daily_data:
+                ohlc_data.append({
+                    'date': d.date,
+                    'high': float(d.high),
+                    'low': float(d.low),
+                    'close': float(d.close_price),
+                    'source': 'historical'
+                })
+        
+        if current_stock_data:
+            ohlc_data.append({
+                'date': current_stock_data.timestamp,
+                'high': float(current_stock_data.high),
+                'low': float(current_stock_data.low),
+                'close': float(current_stock_data.last_trade_price),
+                'source': 'current'
+            })
+        
+        if not ohlc_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Insufficient price data for {symbol}. Need at least some historical data."
+            )
+        
+        ohlc_data = sorted(ohlc_data, key=lambda x: x['date'])
+    
+    # Calculate ATR (Average True Range) - 14 period
+    atr = _calculate_atr(ohlc_data, period=14)
+    
+    # Calculate Donchian Channel resistance levels directly
+    # Use the same logic as get_donchian_channel but inline
+    try:
+        # Calculate for periods 5, 10, 20
+        period_5_data = ohlc_data[-5:]
+        period_10_data = ohlc_data[-10:]
+        period_20_data = ohlc_data[-20:]
+        
+        resistance_5 = max(d['high'] for d in period_5_data) if period_5_data else current_price
+        resistance_10 = max(d['high'] for d in period_10_data) if period_10_data else current_price
+        resistance_20 = max(d['high'] for d in period_20_data) if period_20_data else current_price
+    except:
+        # Fallback if calculation fails
+        recent_highs = [d['high'] for d in ohlc_data[-20:]] if len(ohlc_data) >= 20 else [d['high'] for d in ohlc_data]
+        resistance_20 = max(recent_highs) if recent_highs else current_price
+        resistance_10 = max(recent_highs[-10:]) if len(recent_highs) >= 10 else resistance_20
+        resistance_5 = max(recent_highs[-5:]) if len(recent_highs) >= 5 else resistance_20
+    
+    # Calculate price change from entry
+    price_change = current_price - entry_price
+    price_change_percent = (price_change / entry_price * 100) if entry_price > 0 else 0
+    
+    # Calculate volatility (standard deviation of returns)
+    returns = []
+    for i in range(1, len(ohlc_data)):
+        prev_close = ohlc_data[i-1]['close']
+        curr_close = ohlc_data[i]['close']
+        if prev_close > 0:
+            returns.append((curr_close - prev_close) / prev_close)
+    
+    volatility = 0
+    if len(returns) > 1:
+        mean_return = sum(returns) / len(returns)
+        variance = sum((r - mean_return) ** 2 for r in returns) / (len(returns) - 1)
+        volatility = math.sqrt(variance) * 100  # Percentage volatility
+    
+    # Determine trend
+    if len(ohlc_data) >= 20:
+        recent_close = ohlc_data[-1]['close']
+        older_close = ohlc_data[-20]['close']
+        trend_change = ((recent_close - older_close) / older_close * 100) if older_close > 0 else 0
+        
+        if trend_change > 5:
+            trend = "uptrend"
+        elif trend_change < -5:
+            trend = "downtrend"
+        else:
+            trend = "neutral"
+    else:
+        trend = "neutral"
+    
+    # Determine volatility level
+    if volatility > 3:
+        volatility_level = "high"
+    elif volatility > 1.5:
+        volatility_level = "medium"
+    else:
+        volatility_level = "low"
+    
+    # Get sector performance (simplified - in real implementation, compare with sector index)
+    sector_performance = "neutral"  # Default
+    
+    # Calculate alternative profit targets
+    
+    # 1. Risk/Reward 2x: Entry + 2x ATR (assuming stop loss at entry - 1x ATR)
+    risk_reward_2x_price = entry_price + (2 * atr)
+    risk_reward_2x_gain = ((risk_reward_2x_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
+    
+    # 2. ATR 3x: Entry + 3x ATR
+    atr_3x_price = entry_price + (3 * atr)
+    atr_3x_gain = ((atr_3x_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
+    
+    # 3. Fibonacci 1.618 extension: Entry + (Entry - Support) * 1.618
+    # Use recent low as support
+    recent_low = min(d['low'] for d in ohlc_data[-20:])
+    fib_range = entry_price - recent_low
+    fibonacci_1618_price = entry_price + (fib_range * 1.618)
+    fibonacci_1618_gain = ((fibonacci_1618_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
+    
+    # Primary target: Use the most conservative resistance level that's above current price
+    if resistance_5 > current_price:
+        primary_price = resistance_5
+        primary_rationale = f"Strong resistance at {resistance_5:.2f} tested multiple times in past 5 days"
+    elif resistance_10 > current_price:
+        primary_price = resistance_10
+        primary_rationale = f"Key resistance level at {resistance_10:.2f} from 10-day high"
+    elif resistance_20 > current_price:
+        primary_price = resistance_20
+        primary_rationale = f"Major resistance at {resistance_20:.2f} from 20-day high"
+    else:
+        # If no resistance above, use ATR-based target
+        primary_price = current_price + (2.5 * atr)
+        primary_rationale = f"ATR-based target at {primary_price:.2f} (2.5x ATR from current price)"
+    
+    primary_gain = ((primary_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
+    
+    # Calculate confidence based on multiple factors
+    confidence_factors = []
+    
+    # Factor 1: How close is resistance to current price (closer = higher confidence)
+    if resistance_5 > current_price:
+        resistance_distance = (resistance_5 - current_price) / current_price * 100
+        if resistance_distance < 5:
+            confidence_factors.append(0.9)
+        elif resistance_distance < 10:
+            confidence_factors.append(0.75)
+        else:
+            confidence_factors.append(0.6)
+    
+    # Factor 2: Trend alignment
+    if trend == "uptrend" and current_price < primary_price:
+        confidence_factors.append(0.85)
+    elif trend == "neutral":
+        confidence_factors.append(0.7)
+    else:
+        confidence_factors.append(0.55)
+    
+    # Factor 3: Volatility (moderate volatility is good for targets)
+    if 1.5 <= volatility <= 3:
+        confidence_factors.append(0.8)
+    elif volatility < 1.5:
+        confidence_factors.append(0.65)
+    else:
+        confidence_factors.append(0.6)
+    
+    primary_confidence = sum(confidence_factors) / len(confidence_factors) if confidence_factors else 0.7
+    
+    # Tiered targets (3 levels)
+    tiered_targets = []
+    
+    # Tier 1: Conservative (closest resistance or 1.5x ATR)
+    tier1_price = min(resistance_5, current_price + (1.5 * atr)) if resistance_5 > current_price else current_price + (1.5 * atr)
+    tier1_gain = ((tier1_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
+    tier1_probability = 85 if tier1_price <= resistance_5 else 75
+    
+    tiered_targets.append({
+        "level": 1,
+        "price": round(tier1_price, 2),
+        "percentage_gain": round(tier1_gain, 2),
+        "suggested_action": "Take 33% profit",
+        "probability": f"{tier1_probability}%"
+    })
+    
+    # Tier 2: Moderate (10-day resistance or 2.5x ATR)
+    tier2_price = min(resistance_10, current_price + (2.5 * atr)) if resistance_10 > current_price else current_price + (2.5 * atr)
+    tier2_gain = ((tier2_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
+    tier2_probability = 65 if tier2_price <= resistance_10 else 55
+    
+    tiered_targets.append({
+        "level": 2,
+        "price": round(tier2_price, 2),
+        "percentage_gain": round(tier2_gain, 2),
+        "suggested_action": "Take 33% profit",
+        "probability": f"{tier2_probability}%"
+    })
+    
+    # Tier 3: Aggressive (primary target or 20-day resistance)
+    tier3_price = primary_price
+    tier3_gain = primary_gain
+    tier3_probability = 45
+    
+    tiered_targets.append({
+        "level": 3,
+        "price": round(tier3_price, 2),
+        "percentage_gain": round(tier3_gain, 2),
+        "suggested_action": "Exit remaining position",
+        "probability": f"{tier3_probability}%"
+    })
+    
+    # Alternative methods
+    alternative_methods = [
+        {
+            "method": "risk_reward_2x",
+            "price": round(risk_reward_2x_price, 2),
+            "percentage_gain": round(risk_reward_2x_gain, 2),
+            "confidence": 0.85
+        },
+        {
+            "method": "atr_3x",
+            "price": round(atr_3x_price, 2),
+            "percentage_gain": round(atr_3x_gain, 2),
+            "confidence": 0.80
+        },
+        {
+            "method": "fibonacci_1.618",
+            "price": round(fibonacci_1618_price, 2),
+            "percentage_gain": round(fibonacci_1618_gain, 2),
+            "confidence": 0.75
+        }
+    ]
+    
+    # Sort alternative methods by confidence
+    alternative_methods.sort(key=lambda x: x["confidence"], reverse=True)
+    
+    # Determine recommended strategy
+    if volatility_level == "high":
+        recommended_strategy = "scale_out"
+    elif trend == "uptrend" and primary_confidence > 0.75:
+        recommended_strategy = "hold_to_target"
+    else:
+        recommended_strategy = "scale_out"
+    
+    # Market context
+    market_context = {
+        "trend": trend,
+        "volatility": volatility_level,
+        "sector_performance": sector_performance,
+        "recommended_strategy": recommended_strategy
+    }
+    
+    now = datetime.utcnow()
+    next_update = now + timedelta(hours=1)
+    
+    return {
+        "primary": {
+            "price": round(primary_price, 2),
+            "percentage_gain": round(primary_gain, 2),
+            "method": "technical_resistance",
+            "confidence": round(primary_confidence, 2),
+            "rationale": primary_rationale
+        },
+        "tiered_targets": tiered_targets,
+        "alternative_methods": alternative_methods,
+        "market_context": market_context,
+        "calculated_at": now.isoformat(),
+        "next_update": next_update.isoformat()
+    }
+
+
+def _calculate_atr(ohlc_data: list, period: int = 14) -> float:
+    """
+    Calculate Average True Range (ATR) from OHLC data.
+    
+    True Range = max of:
+    - High - Low
+    - abs(High - Previous Close)
+    - abs(Low - Previous Close)
+    
+    ATR = Simple Moving Average of True Range over period
+    """
+    if len(ohlc_data) < period + 1:
+        # Not enough data, use simple high-low range
+        if ohlc_data:
+            return (ohlc_data[-1]['high'] - ohlc_data[-1]['low']) / 2
+        return 0.0
+    
+    true_ranges = []
+    
+    for i in range(1, len(ohlc_data)):
+        high = ohlc_data[i]['high']
+        low = ohlc_data[i]['low']
+        prev_close = ohlc_data[i-1]['close']
+        
+        tr1 = high - low
+        tr2 = abs(high - prev_close)
+        tr3 = abs(low - prev_close)
+        
+        true_range = max(tr1, tr2, tr3)
+        true_ranges.append(true_range)
+    
+    # Calculate ATR as SMA of True Range
+    if len(true_ranges) >= period:
+        recent_trs = true_ranges[-period:]
+        atr = sum(recent_trs) / len(recent_trs)
+    else:
+        atr = sum(true_ranges) / len(true_ranges) if true_ranges else 0.0
+    
+    return atr
+
+
 def _fetch_ohlc_data(session, company_id: UUID, max_period: int) -> list:
     """
     Helper function to fetch OHLC data combining historical and current day data.

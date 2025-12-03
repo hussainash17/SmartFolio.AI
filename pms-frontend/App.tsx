@@ -41,6 +41,8 @@ const Fundamentals = lazy(() => import("./components/Fundamentals").then(m => ({
 const TradingViewChart = lazy(() => import("./components/TradingViewChart").then(m => ({ default: m.TradingViewChart })));
 const ResearchWorkspace = lazy(() => import("./components/ResearchWorkspace").then(m => ({ default: m.ResearchWorkspace })));
 const AnalyticsToolLayout = lazy(() => import("./components/analytics").then(m => ({ default: m.AnalyticsToolLayout })));
+const SettingsView = lazy(() => import("./components/SettingsView").then(m => ({ default: m.SettingsView })));
+const HelpSupportView = lazy(() => import("./components/HelpSupportView").then(m => ({ default: m.HelpSupportView })));
 
 type View =
     | "dashboard"
@@ -727,44 +729,16 @@ export default function App() {
 
             case "settings":
                 return (
-                    <div className="space-y-6">
-                        <div className="mb-8">
-                            <h1 className="text-3xl font-semibold text-foreground mb-2">Platform Settings</h1>
-                            <p className="text-muted-foreground text-lg">Customize your platform experience,
-                                notifications, and preferences</p>
-                        </div>
-                        <div className="text-center py-12">
-                            <div
-                                className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <Settings className="h-8 w-8 text-primary" />
-                            </div>
-                            <p className="text-muted-foreground max-w-md mx-auto">
-                                Personalized platform settings with notification preferences and theme customization
-                                coming soon.
-                            </p>
-                        </div>
-                    </div>
+                    <Suspense fallback={<div>Loading Settings...</div>}>
+                        <SettingsView />
+                    </Suspense>
                 );
 
             case "help":
                 return (
-                    <div className="space-y-6">
-                        <div className="mb-8">
-                            <h1 className="text-3xl font-semibold text-foreground mb-2">Help & Support</h1>
-                            <p className="text-muted-foreground text-lg">Documentation, tutorials, and customer support
-                                resources</p>
-                        </div>
-                        <div className="text-center py-12">
-                            <div
-                                className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <HelpCircle className="h-8 w-8 text-primary" />
-                            </div>
-                            <p className="text-muted-foreground max-w-md mx-auto">
-                                Interactive help center with live chat support and comprehensive documentation coming
-                                soon.
-                            </p>
-                        </div>
-                    </div>
+                    <Suspense fallback={<div>Loading Help & Support...</div>}>
+                        <HelpSupportView />
+                    </Suspense>
                 );
 
             default:
@@ -801,9 +775,12 @@ export default function App() {
                     onQuickTrade={handleQuickTrade}
                     onOpenChart={handleOpenChart}
                     onOpenFundamentals={handleOpenFundamentals}
+                    onViewChange={handleViewChange}
+                    user={user}
+                    onLogout={handleLogout}
                 />
 
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden">
                     <div className={currentView === "research" ? "" : "p-8"}>
                         {/* Page Content - Each component manages its own header */}
                         {renderContent()}

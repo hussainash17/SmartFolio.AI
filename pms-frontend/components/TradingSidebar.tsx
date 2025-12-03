@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Badge } from "./ui/badge";
 import { Separator } from "./ui/separator";
 import { 
@@ -11,15 +10,12 @@ import {
   Search,
   ShieldCheck,
   FileText,
-  Settings,
-  User,
   Target,
   BarChart3,
   Activity,
   AlertTriangle,
   Calculator,
   Bell,
-  HelpCircle,
   LogOut,
   Briefcase,
   DollarSign,
@@ -101,23 +97,8 @@ export function TradingSidebar({ currentView, onViewChange, user, onLogout }: Tr
     }
   ];
 
-  const bottomNavItems = [
-    { id: 'account', label: 'Account', icon: <User className="h-5 w-5" /> },
-    { id: 'settings', label: 'Settings', icon: <Settings className="h-5 w-5" /> },
-    { id: 'help', label: 'Help & Support', icon: <HelpCircle className="h-5 w-5" /> },
-  ];
+  const bottomNavItems: NavItem[] = [];
 
-  const getUserInitials = (name: string | undefined) => {
-    if (!name || typeof name !== 'string') {
-      return 'U';
-    }
-    return name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2);
-  };
-
-  const getUserName = () => user?.name || 'User';
-  const getUserEmail = () => user?.email || 'user@example.com';
-  const getUserAccountType = () => 'Individual'; // Default for AuthUser
-  const getVerifiedStatus = () => user?.isVerified ? 'Verified' : 'Pending';
 
   const handleSignOut = () => {
     if (confirm('Are you sure you want to sign out?')) {
@@ -170,7 +151,7 @@ export function TradingSidebar({ currentView, onViewChange, user, onLogout }: Tr
   };
 
   return (
-    <div className={`${isCollapsed ? 'w-20' : 'w-72'} h-full bg-card border-r border-border flex flex-col transition-all duration-300`}>
+    <div className={`${isCollapsed ? 'w-20' : 'w-64'} h-full bg-card border-r border-border flex flex-col transition-all duration-300`}>
       {/* Header */}
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between">
@@ -195,45 +176,6 @@ export function TradingSidebar({ currentView, onViewChange, user, onLogout }: Tr
           </Button>
         </div>
       </div>
-
-      {/* User Profile */}
-      {!isCollapsed && (
-        <div className="p-4 border-b border-border">
-          <Card className="p-4 bg-accent/50 border-0">
-            <div className="flex items-center gap-3">
-              <Avatar className="h-12 w-12 ring-2 ring-primary/10">
-                <AvatarImage src="" alt={getUserName()} />
-                <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                  {getUserInitials(user?.name)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground truncate">
-                  {getUserName()}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {getUserEmail()}
-                </p>
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge variant="outline" className="text-xs px-2 py-0.5 capitalize">
-                    {getUserAccountType()}
-                  </Badge>
-                  <Badge 
-                    variant="outline" 
-                    className={`text-xs px-2 py-0.5 ${
-                      user?.isVerified 
-                        ? 'bg-green-50 text-green-700 border-green-200' 
-                        : 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                    }`}
-                  >
-                    {user?.isVerified ? '✓ Verified' : '⏳ Pending'}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto py-4">
@@ -264,18 +206,8 @@ export function TradingSidebar({ currentView, onViewChange, user, onLogout }: Tr
         </nav>
       </div>
 
-      {/* Bottom Navigation */}
-      <div className="border-t border-border p-3 space-y-2">
-        {bottomNavItems.map((item) => (
-          <NavItemComponent
-            key={item.id}
-            item={item}
-            isActive={currentView === item.id}
-          />
-        ))}
-        
-        <Separator className="my-3" />
-        
+      {/* Bottom Navigation - Sign Out */}
+      <div className="border-t border-border p-3">
         <div className="relative group">
           <Button
             variant="ghost"

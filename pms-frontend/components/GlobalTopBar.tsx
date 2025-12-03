@@ -2,6 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "./ui/dropdown-menu";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -11,9 +19,14 @@ import {
   Plus,
   Search,
   Bell,
-  Settings
+  Settings,
+  HelpCircle,
+  User,
+  LogOut,
+  ChevronDown
 } from "lucide-react";
 import { AccountBalance } from "../types/trading";
+import { AuthUser } from "../hooks/useAuth";
 import { SymbolSearchDropdown } from "./SymbolSearchDropdown";
 import { formatCurrency } from "../lib/utils";
 
@@ -22,12 +35,23 @@ interface GlobalTopBarProps {
   onQuickTrade: (symbol?: string) => void;
   onOpenChart: (symbol: string) => void;
   onOpenFundamentals: (symbol: string) => void;
+  onViewChange?: (view: string) => void;
+  user: AuthUser | null;
+  onLogout?: () => void;
   className?: string;
 }
 
-export function GlobalTopBar({ accountBalance, onQuickTrade, onOpenChart, onOpenFundamentals, className }: GlobalTopBarProps) {
+export function GlobalTopBar({ accountBalance, onQuickTrade, onOpenChart, onOpenFundamentals, onViewChange, user, onLogout, className }: GlobalTopBarProps) {
+  const getUserInitials = (name: string | undefined) => {
+    if (!name || typeof name !== 'string') {
+      return 'U';
+    }
+    return name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const getUserName = () => user?.name || 'User';
+  const getUserEmail = () => user?.email || 'user@example.com';
   const [searchTerm, setSearchTerm] = useState('');
-  const [autoRefresh, setAutoRefresh] = useState<number | 'off'>('off');
   const [now, setNow] = useState<Date>(new Date());
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -37,13 +61,6 @@ export function GlobalTopBar({ accountBalance, onQuickTrade, onOpenChart, onOpen
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
-
-  // Persist auto-refresh selection
-  useEffect(() => {
-    try {
-      localStorage.setItem('auto_refresh_minutes', String(autoRefresh));
-    } catch {}
-  }, [autoRefresh]);
 
   // DSE trading hours: 10:00-14:30 local time (assume Asia/Dhaka)
   const isTradingHours = (() => {
@@ -155,7 +172,7 @@ export function GlobalTopBar({ accountBalance, onQuickTrade, onOpenChart, onOpen
 
         {/* Center: Search */}
         <div className="flex-1 max-w-md mx-8" ref={searchContainerRef}>
-          <div className="relative">
+          <div className="relative w-full overflow-visible">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
             <input
               type="text"
@@ -195,25 +212,8 @@ export function GlobalTopBar({ accountBalance, onQuickTrade, onOpenChart, onOpen
           </div>
         </div>
 
-        {/* Right: Actions */}
+        {/* Right: Actions & User Menu */}
         <div className="flex items-center gap-3">
-          {/* Auto-refresh toggle */}
-          <div className="hidden md:flex items-center gap-2 mr-2">
-            <span className="text-xs text-muted-foreground">Auto-refresh</span>
-            <select
-              value={String(autoRefresh)}
-              onChange={(e) => {
-                const v = e.target.value;
-                setAutoRefresh(v === 'off' ? 'off' : Number(v));
-              }}
-              className="h-8 text-xs bg-input-background border border-border rounded px-2"
-            >
-              <option value="off">Off</option>
-              <option value="1">1m</option>
-              <option value="2">2m</option>
-              <option value="5">5m</option>
-            </select>
-          </div>
           <Button
             variant="default"
             size="sm"
@@ -227,10 +227,71 @@ export function GlobalTopBar({ accountBalance, onQuickTrade, onOpenChart, onOpen
           <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
             <Bell className="h-4 w-4" />
           </Button>
-          
-          <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
-            <Settings className="h-4 w-4" />
-          </Button>
+
+          {/* User Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="h-9 px-2 gap-2 hover:bg-accent/50 transition-colors"
+              >
+                <Avatar className="h-7 w-7 ring-2 ring-primary/20">
+                  <AvatarImage src="" alt={getUserName()} />
+                  <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-xs">
+                    {getUserInitials(user?.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="hidden md:inline-block text-sm font-medium text-foreground max-w-[100px] truncate">
+                  {getUserName()}
+                </span>
+                <ChevronDown className="h-4 w-4 text-muted-foreground hidden md:inline-block" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <div className="px-2 py-3 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10 ring-2 ring-primary/20">
+                    <AvatarImage src="" alt={getUserName()} />
+                    <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                      {getUserInitials(user?.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-foreground truncate">
+                      {getUserName()}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {getUserEmail()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <DropdownMenuItem onClick={() => onViewChange?.('account')}>
+                <User className="h-4 w-4 mr-2" />
+                Account
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onViewChange?.('settings')}>
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onViewChange?.('help')}>
+                <HelpCircle className="h-4 w-4 mr-2" />
+                Help & Support
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => {
+                  if (confirm('Are you sure you want to sign out?')) {
+                    onLogout?.();
+                  }
+                }}
+                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </div>

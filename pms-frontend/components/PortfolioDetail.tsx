@@ -1,7 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { usePortfolioHistory } from "../hooks/usePortfolioHistory";
 import { useDonchianChannelsBatch } from "../hooks/useDonchianChannel";
-import { ArrowLeft, Plus, Minus, Upload, Search, TrendingUp, TrendingDown, AlertTriangle, PieChart as PieChartIcon, Activity } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { OpenAPI } from "../src/client";
+import { ArrowLeft, Plus, Minus, Upload, Search, TrendingUp, TrendingDown, AlertTriangle, PieChart as PieChartIcon, Activity, Target } from "lucide-react";
 import { Portfolio, Stock } from "../types/portfolio";
 import { MarketData } from "../types/trading";
 import { formatCurrency, formatPercent, formatNumber, getChangeColor } from "../lib/utils";
@@ -13,6 +15,8 @@ import { Badge } from "./ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { UploadPortfolioDialog } from "./UploadPortfolioDialog";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { ProfitTargetDialog } from "./ProfitTargetDialog";
+import { ProfitTargetsData } from "../types/profit-target";
 
 interface PortfolioDetailProps {
   portfolio: Portfolio;
@@ -39,6 +43,7 @@ export function PortfolioDetail({
   const [query, setQuery] = useState("");
   const [showOnlyNegative, setShowOnlyNegative] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState("20");
+  const [selectedStockForTargets, setSelectedStockForTargets] = useState<{ symbol: string, currentPrice: number, entryPrice: number, data: ProfitTargetsData } | null>(null);
 
   // Create a map of market data for O(1) lookup
   const marketDataMap = useMemo(() => {
@@ -138,6 +143,64 @@ export function PortfolioDetail({
   }, [historyData]);
 
   const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06B6D4', '#EC4899', '#6366F1'];
+
+  // Fetch profit targets from API
+  const fetchProfitTargets = async (symbol: string, entryPrice: number, currentPrice: number): Promise<ProfitTargetsData> => {
+    const baseUrl = (OpenAPI.BASE || '').replace(/\/$/, '');
+    const params = new URLSearchParams({
+      entry_price: entryPrice.toString(),
+      current_price: currentPrice.toString()
+    });
+
+    const response = await fetch(
+      `${baseUrl}/api/v1/analytics/profit-targets/${symbol}?${params.toString()}`,
+      {
+        headers: OpenAPI.TOKEN ? { Authorization: `Bearer ${OpenAPI.TOKEN as string}` } : undefined,
+        credentials: OpenAPI.WITH_CREDENTIALS ? 'include' : 'omit',
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch profit targets: ${response.statusText}`);
+    }
+
+    return await response.json();
+  };
+
+  const handleOpenTargets = (stock: any) => {
+    // Set the stock info first, then fetch data
+    setSelectedStockForTargets({
+      symbol: stock.symbol,
+      currentPrice: stock.currentPrice,
+      entryPrice: stock.purchasePrice,
+      data: undefined as any // Will be set by the query
+    });
+  };
+
+  // Fetch profit targets when a stock is selected
+  const { data: profitTargetsData, isLoading: isLoadingTargets } = useQuery({
+    queryKey: ['profit-targets', selectedStockForTargets?.symbol, selectedStockForTargets?.entryPrice, selectedStockForTargets?.currentPrice],
+    queryFn: () => {
+      if (!selectedStockForTargets) throw new Error('No stock selected');
+      return fetchProfitTargets(
+        selectedStockForTargets.symbol,
+        selectedStockForTargets.entryPrice,
+        selectedStockForTargets.currentPrice
+      );
+    },
+    enabled: !!selectedStockForTargets && !selectedStockForTargets.data,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Update selected stock data when profit targets are fetched
+  useEffect(() => {
+    if (profitTargetsData && selectedStockForTargets && !selectedStockForTargets.data) {
+      setSelectedStockForTargets({
+        ...selectedStockForTargets,
+        data: profitTargetsData
+      });
+    }
+  }, [profitTargetsData, selectedStockForTargets]);
 
   return (
     <div className="space-y-6">
@@ -313,10 +376,10 @@ export function PortfolioDetail({
                         const donchianData = donchianDataMap.get(stock.symbol);
                         const primaryPeriod = parseInt(selectedPeriod.split(',')[0]);
                         const channel = donchianData?.channels?.find(c => c.period === primaryPeriod);
-                        
+
                         let supportValue: string | null = null;
                         let resistanceValue: string | null = null;
-                        
+
                         if (donchianLoading) {
                           supportValue = null;
                           resistanceValue = null;
@@ -377,6 +440,15 @@ export function PortfolioDetail({
                                   title="View Chart"
                                 >
                                   <Activity className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                  onClick={() => handleOpenTargets(stock)}
+                                  title="Profit Targets"
+                                >
+                                  <Target className="h-4 w-4" />
                                 </Button>
                                 <div className="w-px h-4 bg-border mx-1" />
                                 <Button
@@ -628,6 +700,16 @@ export function PortfolioDetail({
       <div className="text-center text-xs text-muted-foreground pb-6">
         Data is updated in real-time. Last updated: {new Date().toLocaleTimeString()}
       </div>
+
+      <ProfitTargetDialog
+        open={!!selectedStockForTargets}
+        onOpenChange={(open) => !open && setSelectedStockForTargets(null)}
+        symbol={selectedStockForTargets?.symbol || ""}
+        currentPrice={selectedStockForTargets?.currentPrice || 0}
+        entryPrice={selectedStockForTargets?.entryPrice || 0}
+        data={selectedStockForTargets?.data}
+        isLoading={isLoadingTargets}
+      />
     </div>
   );
 }

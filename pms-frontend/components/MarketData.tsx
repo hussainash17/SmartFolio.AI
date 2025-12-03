@@ -136,7 +136,7 @@ export function MarketData({
 
     // Map paginated stocks to MarketData format
     const paginatedStocks: MarketDataType[] = (paginatedStocksResponse || []).map((it: any) => {
-        const lastPrice = Number(it.last || 0);
+        const lastPrice = Number(it.ltp || it.last || 0);
         const totalSecurities = Number(it.total_outstanding_securities || 0);
         // Calculate market cap: last_trade_price × total_outstanding_securities (in crores)
         // 1 crore = 10,000,000
@@ -165,7 +165,7 @@ export function MarketData({
 
     // Map search results to MarketData format
     const searchStocks: MarketDataType[] = (searchStocksResponse || []).map((it: any) => {
-        const lastPrice = Number(it.last || 0);
+        const lastPrice = Number(it.ltp || it.last || 0);
         const totalSecurities = Number(it.total_outstanding_securities || 0);
         // Calculate market cap: last_trade_price × total_outstanding_securities (in crores)
         // 1 crore = 10,000,000

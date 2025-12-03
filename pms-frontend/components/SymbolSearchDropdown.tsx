@@ -104,7 +104,8 @@ export function SymbolSearchDropdown({
   return (
     <Card
       ref={dropdownRef}
-      className="absolute top-full left-0 right-0 mt-1 z-50 max-h-[400px] overflow-y-auto shadow-lg"
+      className="absolute top-full left-0 w-full mt-1 z-[100] max-h-[400px] overflow-y-auto overflow-x-hidden shadow-lg border border-border bg-popover"
+      style={{ minWidth: '100%', maxWidth: '100%' }}
     >
       {loading && (
         <div className="flex items-center justify-center py-8">
@@ -123,48 +124,50 @@ export function SymbolSearchDropdown({
           {results.map((result, index) => (
             <div
               key={result.symbol}
-              className={`flex items-center justify-between px-4 py-3 hover:bg-accent cursor-pointer ${
+              className={`px-4 py-3 hover:bg-accent cursor-pointer ${
                 index === selectedIndex ? "bg-accent" : ""
               }`}
               onMouseEnter={() => setSelectedIndex(index)}
             >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">{result.symbol}</span>
-                  {result.sector && (
-                    <Badge variant="outline" className="text-xs">
-                      {result.sector}
-                    </Badge>
-                  )}
-                </div>
-                <div className="text-sm text-muted-foreground truncate">
-                  {result.company_name}
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="font-semibold text-base">{result.symbol}</span>
+                    {result.sector && (
+                      <Badge variant="outline" className="text-xs">
+                        {result.sector}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="text-sm text-muted-foreground line-clamp-1">
+                    {result.company_name}
+                  </div>
                 </div>
               </div>
-
-              <div className="flex items-center gap-2 ml-4">
+              
+              <div className="flex items-center gap-2 pt-1">
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-xs h-8"
+                  className="text-xs h-7 px-3 flex-1"
                   onClick={(e) => {
                     e.stopPropagation();
                     onPickChart(result.symbol);
                   }}
                 >
-                  <LineChart className="h-3 w-3 mr-1" />
-                  Launch Chart
+                  <LineChart className="h-3 w-3 mr-1.5" />
+                  Chart
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-xs h-8"
+                  className="text-xs h-7 px-3 flex-1"
                   onClick={(e) => {
                     e.stopPropagation();
                     onPickFundamentals(result.symbol);
                   }}
                 >
-                  <BarChart3 className="h-3 w-3 mr-1" />
+                  <BarChart3 className="h-3 w-3 mr-1.5" />
                   Overview
                 </Button>
               </div>

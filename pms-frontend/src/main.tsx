@@ -6,6 +6,29 @@ import {OpenAPI} from './client'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {ReactQueryDevtools} from '@tanstack/react-query-devtools'
 
+// Initialize theme on app load
+function initializeTheme() {
+  const root = window.document.documentElement;
+  const stored = localStorage.getItem("theme") as "light" | "dark" | "system" | null;
+  
+  let theme: "light" | "dark" = "light";
+  
+  if (stored === "system" || !stored) {
+    // Use system preference
+    theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  } else if (stored === "dark") {
+    theme = "dark";
+  } else {
+    theme = "light";
+  }
+  
+  root.classList.remove("light", "dark");
+  root.classList.add(theme);
+}
+
+// Initialize theme before React renders
+initializeTheme();
+
 // Configure API client to existing backend
 // Dynamically detect backend URL based on how the frontend is accessed
 function getBackendUrl(): string {
