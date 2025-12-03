@@ -95,4 +95,7 @@ export const queryKeys = {
     ['rebalancing', 'suggestions', portfolioId, params.thresholdPct, params.minTradeValue, params.strategy] as const,
   rebalancingHistory: (portfolioId: string, limit: number, offset: number) =>
     ['rebalancing', 'history', portfolioId, limit, offset] as const,
+
+  // Technical Indicators
+  donchianChannel: (symbol: string, periods: string) => ['analytics', 'donchian-channel', symbol, periods] as const,
 };

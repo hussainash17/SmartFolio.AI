@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { usePortfolioHistory } from "../hooks/usePortfolioHistory";
+import { useDonchianChannelsBatch } from "../hooks/useDonchianChannel";
 import { ArrowLeft, Plus, Minus, Upload, Search, TrendingUp, TrendingDown, AlertTriangle, PieChart as PieChartIcon, Activity } from "lucide-react";
 import { Portfolio, Stock } from "../types/portfolio";
 import { MarketData } from "../types/trading";
@@ -9,6 +10,7 @@ import { Input } from "./ui/input";
 import { Checkbox } from "./ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { UploadPortfolioDialog } from "./UploadPortfolioDialog";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
@@ -36,11 +38,22 @@ export function PortfolioDetail({
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [showOnlyNegative, setShowOnlyNegative] = useState(false);
+  const [selectedPeriod, setSelectedPeriod] = useState("20");
 
   // Create a map of market data for O(1) lookup
   const marketDataMap = useMemo(() => {
     return new Map(marketData.map(data => [data.symbol, data]));
   }, [marketData]);
+
+  // Fetch Donchian Channel data for all portfolio stocks
+  const portfolioSymbols = useMemo(() => {
+    return portfolio.stocks.map(stock => stock.symbol);
+  }, [portfolio.stocks]);
+
+  const { dataMap: donchianDataMap, isLoading: donchianLoading } = useDonchianChannelsBatch(
+    portfolioSymbols,
+    selectedPeriod
+  );
 
   // Enrich stocks with live market data and calculate metrics
   const enrichedPortfolio = useMemo(() => {
@@ -242,7 +255,7 @@ export function PortfolioDetail({
                     {enrichedPortfolio.stocks.length} different stocks
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -252,6 +265,16 @@ export function PortfolioDetail({
                       className="pl-9 w-[200px]"
                     />
                   </div>
+                  <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Period" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5-day</SelectItem>
+                      <SelectItem value="10">10-day</SelectItem>
+                      <SelectItem value="20">20-day</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="show-negative"
@@ -274,11 +297,11 @@ export function PortfolioDetail({
                   <thead>
                     <tr className="text-left text-xs text-muted-foreground border-b">
                       <th className="pb-3 pl-2 font-medium">Symbol</th>
-                      <th className="pb-3 font-medium">Sector</th>
                       <th className="pb-3 text-right pr-4 font-medium">Qty</th>
                       <th className="pb-3 text-right pr-4 font-medium">Avg Cost</th>
                       <th className="pb-3 text-right pr-4 font-medium">Purchase Price</th>
                       <th className="pb-3 text-right pr-4 font-medium">Current Price</th>
+                      <th className="pb-3 text-right pr-2 font-medium">S/R</th>
                       <th className="pb-3 text-right pr-4 font-medium">Market Value</th>
                       <th className="pb-3 text-right pr-4 font-medium">Unrealized</th>
                       <th className="pb-3 text-center font-medium">Actions</th>
@@ -286,64 +309,99 @@ export function PortfolioDetail({
                   </thead>
                   <tbody>
                     {filteredStocks.length > 0 ? (
-                      filteredStocks.map((stock) => (
-                        <tr key={stock.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
-                          <td className="py-3 pl-2 align-top">
-                            <div className="font-semibold text-foreground">{stock.symbol}</div>
-                          </td>
-                          <td className="py-3 align-top text-muted-foreground">
-                            <Badge variant="secondary" className="font-normal text-xs">
-                              {stock.sector}
-                            </Badge>
-                          </td>
-                          <td className="py-3 align-top text-right pr-4">{stock.quantity}</td>
-                          <td className="py-3 align-top text-right pr-4 text-muted-foreground">{formatCurrency(stock.purchasePrice)}</td>
-                          <td className="py-3 align-top text-right pr-4 text-muted-foreground">{formatCurrency(stock.costBasis)}</td>
-                          <td className="py-3 align-top text-right pr-4 font-medium">{formatCurrency(stock.currentPrice)}</td>
-                          <td className="py-3 align-top text-right pr-4 font-medium">{formatCurrency(stock.marketValue)}</td>
-                          <td className="py-3 align-top text-right pr-4">
-                            <div className={`font-medium ${getChangeColor(stock.unrealizedPnL)}`}>
-                              {stock.unrealizedPnL >= 0 ? "+" : ""}
-                              {formatCurrency(Math.abs(stock.unrealizedPnL))}
-                            </div>
-                            <div className={`text-xs ${getChangeColor(stock.unrealizedPnLPercent)}`}>
-                              {formatPercent(stock.unrealizedPnLPercent)}
-                            </div>
-                          </td>
-                          <td className="py-3 align-top text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                onClick={() => onChartStock(stock.symbol)}
-                                title="View Chart"
-                              >
-                                <Activity className="h-4 w-4" />
-                              </Button>
-                              <div className="w-px h-4 bg-border mx-1" />
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
-                                onClick={() => onQuickTrade(stock.symbol, 'buy')}
-                                title="Buy / Add"
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                onClick={() => onQuickTrade(stock.symbol, 'sell')}
-                                title="Sell / Reduce"
-                              >
-                                <Minus className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                      filteredStocks.map((stock) => {
+                        const donchianData = donchianDataMap.get(stock.symbol);
+                        const primaryPeriod = parseInt(selectedPeriod.split(',')[0]);
+                        const channel = donchianData?.channels?.find(c => c.period === primaryPeriod);
+                        
+                        let supportValue: string | null = null;
+                        let resistanceValue: string | null = null;
+                        
+                        if (donchianLoading) {
+                          supportValue = null;
+                          resistanceValue = null;
+                        } else if (channel) {
+                          supportValue = channel.support.toFixed(2);
+                          resistanceValue = channel.resistance.toFixed(2);
+                        } else if (donchianData && donchianData.channels.length > 0) {
+                          // Fallback to first available channel if primary period not found
+                          const firstChannel = donchianData.channels[0];
+                          supportValue = firstChannel.support.toFixed(2);
+                          resistanceValue = firstChannel.resistance.toFixed(2);
+                        }
+
+                        return (
+                          <tr key={stock.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+                            <td className="py-3 pl-2 align-top">
+                              <div className="font-semibold text-foreground">{stock.symbol}</div>
+                              {stock.sector && stock.sector !== 'Unknown' && (
+                                <Badge variant="secondary" className="font-normal text-xs mt-1">
+                                  {stock.sector}
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="py-3 align-top text-right pr-4">{stock.quantity}</td>
+                            <td className="py-3 align-top text-right pr-4 text-muted-foreground">{formatCurrency(stock.purchasePrice)}</td>
+                            <td className="py-3 align-top text-right pr-4 text-muted-foreground">{formatCurrency(stock.costBasis)}</td>
+                            <td className="py-3 align-top text-right pr-4 font-medium">{formatCurrency(stock.currentPrice)}</td>
+                            <td className="py-2 align-top text-right pr-2 text-xs">
+                              {donchianLoading ? (
+                                <div className="text-muted-foreground">...</div>
+                              ) : supportValue && resistanceValue ? (
+                                <div className="flex flex-col gap-0.5">
+                                  <div className="text-green-600 font-medium">{supportValue}</div>
+                                  <div className="border-t border-border/50 my-0.5"></div>
+                                  <div className="text-red-600 font-medium">{resistanceValue}</div>
+                                </div>
+                              ) : (
+                                <div className="text-muted-foreground">N/A</div>
+                              )}
+                            </td>
+                            <td className="py-3 align-top text-right pr-4 font-medium">{formatCurrency(stock.marketValue)}</td>
+                            <td className="py-3 align-top text-right pr-4">
+                              <div className={`font-medium ${getChangeColor(stock.unrealizedPnL)}`}>
+                                {stock.unrealizedPnL >= 0 ? "+" : ""}
+                                {formatCurrency(Math.abs(stock.unrealizedPnL))}
+                              </div>
+                              <div className={`text-xs ${getChangeColor(stock.unrealizedPnLPercent)}`}>
+                                {formatPercent(stock.unrealizedPnLPercent)}
+                              </div>
+                            </td>
+                            <td className="py-3 align-top text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                  onClick={() => onChartStock(stock.symbol)}
+                                  title="View Chart"
+                                >
+                                  <Activity className="h-4 w-4" />
+                                </Button>
+                                <div className="w-px h-4 bg-border mx-1" />
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
+                                  onClick={() => onQuickTrade(stock.symbol, 'buy')}
+                                  title="Buy / Add"
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                  onClick={() => onQuickTrade(stock.symbol, 'sell')}
+                                  title="Sell / Reduce"
+                                >
+                                  <Minus className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                     ) : (
                       <tr>
                         <td colSpan={9} className="py-8 text-center text-muted-foreground">

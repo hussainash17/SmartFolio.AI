@@ -2,11 +2,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { BarChart3, DollarSign, Plus, ShoppingCart, TrendingDown, TrendingUp, Upload } from "lucide-react";
 import { Portfolio, PortfolioSummary } from "../types/portfolio";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { OpenAPI } from "../src/client";
 import { formatCurrency, formatPercent } from "../lib/utils";
+import { useDonchianChannelsBatch } from "../hooks/useDonchianChannel";
 
 interface PortfolioDashboardProps {
     onCreatePortfolio: () => void;
@@ -39,6 +41,7 @@ export function PortfolioDashboard({
 
     const [aggregates, setAggregates] = useState<Aggregates | null>(null);
     const [aggLoading, setAggLoading] = useState<boolean>(false);
+    const [selectedPeriod, setSelectedPeriod] = useState("20");
 
     useEffect(() => {
         const fetchAggregates = async () => {
@@ -70,6 +73,16 @@ export function PortfolioDashboard({
     const gainLossPctSelected = portfolioForSummary && portfolioForSummary.totalCost > 0
         ? (gainLossSelected / portfolioForSummary.totalCost) * 100
         : 0;
+
+    // Fetch Donchian Channel data for portfolio stocks
+    const portfolioSymbols = useMemo(() => {
+        return portfolioForSummary?.stocks.map(stock => stock.symbol) || [];
+    }, [portfolioForSummary]);
+
+    const { dataMap: donchianDataMap, isLoading: donchianLoading } = useDonchianChannelsBatch(
+        portfolioSymbols,
+        selectedPeriod
+    );
 
     return (
         <div className="space-y-6">
@@ -223,16 +236,28 @@ export function PortfolioDashboard({
             {portfolioForSummary && portfolioForSummary.stocks.length > 0 && (
                 <Card>
                     <CardHeader>
-                        <div className="flex justify-between items-center">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                             <div>
                                 <CardTitle>Selected Portfolio Holdings</CardTitle>
                                 <p className="text-sm text-muted-foreground mt-1">
                                     Showing stocks from: {portfolioForSummary.name}
                                 </p>
                             </div>
-                            <Button variant="outline" onClick={() => onSelectPortfolio(portfolioForSummary)}>
-                                View Full Details
-                            </Button>
+                            <div className="flex items-center gap-3">
+                                <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                                    <SelectTrigger className="w-[140px]">
+                                        <SelectValue placeholder="Period" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="5">5-day</SelectItem>
+                                        <SelectItem value="10">10-day</SelectItem>
+                                        <SelectItem value="20">20-day</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <Button variant="outline" onClick={() => onSelectPortfolio(portfolioForSummary)}>
+                                    View Full Details
+                                </Button>
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -244,6 +269,7 @@ export function PortfolioDashboard({
                                     <TableHead className="text-right">Quantity</TableHead>
                                     <TableHead className="text-right">Avg Cost</TableHead>
                                     <TableHead className="text-right">Current Price</TableHead>
+                                    <TableHead className="text-right">S/R</TableHead>
                                     <TableHead className="text-right">Market Value</TableHead>
                                     <TableHead className="text-right">Gain/Loss</TableHead>
                                     <TableHead className="text-right">%</TableHead>
@@ -257,16 +283,35 @@ export function PortfolioDashboard({
                                     const gainLoss = marketValue - costBasis;
                                     const gainLossPercent = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
 
+                                    const donchianData = donchianDataMap.get(stock.symbol);
+                                    const primaryPeriod = parseInt(selectedPeriod.split(',')[0]);
+                                    const channel = donchianData?.channels?.find(c => c.period === primaryPeriod);
+                                    
+                                    let supportValue: string | null = null;
+                                    let resistanceValue: string | null = null;
+                                    
+                                    if (donchianLoading) {
+                                        supportValue = null;
+                                        resistanceValue = null;
+                                    } else if (channel) {
+                                        supportValue = channel.support.toFixed(2);
+                                        resistanceValue = channel.resistance.toFixed(2);
+                                    } else if (donchianData && donchianData.channels.length > 0) {
+                                        // Fallback to first available channel if primary period not found
+                                        const firstChannel = donchianData.channels[0];
+                                        supportValue = firstChannel.support.toFixed(2);
+                                        resistanceValue = firstChannel.resistance.toFixed(2);
+                                    }
+
                                     return (
                                         <TableRow key={stock.id}>
                                             <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-medium">{stock.symbol}</span>
-                                                    {stock.sector && stock.sector !== 'Unknown' && (
-                                                        <Badge variant="outline"
-                                                            className="text-xs">{stock.sector}</Badge>
-                                                    )}
-                                                </div>
+                                                <div className="font-medium">{stock.symbol}</div>
+                                                {stock.sector && stock.sector !== 'Unknown' && (
+                                                    <Badge variant="outline" className="text-xs mt-1">
+                                                        {stock.sector}
+                                                    </Badge>
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-sm">{stock.companyName}</TableCell>
                                             <TableCell className="text-right">{stock.quantity}</TableCell>
@@ -274,6 +319,19 @@ export function PortfolioDashboard({
                                                 className="text-right">{formatCurrency(stock.purchasePrice)}</TableCell>
                                             <TableCell
                                                 className="text-right">{formatCurrency(stock.currentPrice)}</TableCell>
+                                            <TableCell className="text-right text-xs py-2">
+                                                {donchianLoading ? (
+                                                    <div className="text-muted-foreground">...</div>
+                                                ) : supportValue && resistanceValue ? (
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <div className="text-green-600 font-medium">{supportValue}</div>
+                                                        <div className="border-t border-border/50 my-0.5"></div>
+                                                        <div className="text-red-600 font-medium">{resistanceValue}</div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-muted-foreground">N/A</div>
+                                                )}
+                                            </TableCell>
                                             <TableCell className="text-right">{formatCurrency(marketValue)}</TableCell>
                                             <TableCell
                                                 className={`text-right ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
