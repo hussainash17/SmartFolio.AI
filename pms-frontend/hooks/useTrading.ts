@@ -56,14 +56,14 @@ export function useTrading() {
       const mapped: MarketData[] = allRows.map((it: any) => ({
         symbol: String(it.symbol || '').toUpperCase(),
         companyName: it.company_name || it.name || String(it.symbol || '').toUpperCase(),
-        currentPrice: Number(it.last || 0),
+        currentPrice: Number(it.ltp || it.last || 0),
         change: Number(it.change || 0),
         changePercent: Number(it.change_percent || 0),
         volume: Number(it.volume || 0),
         high52Week: 0,
         low52Week: 0,
         marketCap: (() => {
-            const lastPrice = Number(it.last || 0);
+            const lastPrice = Number(it.ltp || it.last || 0);
             const totalSecurities = Number(it.total_outstanding_securities || 0);
             // Calculate market cap: last_trade_price × total_outstanding_securities (in crores)
             // 1 crore = 10,000,000

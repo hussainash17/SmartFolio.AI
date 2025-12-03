@@ -32,7 +32,7 @@ export const queryKeys = {
     ['risk', 'rebalancing', 'recommendations', portfolioId, targets ? JSON.stringify(targets) : 'default'] as const,
   userRiskProfile: ['risk', 'profile'] as const,
 
-  marketList: (limit = 50, offset = 0, q?: string) => ['market', 'list', { limit, offset, q: q || '' }] as const,
+  marketList: (limit = 50, offset = 0, q?: string, sector?: string) => ['market', 'list', { limit, offset, q: q || '', sector: sector || '' }] as const,
   newsList: (limit = 20, offset = 0, category?: string, symbol?: string, days?: number) =>
     ['news', 'list', { limit, offset, category: category || '', symbol: symbol || '', days: days ?? 7 }] as const,
   ordersList: ['orders', 'list'] as const,

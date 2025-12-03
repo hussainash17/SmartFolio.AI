@@ -3,18 +3,17 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
-from sqlmodel import select, func, desc
-
 from app.api.deps import SessionDep
 from app.model.company import Company
+from app.model.performance import BenchmarkData
 from app.model.stock import (
     DailyOHLC,
     IntradayTick,
     MarketSummary,
     StockData,
 )
-from app.model.performance import BenchmarkData
+from fastapi import APIRouter, HTTPException, Query, status
+from sqlmodel import select, func, desc
 
 router = APIRouter(prefix="/market", tags=["market"])
 
@@ -35,7 +34,7 @@ def get_benchmark_data(benchmark_id: str, session: SessionDep) -> Dict[str, Any]
         trades, volume, total_value (turnover), and date
     """
     from datetime import date as date_type
-    
+
     # Try to get today's data first
     today = date_type.today()
     benchmark = session.exec(
@@ -43,7 +42,7 @@ def get_benchmark_data(benchmark_id: str, session: SessionDep) -> Dict[str, Any]
         .where(BenchmarkData.benchmark_id == benchmark_id)
         .where(BenchmarkData.date == today)
     ).first()
-    
+
     # If no data for today, get the most recent data
     if not benchmark:
         benchmark = session.exec(
@@ -52,13 +51,13 @@ def get_benchmark_data(benchmark_id: str, session: SessionDep) -> Dict[str, Any]
             .order_by(BenchmarkData.date.desc())
             .limit(1)
         ).first()
-    
+
     if not benchmark:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No data found for benchmark '{benchmark_id}'"
         )
-    
+
     # Query raw row to get all columns including those not in the model
     from sqlalchemy import text
     raw_query = text("""
@@ -68,19 +67,20 @@ def get_benchmark_data(benchmark_id: str, session: SessionDep) -> Dict[str, Any]
         WHERE id = :id
     """)
     result = session.execute(raw_query, {"id": benchmark.id}).fetchone()
-    
+
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No data found for benchmark '{benchmark_id}'"
         )
-    
+
     # Use daily_return if available, otherwise fall back to return_1d
-    daily_return_pct = float(result.daily_return) if result.daily_return is not None else (float(result.return_1d) if result.return_1d is not None else 0.0)
+    daily_return_pct = float(result.daily_return) if result.daily_return is not None else (
+        float(result.return_1d) if result.return_1d is not None else 0.0)
     close_val = float(result.close_value)
     # Calculate absolute change from percentage
     absolute_change = close_val * (daily_return_pct / 100) if daily_return_pct != 0 else 0.0
-    
+
     return {
         "benchmark_id": benchmark.benchmark_id,
         "date": result.date,
@@ -112,7 +112,7 @@ def get_benchmark_performance(benchmark_id: str, session: SessionDep) -> Dict[st
     """
     from datetime import date as date_type
     from app.model.performance import Benchmark
-    
+
     # Verify benchmark exists
     benchmark = session.get(Benchmark, benchmark_id)
     if not benchmark:
@@ -120,7 +120,7 @@ def get_benchmark_performance(benchmark_id: str, session: SessionDep) -> Dict[st
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Benchmark '{benchmark_id}' not found"
         )
-    
+
     # Get the most recent data point (current value)
     latest_data = session.exec(
         select(BenchmarkData)
@@ -128,16 +128,16 @@ def get_benchmark_performance(benchmark_id: str, session: SessionDep) -> Dict[st
         .order_by(BenchmarkData.date.desc())
         .limit(1)
     ).first()
-    
+
     if not latest_data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No data found for benchmark '{benchmark_id}'"
         )
-    
+
     current_value = float(latest_data.close_value)
     current_date = latest_data.date
-    
+
     # Helper function to get data point closest to target date
     def get_data_point(target_date: date_type) -> Optional[BenchmarkData]:
         # Try exact date first
@@ -146,10 +146,10 @@ def get_benchmark_performance(benchmark_id: str, session: SessionDep) -> Dict[st
             .where(BenchmarkData.benchmark_id == benchmark_id)
             .where(BenchmarkData.date == target_date)
         ).first()
-        
+
         if data:
             return data
-        
+
         # If exact date not found, get the most recent date before target
         data = session.exec(
             select(BenchmarkData)
@@ -158,18 +158,18 @@ def get_benchmark_performance(benchmark_id: str, session: SessionDep) -> Dict[st
             .order_by(BenchmarkData.date.desc())
             .limit(1)
         ).first()
-        
+
         return data
-    
+
     # Helper function to calculate performance metrics
     def calculate_performance(start_data: Optional[BenchmarkData]) -> Optional[Dict[str, Any]]:
         if not start_data:
             return None
-        
+
         start_value = float(start_data.close_value)
         change = current_value - start_value
         change_percent = (change / start_value * 100) if start_value > 0 else 0.0
-        
+
         return {
             "change": round(change, 2),
             "change_percent": round(change_percent, 2),
@@ -178,22 +178,22 @@ def get_benchmark_performance(benchmark_id: str, session: SessionDep) -> Dict[st
             "start_date": start_data.date,
             "end_date": current_date
         }
-    
+
     # Calculate target dates
     today = current_date
     one_day_ago = today - timedelta(days=1)
     one_week_ago = today - timedelta(days=7)
     one_month_ago = today - timedelta(days=30)
-    
+
     # Calculate YTD start (January 1st of current year)
     ytd_start = date_type(today.year, 1, 1)
-    
+
     # Get data points for each period
     data_1d = get_data_point(one_day_ago)
     data_1w = get_data_point(one_week_ago)
     data_1m = get_data_point(one_month_ago)
     data_ytd = get_data_point(ytd_start)
-    
+
     # Build response
     performance = {
         "1d": calculate_performance(data_1d),
@@ -201,7 +201,7 @@ def get_benchmark_performance(benchmark_id: str, session: SessionDep) -> Dict[st
         "1m": calculate_performance(data_1m),
         "ytd": calculate_performance(data_ytd)
     }
-    
+
     return {
         "benchmark_id": benchmark_id,
         "benchmark_name": benchmark.name,
@@ -256,17 +256,24 @@ def list_stocks(
         limit: int = Query(50, ge=1, le=500),
         offset: int = Query(0, ge=0),
 ) -> List[Dict[str, Any]]:
+    """
+    Get basic market data for stocks.
+    Fast, lightweight endpoint for basic stock information.
+    Use /market/fundamentals for detailed fundamental metrics.
+    """
+    # Build query for companies matching basic criteria
     stmt = select(Company)
     if q:
         like = f"%{q.upper()}%"
         stmt = stmt.where((Company.trading_code.ilike(like)) | (Company.company_name.ilike(like)))
     if sector:
         stmt = stmt.where(Company.sector == sector)
+    
+    # Apply pagination
     stmt = stmt.offset(offset).limit(limit)
-
     companies = session.exec(stmt).all()
 
-    # Fetch latest StockData for these companies
+    # Fetch basic market data for companies
     result: List[Dict[str, Any]] = []
     for company in companies:
         latest_data = session.exec(
@@ -275,33 +282,277 @@ def list_stocks(
             .order_by(StockData.timestamp.desc())
             .limit(1)
         ).first()
-        # Calculate market cap: last_trade_price × total_outstanding_securities (in crores)
-        market_cap = None
-        if latest_data and company.total_outstanding_securities:
-            try:
-                # Market cap in crores (1 crore = 10,000,000)
-                market_cap = (float(latest_data.last_trade_price) * company.total_outstanding_securities) / 10_000_000
-            except (ValueError, TypeError):
-                market_cap = None
 
-        result.append(
-            {
-                "id": str(company.id),
-                "symbol": company.trading_code,
-                "company_name": company.company_name,
-                "sector": company.sector,
-                "industry": company.industry,
-                "last": str(latest_data.last_trade_price) if latest_data else None,
-                "change": str(latest_data.change) if latest_data else None,
-                "change_percent": str(latest_data.change_percent) if latest_data else None,
-                "volume": latest_data.volume if latest_data else None,
-                "turnover": str(latest_data.turnover) if latest_data else None,
-                "timestamp": latest_data.timestamp if latest_data else None,
-                "total_outstanding_securities": company.total_outstanding_securities,
-                "market_cap": str(market_cap) if market_cap is not None else None,
-            }
-        )
+        result.append({
+            "id": str(company.id),
+            "symbol": company.trading_code,
+            "company_name": company.company_name,
+            "sector": company.sector,
+            "industry": company.industry,
+            "ltp": str(latest_data.last_trade_price) if latest_data else None,
+            "change": str(latest_data.change) if latest_data else None,
+            "ycp": str(latest_data.previous_close) if latest_data else None,
+            "change_percent": str(latest_data.change_percent) if latest_data else None,
+            "volume": latest_data.volume if latest_data else None,
+            "turnover": str(latest_data.turnover) if latest_data else None,
+            "timestamp": latest_data.timestamp if latest_data else None,
+        })
+
     return result
+
+
+@router.get("/fundamentals")
+def list_fundamentals(
+        session: SessionDep,
+        q: Optional[str] = Query(None, description="Search by symbol or company name"),
+        sector: Optional[str] = None,
+        min_pe: Optional[float] = Query(None, description="Minimum P/E ratio"),
+        max_pe: Optional[float] = Query(None, description="Maximum P/E ratio"),
+        min_dividend_yield: Optional[float] = Query(None, description="Minimum dividend yield %"),
+        max_dividend_yield: Optional[float] = Query(None, description="Maximum dividend yield %"),
+        min_score: Optional[float] = Query(None, description="Minimum fundamental score"),
+        min_market_cap: Optional[float] = Query(None, description="Minimum market cap (in millions)"),
+        max_market_cap: Optional[float] = Query(None, description="Maximum market cap (in millions)"),
+        min_roe: Optional[float] = Query(None, description="Minimum ROE %"),
+        max_roe: Optional[float] = Query(None, description="Maximum ROE %"),
+        min_debt_equity: Optional[float] = Query(None, description="Minimum debt to equity ratio"),
+        max_debt_equity: Optional[float] = Query(None, description="Maximum debt to equity ratio"),
+        sort_by: Optional[str] = Query("score", description="Sort field: pe, dividend_yield, market_cap, score, roe, debt_equity, symbol"),
+        sort_order: Optional[str] = Query("desc", description="Sort order: asc or desc"),
+        limit: int = Query(20, ge=1, le=500),
+        offset: int = Query(0, ge=0),
+) -> List[Dict[str, Any]]:
+    """
+    Get fundamental metrics for stocks with filtering and sorting.
+    Use this endpoint for the Fundamentals page.
+    """
+    from app.model.fundamental import FinancialPerformance, DividendInformation, LoanStatus
+
+    # Build query for companies matching basic criteria
+    stmt = select(Company)
+    if q:
+        like = f"%{q.upper()}%"
+        stmt = stmt.where((Company.trading_code.ilike(like)) | (Company.company_name.ilike(like)))
+    if sector:
+        stmt = stmt.where(Company.sector == sector)
+    
+    # Check if filters are applied
+    has_filters = any([min_pe, max_pe, min_dividend_yield, max_dividend_yield, min_score, 
+                       min_market_cap, max_market_cap, min_roe, max_roe, min_debt_equity, max_debt_equity])
+    
+    # Apply pagination early when no filters - much faster
+    if not has_filters:
+        stmt = stmt.offset(offset).limit(limit)
+    
+    companies = session.exec(stmt).all()
+
+    # Calculate metrics and scores for companies
+    stocks_with_metrics: List[Dict[str, Any]] = []
+    for company in companies:
+        latest_data = session.exec(
+            select(StockData)
+            .where(StockData.company_id == company.id)
+            .order_by(StockData.timestamp.desc())
+            .limit(1)
+        ).first()
+
+        # Get latest financial performance for P/E, ROE calculations
+        latest_financial = session.exec(
+            select(FinancialPerformance)
+            .where(FinancialPerformance.company_id == company.id)
+            .order_by(FinancialPerformance.year.desc())
+            .limit(1)
+        ).first()
+
+        # Get latest dividend information for dividend yield
+        latest_dividend = session.exec(
+            select(DividendInformation)
+            .where(DividendInformation.company_id == company.id)
+            .order_by(DividendInformation.year.desc())
+            .limit(1)
+        ).first()
+
+        # Get loan status for debt to equity calculation
+        loan_status = session.exec(
+            select(LoanStatus)
+            .where(LoanStatus.company_id == company.id)
+            .limit(1)
+        ).first()
+
+        # Calculate market cap: last_trade_price × shares (in crores)
+        market_cap = None
+        if latest_data:
+            shares = company.total_outstanding_securities or company.total_shares
+            if shares:
+                try:
+                    market_cap = (float(latest_data.last_trade_price) * shares) / 10_000_000
+                except (ValueError, TypeError):
+                    market_cap = None
+            if market_cap is None and company.market_cap:
+                try:
+                    market_cap = float(company.market_cap)
+                except (ValueError, TypeError):
+                    market_cap = None
+
+        # Calculate P/E ratio
+        pe_ratio = company.pe_ratio
+        if pe_ratio is None and latest_data and latest_financial and latest_financial.eps_basic and latest_financial.eps_basic > 0:
+            try:
+                pe_ratio = float(latest_data.last_trade_price) / float(latest_financial.eps_basic)
+            except (ValueError, ZeroDivisionError, TypeError):
+                pe_ratio = None
+
+        # Calculate dividend yield
+        dividend_yield = company.dividend_yield
+        if dividend_yield is None and latest_dividend and latest_dividend.yield_percentage is not None:
+            dividend_yield = float(latest_dividend.yield_percentage)
+
+        # Calculate ROE
+        roe = None
+        if latest_financial and latest_financial.profit is not None and company.reserve_and_surplus and company.reserve_and_surplus > 0:
+            try:
+                roe = (float(latest_financial.profit) / float(company.reserve_and_surplus)) * 100.0
+            except (ValueError, ZeroDivisionError, TypeError):
+                roe = None
+
+        # Get EPS and NAV
+        eps = float(latest_financial.eps_basic) if latest_financial and latest_financial.eps_basic is not None else (
+            float(company.eps) if company.eps else None)
+        nav = float(
+            latest_financial.nav_per_share) if latest_financial and latest_financial.nav_per_share is not None else (
+            float(company.nav) if company.nav else None)
+
+        # Calculate debt to equity ratio
+        debt_to_equity = None
+        if loan_status and company.reserve_and_surplus and company.reserve_and_surplus > 0:
+            try:
+                short_term = float(loan_status.short_term_loan or 0)
+                long_term = float(loan_status.long_term_loan or 0)
+                total_debt = short_term + long_term
+                if total_debt > 0:
+                    debt_to_equity = total_debt / float(company.reserve_and_surplus)
+            except (ValueError, ZeroDivisionError, TypeError):
+                debt_to_equity = None
+
+        # Calculate fundamental score
+        score = 50.0  # Base score
+        
+        # P/E ratio (20 points): lower is better
+        if pe_ratio is not None and pe_ratio > 0:
+            if pe_ratio < 10:
+                score += 20
+            elif pe_ratio < 15:
+                score += 15
+            elif pe_ratio < 20:
+                score += 10
+            elif pe_ratio < 30:
+                score += 5
+        
+        # Dividend yield (15 points): higher is better
+        if dividend_yield is not None:
+            if dividend_yield > 5:
+                score += 15
+            elif dividend_yield > 3:
+                score += 10
+            elif dividend_yield > 1:
+                score += 5
+        
+        # Debt to equity (15 points): lower is better
+        if debt_to_equity is not None:
+            if debt_to_equity < 0.3:
+                score += 15
+            elif debt_to_equity < 0.5:
+                score += 10
+            elif debt_to_equity < 1.0:
+                score += 5
+        
+        # ROE (10 points): higher is better
+        if roe is not None and roe > 0:
+            if roe > 20:
+                score += 10
+            elif roe > 15:
+                score += 7
+            elif roe > 10:
+                score += 5
+
+        stocks_with_metrics.append({
+            "id": str(company.id),
+            "symbol": company.trading_code,
+            "company_name": company.company_name,
+            "sector": company.sector,
+            "total_outstanding_securities": company.total_outstanding_securities,
+            "market_cap": market_cap,
+            "pe": pe_ratio,
+            "dividend_yield": dividend_yield,
+            "roe": roe,
+            "debt_to_equity": debt_to_equity,
+            "debt_equity": debt_to_equity,
+            "eps": eps,
+            "nav": nav,
+            "score": score,
+        })
+
+    # Apply filters
+    filtered_stocks = stocks_with_metrics
+    if has_filters:
+        if min_pe is not None:
+            filtered_stocks = [s for s in filtered_stocks if s.get("pe") is not None and s["pe"] >= min_pe]
+        if max_pe is not None:
+            filtered_stocks = [s for s in filtered_stocks if s.get("pe") is not None and s["pe"] <= max_pe]
+        if min_dividend_yield is not None:
+            filtered_stocks = [s for s in filtered_stocks if s.get("dividend_yield") is not None and s["dividend_yield"] >= min_dividend_yield]
+        if max_dividend_yield is not None:
+            filtered_stocks = [s for s in filtered_stocks if s.get("dividend_yield") is not None and s["dividend_yield"] <= max_dividend_yield]
+        if min_score is not None:
+            filtered_stocks = [s for s in filtered_stocks if s.get("score") is not None and s["score"] >= min_score]
+        if min_market_cap is not None:
+            filtered_stocks = [s for s in filtered_stocks if s.get("market_cap") is not None and s["market_cap"] >= min_market_cap]
+        if max_market_cap is not None:
+            filtered_stocks = [s for s in filtered_stocks if s.get("market_cap") is not None and s["market_cap"] <= max_market_cap]
+        if min_roe is not None:
+            filtered_stocks = [s for s in filtered_stocks if s.get("roe") is not None and s["roe"] >= min_roe]
+        if max_roe is not None:
+            filtered_stocks = [s for s in filtered_stocks if s.get("roe") is not None and s["roe"] <= max_roe]
+        if min_debt_equity is not None:
+            filtered_stocks = [s for s in filtered_stocks if s.get("debt_to_equity") is not None and s["debt_to_equity"] >= min_debt_equity]
+        if max_debt_equity is not None:
+            filtered_stocks = [s for s in filtered_stocks if s.get("debt_to_equity") is not None and s["debt_to_equity"] <= max_debt_equity]
+
+    # Apply sorting
+    if sort_by:
+        reverse = sort_order == "desc"
+        sort_field_map = {
+            "pe": "pe",
+            "dividend_yield": "dividend_yield",
+            "market_cap": "market_cap",
+            "score": "score",
+            "roe": "roe",
+            "debt_equity": "debt_to_equity",
+            "symbol": "symbol",
+            "company_name": "company_name",
+        }
+        field = sort_field_map.get(sort_by, "score")
+        
+        def get_sort_key(stock):
+            value = stock.get(field)
+            if value is None:
+                return float('-inf') if reverse else float('inf')
+            if field in ["symbol", "company_name"]:
+                return str(value).lower()
+            return value
+        
+        filtered_stocks.sort(key=get_sort_key, reverse=reverse)
+    else:
+        # Default sort by score descending
+        filtered_stocks.sort(key=lambda s: s.get("score") or 0, reverse=True)
+
+    # Apply pagination
+    if has_filters:
+        paginated_stocks = filtered_stocks[offset:offset + limit]
+    else:
+        paginated_stocks = filtered_stocks
+
+    return paginated_stocks
 
 
 @router.get("/stocks/{symbol}")
