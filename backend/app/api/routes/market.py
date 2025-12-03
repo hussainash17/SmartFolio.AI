@@ -326,233 +326,111 @@ def list_fundamentals(
     Get fundamental metrics for stocks with filtering and sorting.
     Use this endpoint for the Fundamentals page.
     """
-    from app.model.fundamental import FinancialPerformance, DividendInformation, LoanStatus
+    from app.model.technical_indicators import DonchianChannelCache
+    from sqlalchemy import func, desc, asc
 
-    # Build query for companies matching basic criteria
-    stmt = select(Company)
+    # Subquery to get the latest calculation date
+    latest_date_subquery = select(func.max(DonchianChannelCache.calculation_date))
+    latest_date = session.exec(latest_date_subquery).first()
+
+    if not latest_date:
+        return []
+
+    # Build query
+    stmt = (
+        select(DonchianChannelCache, Company)
+        .join(Company, DonchianChannelCache.company_id == Company.id)
+        .where(DonchianChannelCache.calculation_date == latest_date)
+    )
+
+    # Apply search filter
     if q:
         like = f"%{q.upper()}%"
         stmt = stmt.where((Company.trading_code.ilike(like)) | (Company.company_name.ilike(like)))
+    
+    # Apply sector filter
     if sector:
-        stmt = stmt.where(Company.sector == sector)
-    
-    # Check if filters are applied
-    has_filters = any([min_pe, max_pe, min_dividend_yield, max_dividend_yield, min_score, 
-                       min_market_cap, max_market_cap, min_roe, max_roe, min_debt_equity, max_debt_equity])
-    
-    # Apply pagination early when no filters - much faster
-    if not has_filters:
-        stmt = stmt.offset(offset).limit(limit)
-    
-    companies = session.exec(stmt).all()
+        stmt = stmt.where(DonchianChannelCache.sector == sector)
 
-    # Calculate metrics and scores for companies
+    # Apply numeric filters
+    if min_pe is not None:
+        stmt = stmt.where(DonchianChannelCache.pe_ratio >= min_pe)
+    if max_pe is not None:
+        stmt = stmt.where(DonchianChannelCache.pe_ratio <= max_pe)
+        
+    if min_dividend_yield is not None:
+        stmt = stmt.where(DonchianChannelCache.dividend_yield >= min_dividend_yield)
+    if max_dividend_yield is not None:
+        stmt = stmt.where(DonchianChannelCache.dividend_yield <= max_dividend_yield)
+        
+    if min_score is not None:
+        stmt = stmt.where(DonchianChannelCache.fundamental_score >= min_score)
+        
+    if min_market_cap is not None:
+        stmt = stmt.where(DonchianChannelCache.market_cap >= min_market_cap)
+    if max_market_cap is not None:
+        stmt = stmt.where(DonchianChannelCache.market_cap <= max_market_cap)
+        
+    if min_roe is not None:
+        stmt = stmt.where(DonchianChannelCache.roe >= min_roe)
+    if max_roe is not None:
+        stmt = stmt.where(DonchianChannelCache.roe <= max_roe)
+        
+    if min_debt_equity is not None:
+        stmt = stmt.where(DonchianChannelCache.debt_to_equity >= min_debt_equity)
+    if max_debt_equity is not None:
+        stmt = stmt.where(DonchianChannelCache.debt_to_equity <= max_debt_equity)
+
+    # Apply sorting
+    sort_column = None
+    if sort_by == "pe":
+        sort_column = DonchianChannelCache.pe_ratio
+    elif sort_by == "dividend_yield":
+        sort_column = DonchianChannelCache.dividend_yield
+    elif sort_by == "market_cap":
+        sort_column = DonchianChannelCache.market_cap
+    elif sort_by == "roe":
+        sort_column = DonchianChannelCache.roe
+    elif sort_by == "debt_equity":
+        sort_column = DonchianChannelCache.debt_to_equity
+    elif sort_by == "symbol":
+        sort_column = Company.trading_code
+    elif sort_by == "company_name":
+        sort_column = Company.company_name
+    else:
+        sort_column = DonchianChannelCache.fundamental_score
+
+    if sort_order == "asc":
+        stmt = stmt.order_by(asc(sort_column).nulls_last())
+    else:
+        stmt = stmt.order_by(desc(sort_column).nulls_last())
+
+    # Apply pagination
+    stmt = stmt.offset(offset).limit(limit)
+
+    results = session.exec(stmt).all()
+
+    # Format response
     stocks_with_metrics: List[Dict[str, Any]] = []
-    for company in companies:
-        latest_data = session.exec(
-            select(StockData)
-            .where(StockData.company_id == company.id)
-            .order_by(StockData.timestamp.desc())
-            .limit(1)
-        ).first()
-
-        # Get latest financial performance for P/E, ROE calculations
-        latest_financial = session.exec(
-            select(FinancialPerformance)
-            .where(FinancialPerformance.company_id == company.id)
-            .order_by(FinancialPerformance.year.desc())
-            .limit(1)
-        ).first()
-
-        # Get latest dividend information for dividend yield
-        latest_dividend = session.exec(
-            select(DividendInformation)
-            .where(DividendInformation.company_id == company.id)
-            .order_by(DividendInformation.year.desc())
-            .limit(1)
-        ).first()
-
-        # Get loan status for debt to equity calculation
-        loan_status = session.exec(
-            select(LoanStatus)
-            .where(LoanStatus.company_id == company.id)
-            .limit(1)
-        ).first()
-
-        # Calculate market cap: last_trade_price × shares (in crores)
-        market_cap = None
-        if latest_data:
-            shares = company.total_outstanding_securities or company.total_shares
-            if shares:
-                try:
-                    market_cap = (float(latest_data.last_trade_price) * shares) / 10_000_000
-                except (ValueError, TypeError):
-                    market_cap = None
-            if market_cap is None and company.market_cap:
-                try:
-                    market_cap = float(company.market_cap)
-                except (ValueError, TypeError):
-                    market_cap = None
-
-        # Calculate P/E ratio
-        pe_ratio = company.pe_ratio
-        if pe_ratio is None and latest_data and latest_financial and latest_financial.eps_basic and latest_financial.eps_basic > 0:
-            try:
-                pe_ratio = float(latest_data.last_trade_price) / float(latest_financial.eps_basic)
-            except (ValueError, ZeroDivisionError, TypeError):
-                pe_ratio = None
-
-        # Calculate dividend yield
-        dividend_yield = company.dividend_yield
-        if dividend_yield is None and latest_dividend and latest_dividend.yield_percentage is not None:
-            dividend_yield = float(latest_dividend.yield_percentage)
-
-        # Calculate ROE
-        roe = None
-        if latest_financial and latest_financial.profit is not None and company.reserve_and_surplus and company.reserve_and_surplus > 0:
-            try:
-                roe = (float(latest_financial.profit) / float(company.reserve_and_surplus)) * 100.0
-            except (ValueError, ZeroDivisionError, TypeError):
-                roe = None
-
-        # Get EPS and NAV
-        eps = float(latest_financial.eps_basic) if latest_financial and latest_financial.eps_basic is not None else (
-            float(company.eps) if company.eps else None)
-        nav = float(
-            latest_financial.nav_per_share) if latest_financial and latest_financial.nav_per_share is not None else (
-            float(company.nav) if company.nav else None)
-
-        # Calculate debt to equity ratio
-        debt_to_equity = None
-        if loan_status and company.reserve_and_surplus and company.reserve_and_surplus > 0:
-            try:
-                short_term = float(loan_status.short_term_loan or 0)
-                long_term = float(loan_status.long_term_loan or 0)
-                total_debt = short_term + long_term
-                if total_debt > 0:
-                    debt_to_equity = total_debt / float(company.reserve_and_surplus)
-            except (ValueError, ZeroDivisionError, TypeError):
-                debt_to_equity = None
-
-        # Calculate fundamental score
-        score = 50.0  # Base score
-        
-        # P/E ratio (20 points): lower is better
-        if pe_ratio is not None and pe_ratio > 0:
-            if pe_ratio < 10:
-                score += 20
-            elif pe_ratio < 15:
-                score += 15
-            elif pe_ratio < 20:
-                score += 10
-            elif pe_ratio < 30:
-                score += 5
-        
-        # Dividend yield (15 points): higher is better
-        if dividend_yield is not None:
-            if dividend_yield > 5:
-                score += 15
-            elif dividend_yield > 3:
-                score += 10
-            elif dividend_yield > 1:
-                score += 5
-        
-        # Debt to equity (15 points): lower is better
-        if debt_to_equity is not None:
-            if debt_to_equity < 0.3:
-                score += 15
-            elif debt_to_equity < 0.5:
-                score += 10
-            elif debt_to_equity < 1.0:
-                score += 5
-        
-        # ROE (10 points): higher is better
-        if roe is not None and roe > 0:
-            if roe > 20:
-                score += 10
-            elif roe > 15:
-                score += 7
-            elif roe > 10:
-                score += 5
-
+    for cache, company in results:
         stocks_with_metrics.append({
             "id": str(company.id),
             "symbol": company.trading_code,
             "company_name": company.company_name,
             "sector": company.sector,
             "total_outstanding_securities": company.total_outstanding_securities,
-            "market_cap": market_cap,
-            "pe": pe_ratio,
-            "dividend_yield": dividend_yield,
-            "roe": roe,
-            "debt_to_equity": debt_to_equity,
-            "debt_equity": debt_to_equity,
-            "eps": eps,
-            "nav": nav,
-            "score": score,
+            "market_cap": float(cache.market_cap) if cache.market_cap is not None else None,
+            "pe": float(cache.pe_ratio) if cache.pe_ratio is not None else None,
+            "dividend_yield": float(cache.dividend_yield) if cache.dividend_yield is not None else None,
+            "roe": float(cache.roe) if cache.roe is not None else None,
+            "debt_to_equity": float(cache.debt_to_equity) if cache.debt_to_equity is not None else None,
+            "debt_equity": float(cache.debt_to_equity) if cache.debt_to_equity is not None else None,
+            "eps": float(cache.eps) if cache.eps is not None else None,
+            "nav": float(cache.nav) if cache.nav is not None else None,
+            "score": float(cache.fundamental_score) if cache.fundamental_score is not None else 0,
         })
 
-    # Apply filters
-    filtered_stocks = stocks_with_metrics
-    if has_filters:
-        if min_pe is not None:
-            filtered_stocks = [s for s in filtered_stocks if s.get("pe") is not None and s["pe"] >= min_pe]
-        if max_pe is not None:
-            filtered_stocks = [s for s in filtered_stocks if s.get("pe") is not None and s["pe"] <= max_pe]
-        if min_dividend_yield is not None:
-            filtered_stocks = [s for s in filtered_stocks if s.get("dividend_yield") is not None and s["dividend_yield"] >= min_dividend_yield]
-        if max_dividend_yield is not None:
-            filtered_stocks = [s for s in filtered_stocks if s.get("dividend_yield") is not None and s["dividend_yield"] <= max_dividend_yield]
-        if min_score is not None:
-            filtered_stocks = [s for s in filtered_stocks if s.get("score") is not None and s["score"] >= min_score]
-        if min_market_cap is not None:
-            filtered_stocks = [s for s in filtered_stocks if s.get("market_cap") is not None and s["market_cap"] >= min_market_cap]
-        if max_market_cap is not None:
-            filtered_stocks = [s for s in filtered_stocks if s.get("market_cap") is not None and s["market_cap"] <= max_market_cap]
-        if min_roe is not None:
-            filtered_stocks = [s for s in filtered_stocks if s.get("roe") is not None and s["roe"] >= min_roe]
-        if max_roe is not None:
-            filtered_stocks = [s for s in filtered_stocks if s.get("roe") is not None and s["roe"] <= max_roe]
-        if min_debt_equity is not None:
-            filtered_stocks = [s for s in filtered_stocks if s.get("debt_to_equity") is not None and s["debt_to_equity"] >= min_debt_equity]
-        if max_debt_equity is not None:
-            filtered_stocks = [s for s in filtered_stocks if s.get("debt_to_equity") is not None and s["debt_to_equity"] <= max_debt_equity]
-
-    # Apply sorting
-    if sort_by:
-        reverse = sort_order == "desc"
-        sort_field_map = {
-            "pe": "pe",
-            "dividend_yield": "dividend_yield",
-            "market_cap": "market_cap",
-            "score": "score",
-            "roe": "roe",
-            "debt_equity": "debt_to_equity",
-            "symbol": "symbol",
-            "company_name": "company_name",
-        }
-        field = sort_field_map.get(sort_by, "score")
-        
-        def get_sort_key(stock):
-            value = stock.get(field)
-            if value is None:
-                return float('-inf') if reverse else float('inf')
-            if field in ["symbol", "company_name"]:
-                return str(value).lower()
-            return value
-        
-        filtered_stocks.sort(key=get_sort_key, reverse=reverse)
-    else:
-        # Default sort by score descending
-        filtered_stocks.sort(key=lambda s: s.get("score") or 0, reverse=True)
-
-    # Apply pagination
-    if has_filters:
-        paginated_stocks = filtered_stocks[offset:offset + limit]
-    else:
-        paginated_stocks = filtered_stocks
-
-    return paginated_stocks
+    return stocks_with_metrics
 
 
 @router.get("/stocks/{symbol}")

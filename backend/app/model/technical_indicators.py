@@ -29,27 +29,39 @@ class DonchianChannelCache(SQLModel, table=True):
     calculation_date: date = Field(index=True, description="Date for which calculations are made")
     
     # Current price at time of calculation
-    current_price: Decimal = Field(max_digits=10, decimal_places=2)
-    data_points: int = Field(description="Number of data points used in calculation")
+    current_price: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2)
+    data_points: Optional[int] = Field(default=None, description="Number of data points used in calculation")
     includes_current_day: bool = Field(default=False)
     
     # Period 5 values
-    period_5_resistance: Decimal = Field(max_digits=10, decimal_places=2)
-    period_5_support: Decimal = Field(max_digits=10, decimal_places=2)
-    period_5_middle: Decimal = Field(max_digits=10, decimal_places=2)
-    period_5_range: Decimal = Field(max_digits=10, decimal_places=2)
+    period_5_resistance: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2)
+    period_5_support: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2)
+    period_5_middle: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2)
+    period_5_range: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2)
     
     # Period 10 values
-    period_10_resistance: Decimal = Field(max_digits=10, decimal_places=2)
-    period_10_support: Decimal = Field(max_digits=10, decimal_places=2)
-    period_10_middle: Decimal = Field(max_digits=10, decimal_places=2)
-    period_10_range: Decimal = Field(max_digits=10, decimal_places=2)
+    period_10_resistance: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2)
+    period_10_support: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2)
+    period_10_middle: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2)
+    period_10_range: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2)
     
     # Period 20 values
-    period_20_resistance: Decimal = Field(max_digits=10, decimal_places=2)
-    period_20_support: Decimal = Field(max_digits=10, decimal_places=2)
-    period_20_middle: Decimal = Field(max_digits=10, decimal_places=2)
-    period_20_range: Decimal = Field(max_digits=10, decimal_places=2)
+    period_20_resistance: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2)
+    period_20_support: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2)
+    period_20_middle: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2)
+    period_20_range: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2)
+
+    # Fundamental Data
+    market_cap: Optional[Decimal] = Field(default=None)
+    pe_ratio: Optional[Decimal] = Field(default=None)
+    dividend_yield: Optional[Decimal] = Field(default=None)
+    roe: Optional[Decimal] = Field(default=None)
+    debt_to_equity: Optional[Decimal] = Field(default=None)
+    eps: Optional[Decimal] = Field(default=None)
+    nav: Optional[Decimal] = Field(default=None)
+    fundamental_score: Optional[Decimal] = Field(default=None)
+    sector: Optional[str] = Field(default=None)
+    symbol: Optional[str] = Field(default=None)
     
     # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
