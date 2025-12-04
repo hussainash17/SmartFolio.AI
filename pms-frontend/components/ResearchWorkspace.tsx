@@ -9,6 +9,7 @@ import { WatchlistPanel } from './WatchlistPanel'
 import { SymbolInfoPanel } from './SymbolInfoPanel'
 import { OrdersPositionsPanel } from './OrdersPositionsPanel'
 import { MultiChartGrid } from './MultiChartGrid'
+import { PaperTradingSimulation } from './PaperTradingSimulation'
 import type { MarketData } from '../types/trading'
 import { Plus, Minus, ChevronLeft, ChevronRight } from 'lucide-react'
 
@@ -47,7 +48,7 @@ export function ResearchWorkspace({ defaultSymbol, marketData, onQuickTrade }: R
   }, [marketData, defaultSymbol])
 
   const initialDefault = sanitizeSymbol(defaultSymbol) || availableSymbols[0] || ''
-  const [viewMode, setViewMode] = useState<'analytics' | 'multi'>('analytics')
+  const [viewMode, setViewMode] = useState<'analytics' | 'multi' | 'paper-trading'>('analytics')
   const [layoutCount, setLayoutCount] = useState<number>(4)
   const [interval, setInterval] = useState<string>('1D')
   const [symbols, setSymbols] = useState<string[]>(() => {
@@ -337,12 +338,19 @@ export function ResearchWorkspace({ defaultSymbol, marketData, onQuickTrade }: R
         <TabsList className="w-fit">
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="multi">Multi Chart</TabsTrigger>
+          <TabsTrigger value="paper-trading">Paper Trading</TabsTrigger>
         </TabsList>
         <TabsContent value="analytics" className="flex-1 min-h-0">
           {renderAnalytics()}
         </TabsContent>
         <TabsContent value="multi" className="flex-1 min-h-0">
           <MultiChartGrid />
+        </TabsContent>
+        <TabsContent value="paper-trading" className="flex-1 min-h-0">
+          <PaperTradingSimulation
+            availableSymbols={availableSymbols}
+            defaultSymbol={initialDefault}
+          />
         </TabsContent>
       </Tabs>
     </div>

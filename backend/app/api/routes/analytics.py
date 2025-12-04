@@ -872,33 +872,43 @@ def get_donchian_channel(
         # Build response from cached data
         channels = []
         
-        # Always include standard periods from cache
+        # Helper function to safely convert Decimal to float
+        def safe_float(value):
+            return float(value) if value is not None else None
+        
+        # Always include standard periods from cache (only if they have valid data)
         if 5 in period_list or not period_list:
-            channels.append({
-                "period": 5,
-                "resistance": float(cached_data.period_5_resistance),
-                "support": float(cached_data.period_5_support),
-                "middle": float(cached_data.period_5_middle),
-                "range": float(cached_data.period_5_range)
-            })
+            if (cached_data.period_5_resistance is not None and 
+                cached_data.period_5_support is not None):
+                channels.append({
+                    "period": 5,
+                    "resistance": safe_float(cached_data.period_5_resistance),
+                    "support": safe_float(cached_data.period_5_support),
+                    "middle": safe_float(cached_data.period_5_middle),
+                    "range": safe_float(cached_data.period_5_range)
+                })
         
         if 10 in period_list or not period_list:
-            channels.append({
-                "period": 10,
-                "resistance": float(cached_data.period_10_resistance),
-                "support": float(cached_data.period_10_support),
-                "middle": float(cached_data.period_10_middle),
-                "range": float(cached_data.period_10_range)
-            })
+            if (cached_data.period_10_resistance is not None and 
+                cached_data.period_10_support is not None):
+                channels.append({
+                    "period": 10,
+                    "resistance": safe_float(cached_data.period_10_resistance),
+                    "support": safe_float(cached_data.period_10_support),
+                    "middle": safe_float(cached_data.period_10_middle),
+                    "range": safe_float(cached_data.period_10_range)
+                })
         
         if 20 in period_list or not period_list:
-            channels.append({
-                "period": 20,
-                "resistance": float(cached_data.period_20_resistance),
-                "support": float(cached_data.period_20_support),
-                "middle": float(cached_data.period_20_middle),
-                "range": float(cached_data.period_20_range)
-            })
+            if (cached_data.period_20_resistance is not None and 
+                cached_data.period_20_support is not None):
+                channels.append({
+                    "period": 20,
+                    "resistance": safe_float(cached_data.period_20_resistance),
+                    "support": safe_float(cached_data.period_20_support),
+                    "middle": safe_float(cached_data.period_20_middle),
+                    "range": safe_float(cached_data.period_20_range)
+                })
         
         # For any non-standard periods, we need to calculate on-the-fly
         non_standard_periods = [p for p in period_list if p not in [5, 10, 20]]
@@ -922,10 +932,75 @@ def get_donchian_channel(
                     "range": round(highest_high - lowest_low, 2)
                 })
         
+        # If we have no valid channels from cache but cache exists, fall back to recalculation
+        if not channels and period_list:
+            # Cache exists but has no valid data, recalculate fresh
+            standard_periods = [5, 10, 20]
+            all_periods_to_calculate = list(set(standard_periods + period_list))
+            max_period = max(all_periods_to_calculate)
+            
+            # Fetch OHLC data
+            ohlc_data = _fetch_ohlc_data(session, company.id, max_period)
+            
+            # Calculate channels for all periods
+            results = {}
+            for period in all_periods_to_calculate:
+                period_data = ohlc_data[-period:]
+                highest_high = max(d['high'] for d in period_data)
+                lowest_low = min(d['low'] for d in period_data)
+                middle_channel = (highest_high + lowest_low) / 2
+                
+                results[period] = {
+                    "period": period,
+                    "resistance": round(highest_high, 2),
+                    "support": round(lowest_low, 2),
+                    "middle": round(middle_channel, 2),
+                    "range": round(highest_high - lowest_low, 2)
+                }
+            
+            # Get metadata
+            latest_close = ohlc_data[-1]['close']
+            latest_date = ohlc_data[-1]['date']
+            includes_current_day = ohlc_data[-1]['source'] == 'current'
+            
+            # Update cache with fresh values
+            cached_data.period_5_resistance = Decimal(str(results[5]["resistance"]))
+            cached_data.period_5_support = Decimal(str(results[5]["support"]))
+            cached_data.period_5_middle = Decimal(str(results[5]["middle"]))
+            cached_data.period_5_range = Decimal(str(results[5]["range"]))
+            cached_data.period_10_resistance = Decimal(str(results[10]["resistance"]))
+            cached_data.period_10_support = Decimal(str(results[10]["support"]))
+            cached_data.period_10_middle = Decimal(str(results[10]["middle"]))
+            cached_data.period_10_range = Decimal(str(results[10]["range"]))
+            cached_data.period_20_resistance = Decimal(str(results[20]["resistance"]))
+            cached_data.period_20_support = Decimal(str(results[20]["support"]))
+            cached_data.period_20_middle = Decimal(str(results[20]["middle"]))
+            cached_data.period_20_range = Decimal(str(results[20]["range"]))
+            cached_data.current_price = Decimal(str(latest_close))
+            cached_data.data_points = len(ohlc_data)
+            cached_data.includes_current_day = includes_current_day
+            
+            session.add(cached_data)
+            session.commit()
+            
+            # Return only requested periods
+            channels = [results[p] for p in period_list]
+            
+            return {
+                "symbol": symbol,
+                "company_name": company.company_name or company.name,
+                "current_price": round(latest_close, 2),
+                "data_points": len(ohlc_data),
+                "latest_date": latest_date,
+                "includes_current_day": includes_current_day,
+                "cached": False,  # Was cached but had to recalculate
+                "channels": sorted(channels, key=lambda x: x['period'])
+            }
+        
         return {
             "symbol": symbol,
             "company_name": company.company_name or company.name,
-            "current_price": float(cached_data.current_price),
+            "current_price": safe_float(cached_data.current_price) if cached_data.current_price is not None else None,
             "data_points": cached_data.data_points,
             "latest_date": cached_data.calculation_date,
             "includes_current_day": cached_data.includes_current_day,
