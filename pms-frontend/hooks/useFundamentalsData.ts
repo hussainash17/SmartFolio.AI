@@ -1,6 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { OpenAPI } from "../src/client";
 
+interface ScoreBreakdown {
+    base_score?: number;
+    pe_contribution?: number;
+    dividend_yield_contribution?: number;
+    debt_to_equity_contribution?: number;
+    roe_contribution?: number;
+}
+
 interface FundamentalsStock {
     id: string;
     symbol: string;
@@ -15,6 +23,7 @@ interface FundamentalsStock {
     eps: number;
     navPerShare: number;
     score: number;
+    scoreBreakdown?: ScoreBreakdown;
 }
 
 interface UseFundamentalsDataOptions {
@@ -134,6 +143,18 @@ export function useFundamentalsData(options: UseFundamentalsDataOptions = {}) {
                 eps: Number(item.eps || 0),
                 navPerShare: Number(item.nav || 0),
                 score: Number(item.score || 0),
+                scoreBreakdown: item.score_breakdown ? {
+                    base_score: item.score_breakdown.base_score !== null && item.score_breakdown.base_score !== undefined 
+                        ? Number(item.score_breakdown.base_score) : undefined,
+                    pe_contribution: item.score_breakdown.pe_contribution !== null && item.score_breakdown.pe_contribution !== undefined 
+                        ? Number(item.score_breakdown.pe_contribution) : undefined,
+                    dividend_yield_contribution: item.score_breakdown.dividend_yield_contribution !== null && item.score_breakdown.dividend_yield_contribution !== undefined 
+                        ? Number(item.score_breakdown.dividend_yield_contribution) : undefined,
+                    debt_to_equity_contribution: item.score_breakdown.debt_to_equity_contribution !== null && item.score_breakdown.debt_to_equity_contribution !== undefined 
+                        ? Number(item.score_breakdown.debt_to_equity_contribution) : undefined,
+                    roe_contribution: item.score_breakdown.roe_contribution !== null && item.score_breakdown.roe_contribution !== undefined 
+                        ? Number(item.score_breakdown.roe_contribution) : undefined,
+                } : undefined,
             })) as FundamentalsStock[];
         },
         staleTime: 1000 * 60 * 2, // 2 minutes

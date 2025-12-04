@@ -27,7 +27,7 @@ import {
     calculateFundamentalScore,
     generateInsights,
     exportToCSV
-} from "./fundamentals";
+} from "./fundamentals/index";
 import { QuickTradeDialog } from "./QuickTradeDialog";
 import { ShareholdingChart } from "./charts/ShareholdingChart";
 import { DividendsChart } from "./charts/DividendsChart";
@@ -58,7 +58,7 @@ function formatTk(n?: number | string | null) {
     if (n === undefined || n === null) return "-";
     const num = typeof n === "string" ? Number(n) : n;
     if (!isFinite(num)) return "-";
-    return `৳${formatNumber(num)}`;
+    return `${formatNumber(num)}`;
 }
 
 function formatPct(n?: number | string | null) {
@@ -151,14 +151,17 @@ export function Fundamentals({ defaultSymbol }: FundamentalsProps) {
 
     // Map fundamentals data to display format
     const displayedStocks = useMemo(() => {
-        return fundamentalsData.map(stock => ({
-            ...stock,
-            currentPrice: 0, // Not available in fundamentals API
-            priceChange: 0,
-            priceChangePercent: 0,
-            fundamentalScore: stock.score || 0,
-        }));
-    }, [fundamentalsData]);
+        return fundamentalsData.map(stock => {
+            const marketInfo = tradingMarketData.find(m => m.symbol === stock.symbol);
+            return {
+                ...stock,
+                currentPrice: marketInfo?.currentPrice || 0,
+                priceChange: marketInfo?.change || 0,
+                priceChangePercent: marketInfo?.changePercent || 0,
+                fundamentalScore: stock.score || 0,
+            };
+        });
+    }, [fundamentalsData, tradingMarketData]);
 
     // Get unique sectors for filter (fetch separately or from displayed stocks)
     const sectors = useMemo(() => {
@@ -177,26 +180,86 @@ export function Fundamentals({ defaultSymbol }: FundamentalsProps) {
         isLoading,
     } = useFundamentals(selectedSymbol);
 
-    // Calculate score and insights for selected stock
+    // Get score and insights for selected stock (uses API score and breakdown when available)
     const selectedStockScore = useMemo(() => {
-        if (!marketSummary || !financialHealth) return null;
+        const stock = displayedStocks.find(s => s.symbol === selectedSymbol);
+        if (!stock || !marketSummary || !financialHealth) return null;
 
-        const result = calculateFundamentalScore({
-            pe: Number(marketSummary.current_pe),
-            dividendYield: Number(marketSummary.dividend_yield),
-            debtToEquity: Number(financialHealth.total_loan) / Math.max(1, Number(financialHealth.reserve_and_surplus) || 1),
-            marketCap: Number(marketSummary.market_cap),
-        });
+        // Use API score to match list view
+        const apiScore = stock.fundamentalScore || 0;
+
+        // Use API breakdown if available, otherwise calculate locally
+        let breakdown;
+        if (stock.scoreBreakdown) {
+            // Convert API breakdown format to component format
+            const apiBreakdown = stock.scoreBreakdown;
+            breakdown = [
+                {
+                    category: 'Base Score',
+                    score: apiBreakdown.base_score || 50,
+                    maxScore: 50,
+                    description: 'Starting score for all stocks'
+                },
+                {
+                    category: 'P/E Ratio',
+                    score: apiBreakdown.pe_contribution || 0,
+                    maxScore: 20,
+                    description: 'Valuation metric - lower P/E is better'
+                },
+                {
+                    category: 'Dividend Yield',
+                    score: apiBreakdown.dividend_yield_contribution || 0,
+                    maxScore: 15,
+                    description: 'Annual dividend return percentage'
+                },
+                {
+                    category: 'Debt-to-Equity',
+                    score: apiBreakdown.debt_to_equity_contribution || 0,
+                    maxScore: 15,
+                    description: 'Financial leverage - lower is better'
+                },
+                {
+                    category: 'ROE',
+                    score: apiBreakdown.roe_contribution || 0,
+                    maxScore: 10,
+                    description: 'Return on equity - profitability metric'
+                }
+            ];
+        } else {
+            // Fallback: Calculate breakdown from detail view data
+            const result = calculateFundamentalScore({
+                pe: Number(marketSummary.current_pe),
+                dividendYield: Number(marketSummary.dividend_yield),
+                debtToEquity: Number(financialHealth.total_loan) / Math.max(1, Number(financialHealth.reserve_and_surplus) || 1),
+                marketCap: Number(marketSummary.market_cap),
+            });
+
+            // Scale breakdown to match API score (so breakdown sums to overall score)
+            const calculatedTotal = Object.values(result.breakdown).reduce((sum, item) => sum + item.score, 0);
+            const scaleFactor = calculatedTotal > 0 ? apiScore / calculatedTotal : 1;
+
+            breakdown = Object.values(
+                Object.fromEntries(
+                    Object.entries(result.breakdown).map(([key, value]) => [
+                        key,
+                        {
+                            ...value,
+                            score: Math.round(value.score * scaleFactor)
+                        }
+                    ])
+                )
+            );
+        }
 
         const insights = generateInsights({
             pe: Number(marketSummary.current_pe),
             dividendYield: Number(marketSummary.dividend_yield),
             debtToEquity: Number(financialHealth.total_loan) / Math.max(1, Number(financialHealth.reserve_and_surplus) || 1),
-            score: result.score,
+            score: apiScore,
         });
 
-        return { ...result, insights };
-    }, [marketSummary, financialHealth]);
+        return { score: apiScore, breakdown, insights };
+    }, [displayedStocks, selectedSymbol, marketSummary, financialHealth]);
 
     // Comparison data
     const comparisonData = useMemo(() => {
@@ -493,7 +556,7 @@ export function Fundamentals({ defaultSymbol }: FundamentalsProps) {
                     </Card>
 
                     {/* Comparison Table */}
-                    <ComparisonTable 
+                    <ComparisonTable
                         stocks={comparisonData}
                         onRemove={handleRemoveFromComparison}
                         onExport={handleExportComparison}
@@ -573,32 +636,37 @@ export function Fundamentals({ defaultSymbol }: FundamentalsProps) {
                     )}
 
                     {/* Key Metrics Grid */}
-                    {marketSummary && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <MetricCard
-                                label="P/E Ratio"
-                                value={formatNumber(marketSummary.current_pe)}
-                                status={Number(marketSummary.current_pe) < 15 ? 'good' : Number(marketSummary.current_pe) < 25 ? 'fair' : 'poor'}
-                                description="Price-to-Earnings ratio indicates valuation"
-                            />
-                            <MetricCard
-                                label="Dividend Yield"
-                                value={formatPct(marketSummary.dividend_yield)}
-                                status={Number(marketSummary.dividend_yield) > 3 ? 'good' : Number(marketSummary.dividend_yield) > 1 ? 'fair' : 'poor'}
-                                description="Annual dividend as percentage of price"
-                            />
-                            <MetricCard
-                                label="Market Cap"
-                                value={`৳${formatNumber(marketSummary.market_cap)}M`}
-                                description="Total market value of the company"
-                            />
-                            <MetricCard
-                                label="NAV/Share"
-                                value={formatTk(marketSummary.nav)}
-                                description="Net Asset Value per share"
-                            />
-                        </div>
-                    )}
+                    {(() => {
+                        const selectedStock = displayedStocks.find(s => s.symbol === selectedSymbol);
+                        if (!selectedStock) return null;
+                        
+                        return (
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <MetricCard
+                                    label="P/E Ratio"
+                                    value={formatNumber(selectedStock.pe)}
+                                    status={selectedStock.pe && selectedStock.pe > 0 && selectedStock.pe < 15 ? 'good' : selectedStock.pe && selectedStock.pe < 25 ? 'fair' : 'poor'}
+                                    description="Price-to-Earnings ratio indicates valuation"
+                                />
+                                <MetricCard
+                                    label="Dividend Yield"
+                                    value={formatPct(selectedStock.dividendYield)}
+                                    status={selectedStock.dividendYield && selectedStock.dividendYield > 3 ? 'good' : selectedStock.dividendYield && selectedStock.dividendYield > 1 ? 'fair' : 'poor'}
+                                    description="Annual dividend as percentage of price"
+                                />
+                                <MetricCard
+                                    label="Market Cap"
+                                    value={`${formatNumber(selectedStock.marketCap)}M`}
+                                    description="Total market value of the company"
+                                />
+                                <MetricCard
+                                    label="NAV/Share"
+                                    value={formatNumber(selectedStock.navPerShare)}
+                                    description="Net Asset Value per share"
+                                />
+                            </div>
+                        );
+                    })()}
 
                     {/* Detailed Tabs */}
                     <Tabs defaultValue="overview">
@@ -638,7 +706,7 @@ export function Fundamentals({ defaultSymbol }: FundamentalsProps) {
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                         <div>
                                             <div className="text-muted-foreground">Last Price (LTP)</div>
-                                            <div className="font-bold text-lg">{formatTk(marketSummary?.ltp)}</div>
+                                            <div className="font-bold text-lg">{marketSummary?.ltp}</div>
                                         </div>
                                         <div><div className="text-muted-foreground">Current P/E</div><div className="font-medium">{formatNumber(marketSummary?.current_pe)}</div></div>
                                         <div><div className="text-muted-foreground">Dividend Yield</div><div className="font-medium">{formatPct(marketSummary?.dividend_yield)}</div></div>
@@ -651,12 +719,212 @@ export function Fundamentals({ defaultSymbol }: FundamentalsProps) {
                             </Card>
                         </TabsContent>
 
-                        {/* Other tabs remain similar to original but condensed */}
-                        <TabsContent value="earnings"><Card><CardContent className="pt-6">Earnings data...</CardContent></Card></TabsContent>
-                        <TabsContent value="financial-health"><Card><CardContent className="pt-6">Financial health data...</CardContent></Card></TabsContent>
-                        <TabsContent value="shareholding"><Card><CardContent className="pt-6">Shareholding pattern...</CardContent></Card></TabsContent>
-                        <TabsContent value="dividends"><Card><CardContent className="pt-6">Dividend history...</CardContent></Card></TabsContent>
-                        <TabsContent value="ratios"><Card><CardContent className="pt-6">Historical ratios...</CardContent></Card></TabsContent>
+                        {/* Earnings Tab */}
+                        <TabsContent value="earnings" className="space-y-4">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Earnings & Profitability</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {earnings ? (
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                <div>
+                                                    <div className="text-sm text-muted-foreground">Revenue</div>
+                                                    <div className="text-lg font-semibold">{formatNumber((earnings as any).revenue)}M</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm text-muted-foreground">Net Profit</div>
+                                                    <div className="text-lg font-semibold">{formatNumber((earnings as any).net_profit)}M</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm text-muted-foreground">EPS</div>
+                                                    <div className="text-lg font-semibold">{formatNumber((earnings as any).eps)}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm text-muted-foreground">ROE</div>
+                                                    <div className="text-lg font-semibold">{formatPct((earnings as any).roe)}</div>
+                                                </div>
+                                            </div>
+                                            <Separator />
+                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                                                <div><span className="text-muted-foreground">Operating Profit:</span> <span className="font-medium">{formatNumber((earnings as any).operating_profit)}M</span></div>
+                                                <div><span className="text-muted-foreground">Profit Margin:</span> <span className="font-medium">{formatPct((earnings as any).profit_margin)}</span></div>
+                                                <div><span className="text-muted-foreground">ROA:</span> <span className="font-medium">{formatPct((earnings as any).roa)}</span></div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center text-muted-foreground py-8">No earnings data available</div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        {/* Financial Health Tab */}
+                        <TabsContent value="financial-health" className="space-y-4">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Financial Health</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {financialHealth ? (
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                                <div>
+                                                    <div className="text-sm text-muted-foreground">Total Assets</div>
+                                                    <div className="text-lg font-semibold">{formatNumber((financialHealth as any).total_assets)}M</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm text-muted-foreground">Total Liabilities</div>
+                                                    <div className="text-lg font-semibold">{formatNumber((financialHealth as any).total_liabilities)}M</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm text-muted-foreground">Total Equity</div>
+                                                    <div className="text-lg font-semibold">{formatNumber(financialHealth.reserve_and_surplus)}M</div>
+                                                </div>
+                                            </div>
+                                            <Separator />
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                                <div><span className="text-muted-foreground">Total Loan:</span> <span className="font-medium">{formatNumber(financialHealth.total_loan)}M</span></div>
+                                                <div><span className="text-muted-foreground">Current Assets:</span> <span className="font-medium">{formatNumber((financialHealth as any).current_assets)}M</span></div>
+                                                <div><span className="text-muted-foreground">Current Liabilities:</span> <span className="font-medium">{formatNumber((financialHealth as any).current_liabilities)}M</span></div>
+                                                <div>
+                                                    <span className="text-muted-foreground">Current Ratio:</span>
+                                                    <span className="font-medium ml-1">
+                                                        {formatNumber(Number((financialHealth as any).current_assets) / Math.max(1, Number((financialHealth as any).current_liabilities)))}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center text-muted-foreground py-8">No financial health data available</div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        {/* Shareholding Tab */}
+                        <TabsContent value="shareholding" className="space-y-4">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Shareholding Pattern</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {shareholding ? (
+                                        <div className="space-y-6">
+                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                                <div>
+                                                    <div className="text-sm text-muted-foreground">Sponsor/Directors</div>
+                                                    <div className="text-lg font-semibold">{formatPct((shareholding as any).sponsor_director)}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm text-muted-foreground">Public shareholding</div>
+                                                    <div className="text-lg font-semibold">{formatPct((shareholding as any).public_shareholding)}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm text-muted-foreground">Institutional</div>
+                                                    <div className="text-lg font-semibold">{formatPct((shareholding as any).institutional)}</div>
+                                                </div>
+                                            </div>
+                                            {(shareholding as any).sponsor_director && (shareholding as any).public_shareholding && (
+                                                <ShareholdingChart
+                                                    data={[
+                                                        { name: 'Sponsor/Directors', value: Number((shareholding as any).sponsor_director), color: '#0088FE' },
+                                                        { name: 'Public', value: Number((shareholding as any).public_shareholding), color: '#00C49F' },
+                                                        { name: 'Institutional', value: Number((shareholding as any).institutional) || 0, color: '#FFBB28' },
+                                                        { name: 'Government', value: Number((shareholding as any).government) || 0, color: '#FF8042' },
+                                                        { name: 'Foreign', value: Number((shareholding as any).foreign) || 0, color: '#8884d8' },
+                                                    ].filter(item => item.value > 0)}
+                                                />
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center text-muted-foreground py-8">No shareholding data available</div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        {/* Dividends Tab */}
+                        <TabsContent value="dividends" className="space-y-4">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Dividend History</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {dividends && Array.isArray(dividends) && dividends.length > 0 ? (
+                                        <div className="space-y-6">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>Year</TableHead>
+                                                        <TableHead>Type</TableHead>
+                                                        <TableHead>Cash Dividend</TableHead>
+                                                        <TableHead>Stock Dividend</TableHead>
+                                                        <TableHead>Record Date</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {dividends.map((div: any, idx: number) => (
+                                                        <TableRow key={idx}>
+                                                            <TableCell className="font-medium">{div.year || '-'}</TableCell>
+                                                            <TableCell>{div.dividend_type || '-'}</TableCell>
+                                                            <TableCell>{div.cash_dividend ? `${div.cash_dividend}%` : '-'}</TableCell>
+                                                            <TableCell>{div.stock_dividend ? `${div.stock_dividend}%` : '-'}</TableCell>
+                                                            <TableCell>{div.record_date || '-'}</TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                            <DividendsChart data={dividends as any} />
+                                        </div>
+                                    ) : (
+                                        <div className="text-center text-muted-foreground py-8">No dividend history available</div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        {/* Historical Ratios Tab */}
+                        <TabsContent value="ratios" className="space-y-4">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Historical Financial Ratios</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {historicalRatios && Array.isArray(historicalRatios) && historicalRatios.length > 0 ? (
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Year</TableHead>
+                                                    <TableHead>P/E Ratio</TableHead>
+                                                    <TableHead>ROE (%)</TableHead>
+                                                    <TableHead>ROA (%)</TableHead>
+                                                    <TableHead>Debt/Equity</TableHead>
+                                                    <TableHead>EPS</TableHead>
+                                                    <TableHead>NAV</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {historicalRatios.map((ratio: any, idx: number) => (
+                                                    <TableRow key={idx}>
+                                                        <TableCell className="font-medium">{ratio.year || '-'}</TableCell>
+                                                        <TableCell>{formatNumber(ratio.pe_ratio)}</TableCell>
+                                                        <TableCell>{formatNumber(ratio.roe)}</TableCell>
+                                                        <TableCell>{formatNumber(ratio.roa)}</TableCell>
+                                                        <TableCell>{formatNumber(ratio.debt_to_equity)}</TableCell>
+                                                        <TableCell>{formatNumber(ratio.eps)}</TableCell>
+                                                        <TableCell>{formatNumber(ratio.nav)}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    ) : (
+                                        <div className="text-center text-muted-foreground py-8">No historical ratio data available</div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
                         <TabsContent value="chart">
                             <Card>
                                 <CardHeader>

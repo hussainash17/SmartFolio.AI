@@ -107,7 +107,7 @@ export function ComparisonTable({ stocks, onRemove, onExport }: ComparisonTableP
                             <TableRow>
                                 <TableCell className="sticky left-0 bg-background font-medium">Last Price</TableCell>
                                 {stocks.map((stock) => (
-                                    <TableCell key={stock.symbol}>৳{formatNumber(stock.ltp)}</TableCell>
+                                    <TableCell key={stock.symbol}>{formatNumber(stock.ltp)}</TableCell>
                                 ))}
                             </TableRow>
 
@@ -174,7 +174,7 @@ export function ComparisonTable({ stocks, onRemove, onExport }: ComparisonTableP
                             <TableRow>
                                 <TableCell className="sticky left-0 bg-background font-medium">Market Cap</TableCell>
                                 {stocks.map((stock) => (
-                                    <TableCell key={stock.symbol}>৳{formatNumber(stock.marketCap)}M</TableCell>
+                                    <TableCell key={stock.symbol}>{formatNumber(stock.marketCap)}M</TableCell>
                                 ))}
                             </TableRow>
 
@@ -186,7 +186,7 @@ export function ComparisonTable({ stocks, onRemove, onExport }: ComparisonTableP
                                         className={isHighlighted(stock.eps, bestEPS) ? 'bg-green-50 dark:bg-green-950/20 font-semibold' : ''}
                                     >
                                         <div className="flex items-center gap-1">
-                                            ৳{formatNumber(stock.eps)}
+                                            {formatNumber(stock.eps)}
                                             {isHighlighted(stock.eps, bestEPS) && <Trophy className="h-3 w-3 text-green-600" />}
                                         </div>
                                     </TableCell>
@@ -196,7 +196,7 @@ export function ComparisonTable({ stocks, onRemove, onExport }: ComparisonTableP
                             <TableRow>
                                 <TableCell className="sticky left-0 bg-background font-medium">NAV/Share</TableCell>
                                 {stocks.map((stock) => (
-                                    <TableCell key={stock.symbol}>৳{formatNumber(stock.navPerShare)}</TableCell>
+                                    <TableCell key={stock.symbol}>{formatNumber(stock.navPerShare)}</TableCell>
                                 ))}
                             </TableRow>
                         </TableBody>

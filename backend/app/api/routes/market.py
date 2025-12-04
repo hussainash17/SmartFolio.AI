@@ -413,7 +413,7 @@ def list_fundamentals(
     # Format response
     stocks_with_metrics: List[Dict[str, Any]] = []
     for cache, company in results:
-        stocks_with_metrics.append({
+        stock_data = {
             "id": str(company.id),
             "symbol": company.trading_code,
             "company_name": company.company_name,
@@ -428,7 +428,19 @@ def list_fundamentals(
             "eps": float(cache.eps) if cache.eps is not None else None,
             "nav": float(cache.nav) if cache.nav is not None else None,
             "score": float(cache.fundamental_score) if cache.fundamental_score is not None else 0,
-        })
+        }
+        
+        # Add score breakdown if available
+        if cache.base_score is not None or cache.pe_score_contribution is not None:
+            stock_data["score_breakdown"] = {
+                "base_score": float(cache.base_score) if cache.base_score is not None else None,
+                "pe_contribution": float(cache.pe_score_contribution) if cache.pe_score_contribution is not None else None,
+                "dividend_yield_contribution": float(cache.dividend_yield_score_contribution) if cache.dividend_yield_score_contribution is not None else None,
+                "debt_to_equity_contribution": float(cache.debt_to_equity_score_contribution) if cache.debt_to_equity_score_contribution is not None else None,
+                "roe_contribution": float(cache.roe_score_contribution) if cache.roe_score_contribution is not None else None,
+            }
+        
+        stocks_with_metrics.append(stock_data)
 
     return stocks_with_metrics
 

@@ -60,6 +60,14 @@ class DonchianChannelCache(SQLModel, table=True):
     eps: Optional[Decimal] = Field(default=None)
     nav: Optional[Decimal] = Field(default=None)
     fundamental_score: Optional[Decimal] = Field(default=None)
+    
+    # Score Breakdown
+    base_score: Optional[Decimal] = Field(default=None, description="Base score (always 50.0)")
+    pe_score_contribution: Optional[Decimal] = Field(default=None, description="PE ratio contribution to score (0-20)")
+    dividend_yield_score_contribution: Optional[Decimal] = Field(default=None, description="Dividend yield contribution to score (0-15)")
+    debt_to_equity_score_contribution: Optional[Decimal] = Field(default=None, description="Debt-to-equity contribution to score (0-15)")
+    roe_score_contribution: Optional[Decimal] = Field(default=None, description="ROE contribution to score (0-10)")
+    
     sector: Optional[str] = Field(default=None)
     symbol: Optional[str] = Field(default=None)
     

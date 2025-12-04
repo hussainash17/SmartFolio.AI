@@ -22,6 +22,7 @@ public class FundamentalCacheService {
     private final FinancialPerformanceRepository financialPerformanceRepository;
     private final LoanStatusRepository loanStatusRepository;
     private final DonchianChannelCacheRepository donchianChannelCacheRepository;
+    private final StockDataRepository stockDataRepository;
 
     /**
      * Calculate and cache fundamental metrics for all active companies.
@@ -106,21 +107,64 @@ public class FundamentalCacheService {
 
     private BigDecimal calculateMarketCap(Company company) {
         try {
+            // Return existing market cap if available
             if (company.getMarketCap() != null) {
                 return company.getMarketCap();
             }
+            
+            // Calculate market cap if not available
+            Optional<StockData> latestStockData = stockDataRepository.findTopByCompanyIdOrderByTimestampDesc(company.getId());
+            if (latestStockData.isPresent() && latestStockData.get().getLastTradePrice() != null 
+                    && company.getTotalOutstandingSecurities() != null && company.getTotalOutstandingSecurities() > 0) {
+                
+                BigDecimal currentPrice = latestStockData.get().getLastTradePrice();
+                BigDecimal totalShares = BigDecimal.valueOf(company.getTotalOutstandingSecurities());
+                BigDecimal calculatedMarketCap = currentPrice.multiply(totalShares);
+                
+                // Store calculated market cap back to company
+                company.setMarketCap(calculatedMarketCap);
+                companyRepository.save(company);
+                
+                log.debug("Calculated and stored market cap for company {}: {}", company.getTradingCode(), calculatedMarketCap);
+                return calculatedMarketCap;
+            }
+            
             return null;
         } catch (Exception e) {
+            log.error("Error calculating market cap for company {}: {}", company.getTradingCode(), e.getMessage());
             return null;
         }
     }
 
     private BigDecimal calculatePeRatio(Company company, FinancialPerformance fin) {
         try {
-            if (company.getPeRatio() != null)
+            // Return existing P/E ratio if available
+            if (company.getPeRatio() != null) {
                 return company.getPeRatio();
+            }
+            
+            // Calculate P/E ratio if not available
+            // P/E = Current Price / EPS
+            Optional<StockData> latestStockData = stockDataRepository.findTopByCompanyIdOrderByTimestampDesc(company.getId());
+            BigDecimal eps = (fin != null && fin.getEpsBasic() != null) ? fin.getEpsBasic() : company.getEps();
+            
+            if (latestStockData.isPresent() && latestStockData.get().getLastTradePrice() != null 
+                    && eps != null && eps.compareTo(BigDecimal.ZERO) > 0) {
+                
+                BigDecimal currentPrice = latestStockData.get().getLastTradePrice();
+                BigDecimal calculatedPeRatio = currentPrice.divide(eps, 4, java.math.RoundingMode.HALF_UP);
+                
+                // Store calculated P/E ratio back to company
+                company.setPeRatio(calculatedPeRatio);
+                companyRepository.save(company);
+                
+                log.debug("Calculated and stored P/E ratio for company {}: {}", company.getTradingCode(), calculatedPeRatio);
+                return calculatedPeRatio;
+            }
+            
             return null;
         } catch (Exception e) {
+            log.error("Error calculating P/E ratio for company {}: {}", company.getTradingCode(), e.getMessage());
             return null;
         }
     }

@@ -106,14 +106,14 @@ export function StockCard({
                 {/* Price */}
                 <div>
                     <div className="flex items-baseline gap-2">
-                        <span className="text-2xl font-bold">৳{formatNumber(currentPrice)}</span>
+                        <span className="text-2xl font-bold">{formatNumber(currentPrice)}</span>
                         <div className={`flex items-center text-sm ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
                             {isPositive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
                             <span>{isPositive ? '+' : ''}{priceChangePercent.toFixed(2)}%</span>
                         </div>
                     </div>
                     <div className={`text-xs ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                        {isPositive ? '+' : ''}৳{formatNumber(priceChange)}
+                        {isPositive ? '+' : ''}{formatNumber(priceChange)}
                     </div>
                 </div>
 
