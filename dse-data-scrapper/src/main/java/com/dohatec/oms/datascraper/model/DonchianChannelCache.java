@@ -102,6 +102,22 @@ public class DonchianChannelCache {
     @Column(name = "fundamental_score")
     private BigDecimal fundamentalScore;
 
+    // Score Breakdown
+    @Column(name = "base_score")
+    private BigDecimal baseScore;
+
+    @Column(name = "pe_score_contribution")
+    private BigDecimal peScoreContribution;
+
+    @Column(name = "dividend_yield_score_contribution")
+    private BigDecimal dividendYieldScoreContribution;
+
+    @Column(name = "debt_to_equity_score_contribution")
+    private BigDecimal debtToEquityScoreContribution;
+
+    @Column(name = "roe_score_contribution")
+    private BigDecimal roeScoreContribution;
+
     @Column(name = "sector")
     private String sector;
 

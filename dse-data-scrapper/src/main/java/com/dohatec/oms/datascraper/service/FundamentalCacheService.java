@@ -58,7 +58,7 @@ public class FundamentalCacheService {
                 BigDecimal nav = (fin != null && fin.getNavPerShare() != null) ? fin.getNavPerShare()
                         : company.getNav();
 
-                BigDecimal score = calculateFundamentalScore(peRatio, dividendYield, debtToEquity, roe);
+                FundamentalScoreBreakdown scoreBreakdown = calculateFundamentalScore(peRatio, dividendYield, debtToEquity, roe);
 
                 // Create or update cache entry
                 DonchianChannelCache cache = donchianChannelCacheRepository
@@ -79,7 +79,12 @@ public class FundamentalCacheService {
                 cache.setDebtToEquity(debtToEquity);
                 cache.setEps(eps);
                 cache.setNav(nav);
-                cache.setFundamentalScore(score);
+                cache.setFundamentalScore(scoreBreakdown.getTotalScore());
+                cache.setBaseScore(scoreBreakdown.getBaseScore());
+                cache.setPeScoreContribution(scoreBreakdown.getPeContribution());
+                cache.setDividendYieldScoreContribution(scoreBreakdown.getDividendYieldContribution());
+                cache.setDebtToEquityScoreContribution(scoreBreakdown.getDebtToEquityContribution());
+                cache.setRoeScoreContribution(scoreBreakdown.getRoeContribution());
 
                 cacheEntries.add(cache);
                 successCount++;
@@ -164,51 +169,111 @@ public class FundamentalCacheService {
         }
     }
 
-    private BigDecimal calculateFundamentalScore(BigDecimal pe, BigDecimal divYield, BigDecimal de, BigDecimal roe) {
-        double score = 50.0;
+    private FundamentalScoreBreakdown calculateFundamentalScore(BigDecimal pe, BigDecimal divYield, BigDecimal de, BigDecimal roe) {
+        double baseScore = 50.0;
+        double peContribution = 0.0;
+        double divYieldContribution = 0.0;
+        double deContribution = 0.0;
+        double roeContribution = 0.0;
 
         if (pe != null && pe.compareTo(BigDecimal.ZERO) > 0) {
             double peVal = pe.doubleValue();
             if (peVal < 10)
-                score += 20;
+                peContribution = 20;
             else if (peVal < 15)
-                score += 15;
+                peContribution = 15;
             else if (peVal < 20)
-                score += 10;
+                peContribution = 10;
             else if (peVal < 30)
-                score += 5;
+                peContribution = 5;
         }
 
         if (divYield != null) {
             double divVal = divYield.doubleValue();
             if (divVal > 5)
-                score += 15;
+                divYieldContribution = 15;
             else if (divVal > 3)
-                score += 10;
+                divYieldContribution = 10;
             else if (divVal > 1)
-                score += 5;
+                divYieldContribution = 5;
         }
 
         if (de != null) {
             double deVal = de.doubleValue();
             if (deVal < 0.3)
-                score += 15;
+                deContribution = 15;
             else if (deVal < 0.5)
-                score += 10;
+                deContribution = 10;
             else if (deVal < 1.0)
-                score += 5;
+                deContribution = 5;
         }
 
         if (roe != null && roe.compareTo(BigDecimal.ZERO) > 0) {
             double roeVal = roe.doubleValue();
             if (roeVal > 20)
-                score += 10;
+                roeContribution = 10;
             else if (roeVal > 15)
-                score += 7;
+                roeContribution = 7;
             else if (roeVal > 10)
-                score += 5;
+                roeContribution = 5;
         }
 
-        return BigDecimal.valueOf(score);
+        double totalScore = baseScore + peContribution + divYieldContribution + deContribution + roeContribution;
+
+        return new FundamentalScoreBreakdown(
+                BigDecimal.valueOf(baseScore),
+                BigDecimal.valueOf(peContribution),
+                BigDecimal.valueOf(divYieldContribution),
+                BigDecimal.valueOf(deContribution),
+                BigDecimal.valueOf(roeContribution),
+                BigDecimal.valueOf(totalScore)
+        );
+    }
+
+    /**
+     * Inner class to hold fundamental score breakdown
+     */
+    private static class FundamentalScoreBreakdown {
+        private final BigDecimal baseScore;
+        private final BigDecimal peContribution;
+        private final BigDecimal dividendYieldContribution;
+        private final BigDecimal debtToEquityContribution;
+        private final BigDecimal roeContribution;
+        private final BigDecimal totalScore;
+
+        public FundamentalScoreBreakdown(BigDecimal baseScore, BigDecimal peContribution,
+                                        BigDecimal dividendYieldContribution, BigDecimal debtToEquityContribution,
+                                        BigDecimal roeContribution, BigDecimal totalScore) {
+            this.baseScore = baseScore;
+            this.peContribution = peContribution;
+            this.dividendYieldContribution = dividendYieldContribution;
+            this.debtToEquityContribution = debtToEquityContribution;
+            this.roeContribution = roeContribution;
+            this.totalScore = totalScore;
+        }
+
+        public BigDecimal getBaseScore() {
+            return baseScore;
+        }
+
+        public BigDecimal getPeContribution() {
+            return peContribution;
+        }
+
+        public BigDecimal getDividendYieldContribution() {
+            return dividendYieldContribution;
+        }
+
+        public BigDecimal getDebtToEquityContribution() {
+            return debtToEquityContribution;
+        }
+
+        public BigDecimal getRoeContribution() {
+            return roeContribution;
+        }
+
+        public BigDecimal getTotalScore() {
+            return totalScore;
+        }
     }
 }
