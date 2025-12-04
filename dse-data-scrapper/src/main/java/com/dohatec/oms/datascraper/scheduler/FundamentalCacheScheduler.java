@@ -4,7 +4,6 @@ import com.dohatec.oms.datascraper.service.FundamentalCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -20,8 +19,7 @@ public class FundamentalCacheScheduler {
      * Update fundamental cache daily at 5:00 PM (after market close and scraping)
      * Runs Monday to Thursday
      */
-    @Scheduled(cron = "${scraper.schedule.fundamental-cache-cron:0 0 17 * *
-    MON-THU}", zone = "${scraper.schedule.timezone:Asia/Dhaka}")
+    @Scheduled(cron = "${scraper.schedule.fundamental-cache-cron:0 0 17 * * MON-THU}", zone = "${scraper.schedule.timezone:Asia/Dhaka}")
     public void updateFundamentalCache() {
         try {
             log.info("=== Fundamental cache update started ===");
