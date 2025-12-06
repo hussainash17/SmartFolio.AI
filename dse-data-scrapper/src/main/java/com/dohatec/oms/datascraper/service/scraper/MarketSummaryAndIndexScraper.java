@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -333,35 +334,71 @@ public class MarketSummaryAndIndexScraper {
                                      Benchmark benchmark,
                                      LocalDate date,
                                      OffsetDateTime now) {
-        BenchmarkData data = benchmarkDataRepository.findByBenchmarkAndDate(benchmark, date)
-                .orElseGet(() -> BenchmarkData.builder()
-                        .benchmark(benchmark)
-                        .date(date)
-                        .openValue(snapshot.value()) // first tick of the day
-                        .build());
-
-        BigDecimal price = snapshot.value();
-
-        if (data.getOpenValue() == null) {
-            data.setOpenValue(price);
+        // Find existing record for this benchmark and date
+        Optional<BenchmarkData> existingOpt = benchmarkDataRepository.findByBenchmarkAndDate(benchmark, date);
+        
+        BenchmarkData data;
+        boolean isNew = existingOpt.isEmpty();
+        
+        if (isNew) {
+            // Create new record
+            data = BenchmarkData.builder()
+                    .benchmark(benchmark)
+                    .date(date)
+                    .openValue(snapshot.value())
+                    .closeValue(snapshot.value())
+                    .highValue(snapshot.value())
+                    .lowValue(snapshot.value())
+                    .build();
+        } else {
+            // Update existing record
+            data = existingOpt.get();
+            
+            // Update OHLC values (for intraday updates)
+            if (data.getOpenValue() == null) {
+                data.setOpenValue(snapshot.value());
+            }
+            data.setHighValue(max(data.getHighValue(), snapshot.value()));
+            data.setLowValue(min(data.getLowValue(), snapshot.value()));
+            data.setCloseValue(snapshot.value()); // Always update close to latest value
         }
-        data.setHighValue(max(data.getHighValue(), price));
-        data.setLowValue(min(data.getLowValue(), price));
-        data.setCloseValue(price); // last tick seen so far
 
-        // Store daily return (percentage change)
+        // Always store daily return (percentage change) from scraped data
         if (snapshot.percentChange() != null) {
             data.setDailyReturn(snapshot.percentChange());
+        } else if (snapshot.change() != null && snapshot.value() != null) {
+            // Calculate percentage change from absolute change if percentChange is not available
+            BigDecimal previousValue = snapshot.value().subtract(snapshot.change());
+            if (previousValue.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal calculatedPercent = snapshot.change()
+                        .divide(previousValue, 6, java.math.RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100));
+                data.setDailyReturn(calculatedPercent);
+            }
         }
 
-        // Market totals are associated with DSEX
+        // Market totals are associated with DSEX (only set if not already set or if updating)
         MarketTotals totals = snapshot.marketTotals();
         if (totals != null) {
-            data.setVolume(totals.volume());
-            data.setTrades(totals.trades());
-            data.setTotalValue(totals.totalValue());
+            if (data.getVolume() == null || isNew) {
+                data.setVolume(totals.volume());
+            }
+            if (data.getTrades() == null || isNew) {
+                data.setTrades(totals.trades());
+            }
+            if (data.getTotalValue() == null || isNew) {
+                data.setTotalValue(totals.totalValue());
+            }
         }
+        
+        // Save or update the record
         benchmarkDataRepository.save(data);
+        log.debug("{} benchmark data for {} on {}: close={}, daily_return={}%", 
+                isNew ? "Created" : "Updated", 
+                benchmark.getId(), 
+                date, 
+                data.getCloseValue(), 
+                data.getDailyReturn());
     }
 
     private String normalizeIndexName(String text) {
