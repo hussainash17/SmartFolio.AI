@@ -4,6 +4,9 @@
  * Used across all components for consistent formatting throughout the application.
  */
 
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+
 // Re-export formatting utilities from formatting-utils
 export {
     formatPrice,
@@ -161,4 +164,8 @@ export function getRatingColor(rating: string): string {
         default:
             return 'text-gray-600 bg-gray-50 border-gray-200';
     }
+}
+
+export function cn(...inputs: ClassValue[]) {
+    return twMerge(clsx(inputs))
 }
