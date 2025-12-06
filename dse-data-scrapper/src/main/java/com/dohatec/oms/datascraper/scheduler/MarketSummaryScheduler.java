@@ -31,9 +31,8 @@ public class MarketSummaryScheduler {
      * - *: month
      * - SUN-THU: day of week (Sunday to Thursday)
      */
-//    @Scheduled(cron = "${scraper.schedule.market-summary-cron:0 30 14 * * SUN-THU}",
-//            zone = "${scraper.schedule.timezone:Asia/Dhaka}")
-    @Bean
+   @Scheduled(cron = "${scraper.schedule.market-summary-cron:0 30 14 * * SUN-THU}",
+           zone = "${scraper.schedule.timezone:Asia/Dhaka}")
     public void scrapeMarketSummary() {
         try {
             log.debug("Starting scheduled market summary scraping");
