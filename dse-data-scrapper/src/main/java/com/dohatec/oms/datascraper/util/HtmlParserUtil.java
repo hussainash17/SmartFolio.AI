@@ -1,10 +1,13 @@
 package com.dohatec.oms.datascraper.util;
 
 import lombok.extern.slf4j.Slf4j;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
@@ -18,67 +21,85 @@ import java.util.Map;
 public class HtmlParserUtil {
 
     /**
+     * Fetch HTML document from URL
+     *
+     * @param url the URL to fetch
+     * @return the parsed Document
+     * @throws IOException if connection fails
+     */
+    public Document getDocument(String url) throws IOException {
+        return Jsoup.connect(url)
+                .userAgent(
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+                .timeout(30000)
+                .get();
+    }
+
+    /**
      * Parse a key-value table (th-td pairs)
+     *
      * @param table the table element
      * @return map of key-value pairs
      */
     public Map<String, String> parseKeyValueTable(Element table) {
         Map<String, String> data = new HashMap<>();
-        
+
         if (table == null) {
             return data;
         }
-        
+
         Elements rows = table.select("tr");
         for (Element row : rows) {
             Elements headers = row.select("th");
             Elements values = row.select("td");
-            
+
             for (int i = 0; i < headers.size() && i < values.size(); i++) {
                 String key = cleanText(headers.get(i).text());
                 String value = cleanText(values.get(i).text());
-                
+
                 if (!key.isEmpty()) {
                     data.put(key, value);
                 }
             }
         }
-        
+
         return data;
     }
 
     /**
      * Parse a table with multiple th-td pairs per row
+     *
      * @param table the table element
      * @return map of key-value pairs
      */
     public Map<String, String> parseMultiColumnTable(Element table) {
         Map<String, String> data = new HashMap<>();
-        
+
         if (table == null) {
             return data;
         }
-        
+
         Elements rows = table.select("tbody tr");
         for (Element row : rows) {
             Elements cells = row.select("th, td");
-            
+
             // Process pairs of cells (key-value)
             for (int i = 0; i < cells.size() - 1; i += 2) {
                 String key = cleanText(cells.get(i).text());
                 String value = cleanText(cells.get(i + 1).text());
-                
+
                 if (!key.isEmpty()) {
                     data.put(key, value);
                 }
             }
         }
-        
+
         return data;
     }
 
     /**
      * Clean and normalize text extracted from HTML
+     *
      * @param text the raw text
      * @return cleaned text
      */
@@ -86,7 +107,7 @@ public class HtmlParserUtil {
         if (text == null) {
             return "";
         }
-        
+
         return text.trim()
                 .replaceAll("\\s+", " ")
                 .replaceAll("\\u00A0", " ") // Non-breaking space
@@ -96,6 +117,7 @@ public class HtmlParserUtil {
 
     /**
      * Parse a numeric value from string
+     *
      * @param value the string value
      * @return BigDecimal or null if parsing fails
      */
@@ -103,9 +125,10 @@ public class HtmlParserUtil {
         if (value == null || value.isEmpty() || value.equals("-") || value.equalsIgnoreCase("N/A")) {
             return null;
         }
-        
+
         try {
-            // Remove commas and other non-numeric characters except decimal point and minus sign
+            // Remove commas and other non-numeric characters except decimal point and minus
+            // sign
             String cleaned = value.replaceAll("[^0-9.-]", "");
             return new BigDecimal(cleaned);
         } catch (NumberFormatException e) {
@@ -116,6 +139,7 @@ public class HtmlParserUtil {
 
     /**
      * Parse an integer value from string
+     *
      * @param value the string value
      * @return Integer or null if parsing fails
      */
@@ -123,7 +147,7 @@ public class HtmlParserUtil {
         if (value == null || value.isEmpty() || value.equals("-") || value.equalsIgnoreCase("N/A")) {
             return null;
         }
-        
+
         try {
             String cleaned = value.replaceAll("[^0-9-]", "");
             return Integer.parseInt(cleaned);
@@ -135,6 +159,7 @@ public class HtmlParserUtil {
 
     /**
      * Parse an integer value and return as Long
+     *
      * @param value the string value
      * @return Long or null if parsing fails
      */
@@ -145,6 +170,7 @@ public class HtmlParserUtil {
 
     /**
      * Parse a long value from string
+     *
      * @param value the string value
      * @return Long or null if parsing fails
      */
@@ -152,7 +178,7 @@ public class HtmlParserUtil {
         if (value == null || value.isEmpty() || value.equals("-") || value.equalsIgnoreCase("N/A")) {
             return null;
         }
-        
+
         try {
             String cleaned = value.replaceAll("[^0-9-]", "");
             return Long.parseLong(cleaned);
@@ -164,6 +190,7 @@ public class HtmlParserUtil {
 
     /**
      * Parse a double value from string
+     *
      * @param value the string value
      * @return Double or null if parsing fails
      */
@@ -171,7 +198,7 @@ public class HtmlParserUtil {
         if (value == null || value.isEmpty() || value.equals("-") || value.equalsIgnoreCase("N/A")) {
             return null;
         }
-        
+
         try {
             String cleaned = value.replaceAll("[^0-9.-]", "");
             return Double.parseDouble(cleaned);
@@ -183,19 +210,21 @@ public class HtmlParserUtil {
 
     /**
      * Check if a value is empty or placeholder
+     *
      * @param value the value to check
      * @return true if empty, false otherwise
      */
     public boolean isEmpty(String value) {
-        return value == null || 
-               value.isEmpty() || 
-               value.equals("-") || 
-               value.equalsIgnoreCase("N/A") ||
-               value.equalsIgnoreCase("null");
+        return value == null ||
+                value.isEmpty() ||
+                value.equals("-") ||
+                value.equalsIgnoreCase("N/A") ||
+                value.equalsIgnoreCase("null");
     }
 
     /**
      * Get text from element safely
+     *
      * @param element the element
      * @return text or empty string
      */
@@ -205,7 +234,8 @@ public class HtmlParserUtil {
 
     /**
      * Get attribute from element safely
-     * @param element the element
+     *
+     * @param element   the element
      * @param attribute the attribute name
      * @return attribute value or empty string
      */
@@ -218,40 +248,40 @@ public class HtmlParserUtil {
      * Expected table structure:
      * - First 3 rows are headers
      * - Subsequent rows contain: Year, ..., EPS, ..., NAV, ..., Profit, ..., TCI
-     * 
+     *
      * @param table the table element
      * @return map with keys in format "FieldName_Year" (e.g., "EPS_2024")
      */
     public Map<String, String> parseFinancialPerformanceTable(Element table) {
         Map<String, String> data = new HashMap<>();
-        
+
         if (table == null) {
             return data;
         }
-        
+
         Elements rows = table.select("tbody tr");
-        
+
         // Skip first 3 header rows, process data rows
         for (int i = 3; i < rows.size(); i++) {
             Element row = rows.get(i);
             Elements cells = row.select("td");
-            
+
             // Table typically has 12+ columns
             if (cells.size() >= 12) {
                 String year = cleanText(cells.get(0).text());
-                
+
                 // Skip invalid rows
                 if (isEmpty(year) || year.equals("Year")) {
                     continue;
                 }
-                
+
                 // Extract financial metrics
                 String epsBasic = cleanText(cells.size() > 4 ? cells.get(4).text() : "-");
                 String epsDiluted = cleanText(cells.size() > 5 ? cells.get(5).text() : "-");
                 String navPerShare = cleanText(cells.size() > 7 ? cells.get(7).text() : "-");
                 String profit = cleanText(cells.size() > 10 ? cells.get(10).text() : "-");
                 String totalComprehensiveIncome = cleanText(cells.size() > 12 ? cells.get(12).text() : "-");
-                
+
                 // Store with year suffix
                 if (!isEmpty(epsBasic)) {
                     data.put("EPS_Basic_" + year, epsBasic);
@@ -270,7 +300,7 @@ public class HtmlParserUtil {
                 }
             }
         }
-        
+
         return data;
     }
 }
