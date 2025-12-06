@@ -32,8 +32,18 @@ export interface TopMovers {
   losers?: Array<{ symbol: string; change_percent: number }>;
 }
 
+export interface IndexData {
+  level?: number | null;
+  change?: number | null;
+  change_percent?: number | null;
+  series?: Array<{ t: string | Date; v: number }>;
+}
+
 export interface MarketIndices {
-  DSEX?: { change_percent: number };
+  DSEX?: IndexData;
+  DS30?: IndexData;
+  DSES?: IndexData;
+  CSE?: IndexData;
 }
 
 export interface SectorAnalysis {

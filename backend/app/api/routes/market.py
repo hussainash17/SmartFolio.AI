@@ -654,9 +654,14 @@ def get_indices(
         days: int = Query(5, ge=1, le=90),
 ) -> Dict[str, Any]:
     """Return index levels and short history for sparklines.
-    Currently supports DSEX from MarketSummary; DS30 and DSES are placeholders until scraped.
+    Supports DSEX from MarketSummary, and DS30/DSES from benchmark_data table.
     """
+    from datetime import date as date_type
+    
     since = datetime.utcnow() - timedelta(days=days)
+    since_date = since.date()
+    
+    # Get MarketSummary data for DSEX and CSE
     summaries = session.exec(
         select(MarketSummary)
         .where(MarketSummary.date >= since)
@@ -676,26 +681,88 @@ def get_indices(
 
     latest = summaries[-1] if summaries else None
 
+    # Get DS30 and DSES from benchmark_data table
+    def get_benchmark_data(benchmark_id: str) -> Dict[str, Any]:
+        """Get latest benchmark data and series for sparklines."""
+        # Get latest data point
+        latest_data = session.exec(
+            select(BenchmarkData)
+            .where(BenchmarkData.benchmark_id == benchmark_id)
+            .where(BenchmarkData.date >= since_date)
+            .order_by(BenchmarkData.date.desc())
+            .limit(1)
+        ).first()
+        
+        if not latest_data:
+            return {
+                "level": None,
+                "change": None,
+                "change_percent": None,
+                "series": [],
+            }
+        
+        # Get series data for sparklines
+        series_data = session.exec(
+            select(BenchmarkData)
+            .where(BenchmarkData.benchmark_id == benchmark_id)
+            .where(BenchmarkData.date >= since_date)
+            .order_by(BenchmarkData.date.asc())
+        ).all()
+        
+        series = []
+        for data in series_data:
+            if data.close_value is not None:
+                # Use date as timestamp (convert to datetime for consistency)
+                timestamp = datetime.combine(data.date, datetime.min.time())
+                series.append({"t": timestamp, "v": float(data.close_value)})
+        
+        # Calculate change and change_percent
+        # Try to get previous day's close value
+        prev_data = session.exec(
+            select(BenchmarkData)
+            .where(BenchmarkData.benchmark_id == benchmark_id)
+            .where(BenchmarkData.date < latest_data.date)
+            .order_by(BenchmarkData.date.desc())
+            .limit(1)
+        ).first()
+        
+        change = None
+        change_percent = None
+        
+        if latest_data.close_value is not None:
+            if prev_data and prev_data.close_value is not None:
+                # Calculate change from previous day
+                change = float(latest_data.close_value) - float(prev_data.close_value)
+                if float(prev_data.close_value) != 0:
+                    change_percent = (change / float(prev_data.close_value)) * 100
+            elif latest_data.daily_return is not None:
+                # Use daily_return if available
+                change_percent = float(latest_data.daily_return)
+                if latest_data.close_value is not None:
+                    change = float(latest_data.close_value) * (change_percent / 100)
+        
+        return {
+            "level": float(latest_data.close_value) if latest_data.close_value is not None else None,
+            "change": change,
+            "change_percent": change_percent,
+            "series": series,
+        }
+    
+    dsex_data = {
+        "level": float(latest.dse_index) if latest and latest.dse_index is not None else None,
+        "change": float(latest.dse_index_change) if latest and latest.dse_index_change is not None else None,
+        "change_percent": float(
+            latest.dse_index_change_percent) if latest and latest.dse_index_change_percent is not None else None,
+        "series": dsex_series,
+    }
+    
+    ds30_data = get_benchmark_data("DS30")
+    dses_data = get_benchmark_data("DSES")
+    
     return {
-        "DSEX": {
-            "level": float(latest.dse_index) if latest and latest.dse_index is not None else None,
-            "change": float(latest.dse_index_change) if latest and latest.dse_index_change is not None else None,
-            "change_percent": float(
-                latest.dse_index_change_percent) if latest and latest.dse_index_change_percent is not None else None,
-            "series": dsex_series,
-        },
-        "DS30": {
-            "level": None,
-            "change": None,
-            "change_percent": None,
-            "series": [],
-        },
-        "DSES": {
-            "level": None,
-            "change": None,
-            "change_percent": None,
-            "series": [],
-        },
+        "DSEX": dsex_data,
+        "DS30": ds30_data,
+        "DSES": dses_data,
         "CSE": {
             "level": float(latest.cse_index) if latest and latest.cse_index is not None else None,
             "change": float(latest.cse_index_change) if latest and latest.cse_index_change is not None else None,
