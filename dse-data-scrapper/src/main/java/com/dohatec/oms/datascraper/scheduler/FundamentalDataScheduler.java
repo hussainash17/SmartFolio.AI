@@ -20,7 +20,6 @@ import org.springframework.stereotype.Component;
 public class FundamentalDataScheduler {
 
     private final FundamentalDataScraper fundamentalDataScraper;
-    private final ScraperProperties scraperProperties;
 
     /**
      * Scrape fundamental data daily at 4:00 PM (after market close)

@@ -30,11 +30,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -82,8 +78,8 @@ public class MarketSummaryAndIndexScraper {
             StockMovementData movementData = parseStockMovementData(document);
 
             // Store MarketSummary
-            MarketSummary marketSummary = buildMarketSummary(marketDate, now, marketTotals, indexSnapshots, movementData);
-            marketSummaryRepository.save(marketSummary);
+            MarketSummary marketSummary = persistMarketSummary(marketTotals, indexSnapshots, movementData, marketDate,
+                    now);
             log.info("Successfully saved market summary: {}", marketSummary);
 
             // Store individual index data in benchmark_data table
@@ -100,14 +96,24 @@ public class MarketSummaryAndIndexScraper {
         }
     }
 
+    private MarketSummary persistMarketSummary(MarketTotals marketTotals, List<IndexSnapshot> indexSnapshots,
+                                               StockMovementData movementData, LocalDate marketDate, LocalDateTime now) {
+        MarketSummary marketSummary = marketSummaryRepository.findByDate(marketDate)
+                .orElseGet(() -> {
+                    MarketSummary s = new MarketSummary();
+                    s.setDate(marketDate);
+                    return s;
+                });
+
+        updateMarketSummary(marketSummary, now, marketTotals, indexSnapshots, movementData);
+        return marketSummaryRepository.save(marketSummary);
+    }
+
     /**
      * Fetch the DSE homepage HTML.
      */
-    @Retryable(
-            retryFor = {NetworkException.class, Exception.class},
-            maxAttempts = 3,
-            backoff = @Backoff(delay = 1000L, multiplier = 2.0)
-    )
+    @Retryable(retryFor = {NetworkException.class,
+            Exception.class}, maxAttempts = 3, backoff = @Backoff(delay = 1000L, multiplier = 2.0))
     protected String fetchHtml() {
         String url = scraperProperties.getDse().getMarketSummaryUrl();
         try {
@@ -220,7 +226,8 @@ public class MarketSummaryAndIndexScraper {
         StockMovementData movementData = new StockMovementData();
         String bodyText = document.body().text();
 
-        // The text often appears as: "Issues Advanced Issues declined Issues Unchanged 34 307 44"
+        // The text often appears as: "Issues Advanced Issues declined Issues Unchanged
+        // 34 307 44"
         int advIndex = bodyText.toLowerCase(Locale.ROOT).indexOf("issues advanced");
         int decIndex = bodyText.toLowerCase(Locale.ROOT).indexOf("issues declined");
         int unchIndex = bodyText.toLowerCase(Locale.ROOT).indexOf("issues unchanged");
@@ -247,17 +254,15 @@ public class MarketSummaryAndIndexScraper {
     }
 
     /**
-     * Build MarketSummary entity from parsed data.
+     * Update MarketSummary entity with parsed data.
      */
-    private MarketSummary buildMarketSummary(
-            LocalDate marketDate,
+    private void updateMarketSummary(
+            MarketSummary summary,
             LocalDateTime now,
             MarketTotals marketTotals,
             List<IndexSnapshot> indexSnapshots,
             StockMovementData movementData) {
 
-        MarketSummary summary = new MarketSummary();
-        summary.setDate(marketDate.atStartOfDay());
         summary.setTimestamp(now);
 
         // Set market totals
@@ -289,8 +294,6 @@ public class MarketSummaryAndIndexScraper {
         summary.setAdvancers(movementData.advancers != null ? movementData.advancers : 0);
         summary.setDecliners(movementData.decliners != null ? movementData.decliners : 0);
         summary.setUnchanged(movementData.unchanged != null ? movementData.unchanged : 0);
-
-        return summary;
     }
 
     /**
@@ -336,10 +339,10 @@ public class MarketSummaryAndIndexScraper {
                                      OffsetDateTime now) {
         // Find existing record for this benchmark and date
         Optional<BenchmarkData> existingOpt = benchmarkDataRepository.findByBenchmarkAndDate(benchmark, date);
-        
+
         BenchmarkData data;
         boolean isNew = existingOpt.isEmpty();
-        
+
         if (isNew) {
             // Create new record
             data = BenchmarkData.builder()
@@ -353,7 +356,7 @@ public class MarketSummaryAndIndexScraper {
         } else {
             // Update existing record
             data = existingOpt.get();
-            
+
             // Update OHLC values (for intraday updates)
             if (data.getOpenValue() == null) {
                 data.setOpenValue(snapshot.value());
@@ -367,7 +370,8 @@ public class MarketSummaryAndIndexScraper {
         if (snapshot.percentChange() != null) {
             data.setDailyReturn(snapshot.percentChange());
         } else if (snapshot.change() != null && snapshot.value() != null) {
-            // Calculate percentage change from absolute change if percentChange is not available
+            // Calculate percentage change from absolute change if percentChange is not
+            // available
             BigDecimal previousValue = snapshot.value().subtract(snapshot.change());
             if (previousValue.compareTo(BigDecimal.ZERO) > 0) {
                 BigDecimal calculatedPercent = snapshot.change()
@@ -377,27 +381,23 @@ public class MarketSummaryAndIndexScraper {
             }
         }
 
-        // Market totals are associated with DSEX (only set if not already set or if updating)
+        // Market totals are associated with DSEX (only set if not already set or if
+        // updating)
         MarketTotals totals = snapshot.marketTotals();
         if (totals != null) {
-            if (data.getVolume() == null || isNew) {
-                data.setVolume(totals.volume());
-            }
-            if (data.getTrades() == null || isNew) {
-                data.setTrades(totals.trades());
-            }
-            if (data.getTotalValue() == null || isNew) {
-                data.setTotalValue(totals.totalValue());
-            }
+            data.setVolume(totals.volume());
+            data.setTrades(totals.trades());
+            data.setTotalValue(totals.totalValue());
+
         }
-        
+
         // Save or update the record
         benchmarkDataRepository.save(data);
-        log.debug("{} benchmark data for {} on {}: close={}, daily_return={}%", 
-                isNew ? "Created" : "Updated", 
-                benchmark.getId(), 
-                date, 
-                data.getCloseValue(), 
+        log.debug("{} benchmark data for {} on {}: close={}, daily_return={}%",
+                isNew ? "Created" : "Updated",
+                benchmark.getId(),
+                date,
+                data.getCloseValue(),
                 data.getDailyReturn());
     }
 
@@ -413,14 +413,18 @@ public class MarketSummaryAndIndexScraper {
     }
 
     private BigDecimal max(BigDecimal a, BigDecimal b) {
-        if (a == null) return b;
-        if (b == null) return a;
+        if (a == null)
+            return b;
+        if (b == null)
+            return a;
         return a.max(b);
     }
 
     private BigDecimal min(BigDecimal a, BigDecimal b) {
-        if (a == null) return b;
-        if (b == null) return a;
+        if (a == null)
+            return b;
+        if (b == null)
+            return a;
         return a.min(b);
     }
 
@@ -442,7 +446,8 @@ public class MarketSummaryAndIndexScraper {
     private Integer extractValueAfterLabel(String text, String label) {
         try {
             int labelIndex = text.toLowerCase(Locale.ROOT).indexOf(label.toLowerCase(Locale.ROOT));
-            if (labelIndex == -1) return null;
+            if (labelIndex == -1)
+                return null;
 
             int startIndex = labelIndex + label.length();
             StringBuilder numberStr = new StringBuilder();
@@ -533,4 +538,3 @@ public class MarketSummaryAndIndexScraper {
         }
     }
 }
-

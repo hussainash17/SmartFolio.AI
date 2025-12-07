@@ -22,10 +22,10 @@ public class DailyAggregationScheduler {
     private final ScraperProperties scraperProperties;
 
     /**
-     * Aggregate daily OHLC at 3:30 PM (after market close)
+     * Aggregate daily OHLC at 2:32 PM (after market close)
      * Runs Monday to Thursday
      */
-    @Scheduled(cron = "${scraper.schedule.daily-aggregation-cron:0 30 15 * * MON-THU}", 
+    @Scheduled(cron = "${scraper.schedule.daily-aggregation-cron:0 32 14 * * SUN-THU}",
                zone = "${scraper.schedule.timezone:Asia/Dhaka}")
     public void aggregateDailyOHLC() {
         try {

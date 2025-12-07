@@ -63,7 +63,7 @@ public class ScraperProperties {
         private String fundamentalCron = "0 0 16 * * MON-THU";
         
         // Daily OHLC aggregation runs at 3:30 PM
-        private String dailyAggregationCron = "0 30 15 * * MON-THU";
+        private String dailyAggregationCron = "0 32 14 * * SUN-THU";
 
         // Portfolio daily valuation runs at 2:30 PM
         private String portfolioValuationCron = "0 30 15 * * MON-THU";

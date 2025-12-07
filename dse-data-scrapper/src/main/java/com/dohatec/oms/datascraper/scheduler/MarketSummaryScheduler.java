@@ -4,6 +4,7 @@ import com.dohatec.oms.datascraper.service.scraper.MarketSummaryAndIndexScraper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +26,7 @@ public class MarketSummaryScheduler {
 
     /**
      * Scrape market summary and index data.
-     * Scheduled to run Sunday to Thursday every 30 seconds 2:30 PM Dhaka time.
+     * Scheduled to run Sunday to Thursday every 60 seconds 2:30 PM Dhaka time.
      * Cron expression: "0 30 14 * * SUN-THU"
      * - 0: seconds
      * - 30: minutes (2:30 PM = 14:30)
@@ -34,7 +35,7 @@ public class MarketSummaryScheduler {
      * - *: month
      * - SUN-THU: day of week (Sunday to Thursday)
      */
-    @Scheduled(cron = "${scraper.schedule.market-summary-cron:0/30 * 10-14 * * SUN-THU}",
+    @Scheduled(cron = "${scraper.schedule.market-summary-cron:0 */1 10-14 * * SUN-THU}",
             zone = "${scraper.schedule.timezone:Asia/Dhaka}")
     public void scrapeMarketSummary() {
         try {
