@@ -1,5 +1,6 @@
 import React from 'react';
 import { Briefcase } from "lucide-react";
+import { useMarketSummary } from '../hooks/useDashboardMarket';
 
 // Portfolio Components
 import PortfolioSummary from './dashboard/overview/PortfolioSummary';
@@ -20,6 +21,20 @@ interface ComprehensiveDashboardProps {
 }
 
 export function ComprehensiveDashboard({ recentTransactions }: ComprehensiveDashboardProps) {
+    const { data: marketSummary } = useMarketSummary();
+
+    // Calculate sentiment score
+    // Logic: Bullish (2) if advancers > decliners, Bearish (0) if decliners > advancers, else Neutral (1)
+    const advancers = marketSummary?.advancers || 0;
+    const decliners = marketSummary?.decliners || 0;
+
+    let sentimentScore = 1; // Default Neutral
+    if (advancers > decliners) {
+        sentimentScore = 2; // Bullish
+    } else if (decliners > advancers) {
+        sentimentScore = 0; // Bearish
+    }
+
     return (
         <div className="space-y-6 pb-8">
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
@@ -45,7 +60,7 @@ export function ComprehensiveDashboard({ recentTransactions }: ComprehensiveDash
                     {/* Row 1: Sentiment & Indices */}
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                         <div className="md:col-span-4">
-                            <MarketSentiment score={2} />
+                            <MarketSentiment score={sentimentScore} />
                         </div>
                         <div className="md:col-span-8">
                             <IndexOverview />

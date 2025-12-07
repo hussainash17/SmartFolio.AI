@@ -18,6 +18,60 @@ from sqlmodel import select, func, desc
 router = APIRouter(prefix="/market", tags=["market"])
 
 
+@router.get("/benchmark/{benchmark_id}/last-5-days")
+def get_benchmark_last_5_days(benchmark_id: str, session: SessionDep) -> Dict[str, Any]:
+    """Get the last 5 trading days of benchmark data.
+    
+    Returns the last 5 trading days of benchmark data with date and value in crore.
+    Values are converted from million (stored in DB) to crore.
+    
+    Args:
+        benchmark_id: The benchmark identifier (e.g., 'DSEX')
+        session: Database session
+    
+    Returns:
+        Dict containing benchmark_id, data array with date and value_in_crore
+    """
+    from sqlalchemy import text
+    
+    # Fetch last 5 trading days in a single query
+    query = text("""
+        SELECT date, total_value
+        FROM benchmark_data
+        WHERE benchmark_id = :benchmark_id
+        ORDER BY date DESC
+        LIMIT 5
+    """)
+    
+    result = session.execute(query, {"benchmark_id": benchmark_id}).fetchall()
+    
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No data found for benchmark '{benchmark_id}'"
+        )
+
+    # Reverse to get chronological order (oldest to newest)
+    result = list(reversed(result))
+
+    # Format response with values converted from million to crore
+    data = []
+    for row in result:
+        total_value = float(row.total_value) if row.total_value else 0.0
+        
+        # Convert from million to crore (1 crore = 10 million)
+        value_in_crore = total_value / 10.0
+        data.append({
+            "date": row.date,
+            "value_in_crore": round(value_in_crore, 2)
+        })
+
+    return {
+        "benchmark_id": benchmark_id,
+        "data": data
+    }
+
+
 @router.get("/benchmark/{benchmark_id}")
 def get_benchmark_data(benchmark_id: str, session: SessionDep) -> Dict[str, Any]:
     """Get benchmark index data by benchmark_id.
@@ -219,14 +273,66 @@ def get_market_summary(session: SessionDep) -> Dict[str, Any]:
     - DSE and CSE index values and changes
     - Market breadth (advancers, decliners, unchanged)
     - Trading statistics (total trades, volume, turnover)
+    - Calculated breadth metrics (ad_ratio, net_breadth, total_active, sentiment)
+    - Volume breadth (volume_breadth_up, volume_breadth_down)
     
     No request parameters required - returns latest available data.
     """
+    from sqlalchemy import text
+    
     latest = session.exec(
         select(MarketSummary).order_by(MarketSummary.timestamp.desc()).limit(1)
     ).first()
     if not latest:
         return {}
+    
+    # Calculate volume breadth from StockData
+    # Get the latest timestamp from StockData
+    latest_stock_timestamp = session.exec(
+        select(func.max(StockData.timestamp))
+    ).first()
+    
+    volume_breadth_up = 0
+    volume_breadth_down = 0
+    
+    if latest_stock_timestamp:
+        # Query to get volume sums for gainers and losers
+        volume_query = text("""
+            SELECT 
+                COALESCE(SUM(CASE WHEN change_percent > 0 THEN volume ELSE 0 END), 0) as volume_up,
+                COALESCE(SUM(CASE WHEN change_percent < 0 THEN volume ELSE 0 END), 0) as volume_down
+            FROM stockdata
+            WHERE timestamp = :latest_timestamp
+        """)
+        
+        volume_result = session.execute(volume_query, {"latest_timestamp": latest_stock_timestamp}).fetchone()
+        
+        if volume_result:
+            volume_breadth_up = int(volume_result.volume_up) if volume_result.volume_up else 0
+            volume_breadth_down = int(volume_result.volume_down) if volume_result.volume_down else 0
+    
+    # Calculate derived metrics
+    advancers = latest.advancers
+    decliners = latest.decliners
+    unchanged = latest.unchanged
+    
+    # Advance/Decline Ratio
+    ad_ratio = round(advancers / decliners, 2) if decliners > 0 else 0.0
+    
+    # Net Breadth = Advancers - Decliners
+    net_breadth = advancers - decliners
+    
+    # Total Active = Advancers + Decliners
+    total_active = advancers + decliners
+    
+    # Sentiment
+    if advancers > decliners:
+        sentiment = "Bullish"
+    elif decliners > advancers:
+        sentiment = "Bearish"
+    else:
+        sentiment = "Neutral"
+    
     return {
         "id": str(latest.id),
         "date": latest.date,
@@ -241,10 +347,18 @@ def get_market_summary(session: SessionDep) -> Dict[str, Any]:
         "cse_index_change": str(latest.cse_index_change) if latest.cse_index_change is not None else None,
         "cse_index_change_percent": str(
             latest.cse_index_change_percent) if latest.cse_index_change_percent is not None else None,
-        "advancers": latest.advancers,
-        "decliners": latest.decliners,
-        "unchanged": latest.unchanged,
+        "advancers": advancers,
+        "decliners": decliners,
+        "unchanged": unchanged,
         "timestamp": latest.timestamp,
+        # Calculated breadth metrics
+        "ad_ratio": ad_ratio,
+        "net_breadth": net_breadth,
+        "total_active": total_active,
+        "sentiment": sentiment,
+        # Volume breadth
+        "volume_breadth_up": volume_breadth_up,
+        "volume_breadth_down": volume_breadth_down,
     }
 
 
@@ -854,3 +968,71 @@ def get_upcoming_events(limit: int = Query(20, ge=1, le=100)) -> Dict[str, Any]:
             events.append({"type": "IPO", "company": f"IPO{i:03d}", "date": base_date + timedelta(days=i + 3),
                            "note": "IPO Listing"})
     return {"events": events}
+
+
+@router.get("/sector-analysis")
+def get_sector_analysis(session: SessionDep) -> Dict[str, Any]:
+    """Get sector analysis data for Advances/Declines and Turnover charts.
+    
+    Returns:
+        - advances_declines: List of sectors with up, down, unchanged counts
+        - turnover: List of sectors with total turnover values
+    """
+    from sqlalchemy import text, case
+    from decimal import Decimal
+    
+    # Use a single optimized SQL query to get sector aggregates
+    # This query groups by sector and calculates:
+    # - Count of advances (change_percent > 0)
+    # - Count of declines (change_percent < 0)
+    # - Count of unchanged (change_percent = 0)
+    # - Total turnover
+    query = text("""
+        SELECT 
+            c.sector,
+            COUNT(CASE WHEN sd.change_percent > 0 THEN 1 END) as up,
+            COUNT(CASE WHEN sd.change_percent < 0 THEN 1 END) as down,
+            COUNT(CASE WHEN sd.change_percent = 0 THEN 1 END) as unchanged,
+            COALESCE(SUM(sd.turnover), 0) as total_turnover
+        FROM stockdata sd
+        INNER JOIN company c ON sd.company_id = c.id
+        WHERE c.sector IS NOT NULL
+            AND c.is_active = true
+        GROUP BY c.sector
+        HAVING COUNT(*) > 0
+        ORDER BY total_turnover DESC
+        LIMIT 20
+    """)
+    
+    result = session.execute(query).fetchall()
+    
+    # Format the results
+    advances_declines = []
+    turnover = []
+    
+    for row in result:
+        sector = row.sector
+        up = int(row.up) if row.up else 0
+        down = int(row.down) if row.down else 0
+        unchanged = int(row.unchanged) if row.unchanged else 0
+        total_turnover = float(row.total_turnover) if row.total_turnover else 0.0
+        
+        # Convert turnover from base unit to crores (divide by 10,000,000)
+        turnover_cr = total_turnover / 10 if total_turnover > 0 else 0.0
+        
+        advances_declines.append({
+            "name": sector,
+            "up": up,
+            "down": down,
+            "unchanged": unchanged
+        })
+        
+        turnover.append({
+            "name": sector,
+            "value": round(turnover_cr, 2)
+        })
+    
+    return {
+        "advances_declines": advances_declines,
+        "turnover": turnover
+    }

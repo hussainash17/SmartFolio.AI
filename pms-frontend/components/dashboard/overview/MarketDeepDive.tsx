@@ -2,18 +2,22 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../ui/tabs';
 import { ArrowUp, ArrowDown, Zap, Globe, AlertTriangle, Layers } from 'lucide-react';
-import { useMarketTopMovers } from '../../../hooks/useDashboardMarket';
+import { useMarketTopMovers, useMarketMostActive } from '../../../hooks/useDashboardMarket';
 import { cn } from '../../../lib/utils';
 
 // --- Sub-components ---
 
 const MarketMovers = () => {
     const { data } = useMarketTopMovers();
+    const { data: mostActiveData } = useMarketMostActive();
+
     const gainers = data?.gainers || [];
     const losers = data?.losers || [];
+    const mostActive = mostActiveData || [];
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Top Gainers */}
             <div>
                 <h4 className="text-sm font-medium text-green-600 mb-3 flex items-center gap-2">
                     <ArrowUp size={16} /> Top Gainers
@@ -28,6 +32,8 @@ const MarketMovers = () => {
                     {gainers.length === 0 && <div className="text-xs text-muted-foreground">No gainers data</div>}
                 </div>
             </div>
+
+            {/* Top Losers */}
             <div>
                 <h4 className="text-sm font-medium text-red-600 mb-3 flex items-center gap-2">
                     <ArrowDown size={16} /> Top Losers
@@ -40,6 +46,22 @@ const MarketMovers = () => {
                         </div>
                     ))}
                     {losers.length === 0 && <div className="text-xs text-muted-foreground">No losers data</div>}
+                </div>
+            </div>
+
+            {/* Most Active */}
+            <div>
+                <h4 className="text-sm font-medium text-blue-600 mb-3 flex items-center gap-2">
+                    <Zap size={16} /> Most Active
+                </h4>
+                <div className="space-y-2">
+                    {mostActive.slice(0, 5).map((stock, i) => (
+                        <div key={i} className="flex justify-between items-center p-2 bg-blue-50/50 dark:bg-blue-900/10 rounded-md">
+                            <span className="font-medium text-sm">{stock.symbol}</span>
+                            <span className="font-bold text-sm text-blue-600">{(stock.volume / 1000000).toFixed(2)}M</span>
+                        </div>
+                    ))}
+                    {mostActive.length === 0 && <div className="text-xs text-muted-foreground">No active data</div>}
                 </div>
             </div>
         </div>

@@ -73,7 +73,12 @@ export interface SectorAnalysis {
 
 export interface MostActive {
   symbol: string;
+  company_name: string;
+  last: number;
+  change: number;
+  change_percent: number;
   volume: number;
+  turnover: number;
 }
 
 // Hook for market indices
@@ -112,7 +117,7 @@ export function useMarketMostActive() {
     queryKey: queryKeys.mostActive,
     enabled: !!(OpenAPI as any).TOKEN,
     staleTime: 30 * 1000,
-    queryFn: () => fetchMarketAPI<MostActive[]>('/api/v1/market/most-active?limit=5'),
+    queryFn: () => fetchMarketAPI<MostActive[]>('/api/v1/market/most-active?limit=10'),
   });
 }
 
@@ -126,12 +131,86 @@ export function useSectorAnalysis() {
   });
 }
 
+// Types for sector analysis charts
+export interface SectorAdvancesDeclines {
+  name: string;
+  up: number;
+  down: number;
+  unchanged: number;
+}
+
+export interface SectorTurnover {
+  name: string;
+  value: number;
+}
+
+export interface SectorAnalysisCharts {
+  advances_declines: SectorAdvancesDeclines[];
+  turnover: SectorTurnover[];
+}
+
+// Hook for sector analysis charts (Advances/Declines and Turnover)
+export function useSectorAnalysisCharts() {
+  return useQuery({
+    queryKey: ['market', 'sector-analysis-charts'],
+    enabled: !!(OpenAPI as any).TOKEN,
+    staleTime: 30 * 1000,
+    queryFn: () => fetchMarketAPI<SectorAnalysisCharts>('/api/v1/market/sector-analysis'),
+  });
+}
+
+// Market Summary interface
+export interface MarketSummary {
+  id?: string;
+  date?: string;
+  total_trades?: number;
+  total_volume?: number;
+  total_turnover?: string;
+  dse_index?: string;
+  dse_index_change?: string;
+  dse_index_change_percent?: string;
+  cse_index?: string;
+  cse_index_change?: string;
+  cse_index_change_percent?: string;
+  advancers?: number;
+  decliners?: number;
+  unchanged?: number;
+  timestamp?: string;
+  // Calculated breadth metrics
+  ad_ratio?: number;
+  net_breadth?: number;
+  total_active?: number;
+  sentiment?: string;
+  // Volume breadth
+  volume_breadth_up?: number;
+  volume_breadth_down?: number;
+}
+
 // Hook for market summary
 export function useMarketSummary() {
   return useQuery({
     queryKey: ['market', 'summary'],
     enabled: !!(OpenAPI as any).TOKEN,
     staleTime: 30 * 1000,
-    queryFn: () => fetchMarketAPI<any>('/api/v1/market/summary'),
+    queryFn: () => fetchMarketAPI<MarketSummary>('/api/v1/market/summary'),
+  });
+}
+
+// Types for benchmark last 5 days
+export interface BenchmarkLast5Days {
+  benchmark_id: string;
+  data: Array<{
+    date: string;
+    value_in_crore: number;
+  }>;
+}
+
+// Hook for last 5 days of benchmark data
+export function useBenchmarkLast5Days(benchmarkId: string = 'DSEX') {
+  return useQuery({
+    queryKey: ['market', 'benchmark', benchmarkId, 'last-5-days'],
+    enabled: !!(OpenAPI as any).TOKEN,
+    staleTime: 30 * 1000,
+    queryFn: () => fetchMarketAPI<BenchmarkLast5Days>(`/api/v1/market/benchmark/${benchmarkId}/last-5-days`),
   });
 }
