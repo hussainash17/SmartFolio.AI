@@ -311,6 +311,32 @@ def get_market_summary(session: SessionDep) -> Dict[str, Any]:
             volume_breadth_up = int(volume_result.volume_up) if volume_result.volume_up else 0
             volume_breadth_down = int(volume_result.volume_down) if volume_result.volume_down else 0
     
+    # Get previous day's data for comparison
+    previous = session.exec(
+        select(MarketSummary)
+        .where(MarketSummary.date < latest.date)
+        .order_by(MarketSummary.date.desc(), MarketSummary.timestamp.desc())
+        .limit(1)
+    ).first()
+    
+    # Calculate change percentages from previous day
+    turnover_change_percent = 0.0
+    volume_change_percent = 0.0
+    trades_change_percent = 0.0
+    
+    if previous:
+        if previous.total_turnover and previous.total_turnover > 0:
+            turnover_change = float(latest.total_turnover) - float(previous.total_turnover)
+            turnover_change_percent = round((turnover_change / float(previous.total_turnover)) * 100, 2)
+        
+        if previous.total_volume and previous.total_volume > 0:
+            volume_change = latest.total_volume - previous.total_volume
+            volume_change_percent = round((volume_change / previous.total_volume) * 100, 2)
+        
+        if previous.total_trades and previous.total_trades > 0:
+            trades_change = latest.total_trades - previous.total_trades
+            trades_change_percent = round((trades_change / previous.total_trades) * 100, 2)
+    
     # Calculate derived metrics
     advancers = latest.advancers
     decliners = latest.decliners
@@ -359,6 +385,10 @@ def get_market_summary(session: SessionDep) -> Dict[str, Any]:
         # Volume breadth
         "volume_breadth_up": volume_breadth_up,
         "volume_breadth_down": volume_breadth_down,
+        # Change percentages from previous day
+        "turnover_change_percent": turnover_change_percent,
+        "volume_change_percent": volume_change_percent,
+        "trades_change_percent": trades_change_percent,
     }
 
 

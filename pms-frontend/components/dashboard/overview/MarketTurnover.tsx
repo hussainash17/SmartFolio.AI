@@ -2,26 +2,31 @@ import React from 'react';
 import { BarChart, Bar, ResponsiveContainer, Cell, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Card, CardHeader, CardTitle, CardContent } from '../../ui/card';
 import { TrendingUp, Activity, Layers, ArrowUp, ArrowDown } from 'lucide-react';
-import { useBenchmarkData, useBenchmarkLast5Days } from '../../../hooks/useDashboardMarket';
+import { useMarketSummary, useBenchmarkLast5Days } from '../../../hooks/useDashboardMarket';
 import { cn } from '../../../lib/utils';
 
-const MetricItem = ({ label, value, change, icon: Icon, color }: any) => (
-    <div className="flex-1">
-        <div className="flex items-center gap-1.5 mb-0.5">
-            <div className={cn("p-1 rounded", color.replace('text-', 'bg-'))}>
-                <Icon size={12} className={color} />
+const MetricItem = ({ label, value, change, icon: Icon, color }: any) => {
+    const isPositive = change && parseFloat(change) >= 0;
+    const changeColor = isPositive ? 'text-green-600' : 'text-red-600';
+    
+    return (
+        <div className="flex-1">
+            <div className="flex items-center gap-1.5 mb-0.5">
+                <div className={cn("p-1 rounded", color.replace('text-', 'bg-'))}>
+                    <Icon size={12} className={color} />
+                </div>
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{label}</span>
             </div>
-            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{label}</span>
+            <div className="flex items-baseline gap-1.5">
+                <h4 className="text-base font-bold">{value}</h4>
+                {change && <span className={`text-[10px] font-medium ${changeColor}`}>{change}</span>}
+            </div>
         </div>
-        <div className="flex items-baseline gap-1.5">
-            <h4 className="text-base font-bold">{value}</h4>
-            {change && <span className="text-[10px] font-medium text-green-600">{change}</span>}
-        </div>
-    </div>
-);
+    );
+};
 
 const MarketTurnover: React.FC = () => {
-    const { data: benchmark } = useBenchmarkData();
+    const { data: marketSummary } = useMarketSummary();
     const { data: benchmarkLast5Days } = useBenchmarkLast5Days('DSEX');
 
     const formatTurnover = (val: number) => {
@@ -99,9 +104,25 @@ const MarketTurnover: React.FC = () => {
         return null;
     };
 
-    const turnover = benchmark?.total_value ? formatTurnover(Number(benchmark.total_value)) : "550 Cr";
-    const volume = benchmark?.volume ? formatVolume(Number(benchmark.volume)) : "12.5 M";
-    const trades = benchmark?.trades ? formatTrades(Number(benchmark.trades)) : "145 K";
+    // Get current values
+    const turnoverValue = marketSummary?.total_turnover ? Number(marketSummary.total_turnover) : 0;
+    const volumeValue = marketSummary?.total_volume || 0;
+    const tradesValue = marketSummary?.total_trades || 0;
+    
+    const turnover = formatTurnover(turnoverValue);
+    const volume = formatVolume(volumeValue);
+    const trades = formatTrades(tradesValue);
+    
+    // Format change percentages
+    const formatChangePercent = (percent: number | undefined) => {
+        if (percent === undefined || percent === null) return null;
+        const sign = percent >= 0 ? '+' : '';
+        return `${sign}${percent.toFixed(1)}%`;
+    };
+    
+    const turnoverChange = formatChangePercent(marketSummary?.turnover_change_percent);
+    const volumeChange = formatChangePercent(marketSummary?.volume_change_percent);
+    const tradesChange = formatChangePercent(marketSummary?.trades_change_percent);
 
     return (
         <Card className="h-full border-none shadow-sm">
@@ -113,21 +134,21 @@ const MarketTurnover: React.FC = () => {
                     <MetricItem
                         label="Turnover"
                         value={turnover}
-                        change="+5.2%"
+                        change={turnoverChange}
                         icon={TrendingUp}
                         color="text-blue-500"
                     />
                     <MetricItem
                         label="Volume"
                         value={volume}
-                        change="+2.1%"
+                        change={volumeChange}
                         icon={Layers}
                         color="text-purple-500"
                     />
                     <MetricItem
                         label="Trades"
                         value={trades}
-                        change="+1.8%"
+                        change={tradesChange}
                         icon={Activity}
                         color="text-orange-500"
                     />

@@ -184,6 +184,10 @@ export interface MarketSummary {
   // Volume breadth
   volume_breadth_up?: number;
   volume_breadth_down?: number;
+  // Change percentages from previous day
+  turnover_change_percent?: number;
+  volume_change_percent?: number;
+  trades_change_percent?: number;
 }
 
 // Hook for market summary
