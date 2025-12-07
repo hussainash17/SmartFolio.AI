@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
-import { LineChart, PieChart, Activity, List } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { LineChart, PieChart, Activity, List, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '../../ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../ui/tabs';
 import PerformanceChart from './PerformanceChart';
-import HoldingsSnapshot from './HoldingsSnapshot';
+import HoldingsSnapshot, { HoldingItem } from './HoldingsSnapshot';
 import Allocation from './Allocation';
 import RecentActivity from './RecentActivity';
 import { Transaction } from '../../../types/trading';
+import { useUserAllocation, useUserHoldings } from '../../../hooks/useAnalytics';
 
 interface PortfolioTabsProps {
     portfolioId?: string;
@@ -14,7 +15,31 @@ interface PortfolioTabsProps {
     allocationData?: any[];
 }
 
+const PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#f97316', '#22c55e', '#eab308', '#06b6d4'];
+
 const PortfolioTabs: React.FC<PortfolioTabsProps> = ({ portfolioId, transactions, allocationData }) => {
+
+    // Fetch aggregated allocation if no portfolio selected
+    const { data: userAllocation, isLoading: isAllocationLoading } = useUserAllocation();
+
+    // Fetch aggregated holdings if no portfolio selected
+    const { data: userHoldings, isLoading: isHoldingsLoading } = useUserHoldings();
+
+    // Prepare allocation data for the chart
+    const effectiveAllocationData = useMemo(() => {
+        if (portfolioId && allocationData) return allocationData;
+
+        if (userAllocation?.sector_wise_allocation) {
+            return userAllocation.sector_wise_allocation.map((s: any, idx: number) => ({
+                name: s.sector,
+                value: Number(s.allocation_percent || 0),
+                color: PALETTE[idx % PALETTE.length]
+            }));
+        }
+
+        return [];
+    }, [portfolioId, allocationData, userAllocation]);
+
     return (
         <Card className="h-full min-h-[420px] flex flex-col">
             <CardContent className="p-6 flex-1 flex flex-col">
@@ -55,10 +80,22 @@ const PortfolioTabs: React.FC<PortfolioTabsProps> = ({ portfolioId, transactions
                             <PerformanceChart portfolioId={portfolioId} />
                         </TabsContent>
                         <TabsContent value="holdings" className="h-full m-0">
-                            <HoldingsSnapshot portfolioId={portfolioId} />
+                            {isHoldingsLoading && !portfolioId ? (
+                                <div className="flex justify-center items-center h-full">
+                                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                                </div>
+                            ) : (
+                                <HoldingsSnapshot portfolioId={portfolioId} holdings={!portfolioId ? userHoldings : undefined} />
+                            )}
                         </TabsContent>
                         <TabsContent value="allocation" className="h-full m-0">
-                            <Allocation data={allocationData} />
+                            {isAllocationLoading && !portfolioId ? (
+                                <div className="flex justify-center items-center h-full">
+                                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                                </div>
+                            ) : (
+                                <Allocation data={effectiveAllocationData} />
+                            )}
                         </TabsContent>
                         <TabsContent value="activity" className="h-full m-0">
                             <RecentActivity transactions={transactions} />

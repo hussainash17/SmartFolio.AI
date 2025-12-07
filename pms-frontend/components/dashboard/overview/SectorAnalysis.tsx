@@ -8,11 +8,14 @@ const SectorAnalysis: React.FC = () => {
 
     // Transform API data for chart or use mock if empty
     const sectors = data?.sectors || [];
-    const chartData = sectors.length > 0
-        ? sectors.map(s => ({
-            name: s.name || s.sector,
-            value: s.change_percent || 0
-        })).sort((a, b) => b.value - a.value).slice(0, 10) // Top 10 movers
+    const chartData: Array<{ name: string; value: number }> = sectors.length > 0
+        ? sectors.map(s => {
+            const performance = typeof s.performance === 'number' ? s.performance : (s.change_percent || 0);
+            return {
+                name: s.sector || s.name || '',
+                value: performance
+            };
+        }).sort((a, b) => b.value - a.value).slice(0, 10) // Top 10 movers
         : [
             { name: 'IT', value: 2.4 },
             { name: 'Textile', value: 1.8 },

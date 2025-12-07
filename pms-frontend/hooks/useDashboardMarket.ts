@@ -47,14 +47,28 @@ export interface MarketIndices {
 }
 
 export interface SectorAnalysis {
+  total_sectors?: number;
   sectors?: Array<{
     sector?: string;
     name?: string;
-    performance?: Record<string, number>;
-    change_percent?: number;
+    stock_count?: number;
+    performance?: number;
+    market_cap?: number;
+    turnover?: number;
+    pe_ratio?: number;
+    gainers?: number;
+    losers?: number;
+    unchanged?: number;
+    momentum?: string;
+    change_percent?: number; // Keep for backward compatibility
     change?: number;
     market_cap_weight?: number;
   }>;
+  market_summary?: {
+    best_performing_sector?: string;
+    worst_performing_sector?: string;
+    avg_sector_performance?: number;
+  };
 }
 
 export interface MostActive {
