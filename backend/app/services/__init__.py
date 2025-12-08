@@ -12,6 +12,7 @@ from .analytics_service import AnalyticsService
 from .research_service import ResearchService
 from .goal_service import EnhancedInvestmentGoalService
 from .financial_calculations import FinancialCalculator, calculate_step_up_sip
+from .upcoming_events_service import UpcomingEventsService
 
 __all__ = [
     "BaseService",
@@ -22,4 +23,5 @@ __all__ = [
     "EnhancedInvestmentGoalService",
     "FinancialCalculator",
     "calculate_step_up_sip",
+    "UpcomingEventsService",
 ]

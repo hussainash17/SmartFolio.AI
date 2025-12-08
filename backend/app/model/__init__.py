@@ -61,6 +61,14 @@ from .fundamental import (
 from .funds import AccountTransaction, AccountTransactionPublic, TransactionType
 from .item import Item, ItemBase, ItemCreate, ItemPublic, ItemUpdate, ItemsPublic
 from .market_information import MarketInformation
+from .upcoming_events import (
+    UpcomingEvent,
+    UpcomingEventBase,
+    UpcomingEventCreate,
+    UpcomingEventUpdate,
+    UpcomingEventPublic,
+    UpcomingEventsPublic
+)
 from .order import (
     Order,
     OrderBase,
@@ -302,6 +310,13 @@ __all__ = [
     "UserUpdateMe",
     "UsersPublic",
     "MarketInformation",
+    # Upcoming Events Models
+    "UpcomingEvent",
+    "UpcomingEventBase",
+    "UpcomingEventCreate",
+    "UpcomingEventUpdate",
+    "UpcomingEventPublic",
+    "UpcomingEventsPublic",
     # SmartStock Models
     "StockCompany",
     "StockCompanyBase",

@@ -979,27 +979,6 @@ def get_macro_snapshot() -> Dict[str, Any]:
         },
     }
 
-
-@router.get("/events/upcoming")
-def get_upcoming_events(limit: int = Query(20, ge=1, le=100)) -> Dict[str, Any]:
-    """Return upcoming market events (AGMs, EGMs, Record Dates, IPO listings). Placeholder content."""
-    base_date = datetime.utcnow()
-    events: List[Dict[str, Any]] = []
-    for i in range(1, min(limit, 20) + 1):
-        events.append({"type": "AGM", "company": f"COMP{i:03d}", "date": base_date + timedelta(days=i),
-                       "note": "Annual General Meeting"})
-        if i % 3 == 0:
-            events.append({"type": "EGM", "company": f"COMP{i:03d}", "date": base_date + timedelta(days=i + 1),
-                           "note": "Extraordinary General Meeting"})
-        if i % 4 == 0:
-            events.append({"type": "RECORD", "company": f"COMP{i:03d}", "date": base_date + timedelta(days=i + 2),
-                           "note": "Record Date"})
-        if i % 5 == 0:
-            events.append({"type": "IPO", "company": f"IPO{i:03d}", "date": base_date + timedelta(days=i + 3),
-                           "note": "IPO Listing"})
-    return {"events": events}
-
-
 @router.get("/sector-analysis")
 def get_sector_analysis(session: SessionDep) -> Dict[str, Any]:
     """Get sector analysis data for Advances/Declines and Turnover charts.

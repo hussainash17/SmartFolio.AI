@@ -2,8 +2,8 @@ from decimal import Decimal
 from typing import Dict, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status, UploadFile, File
-from sqlmodel import select
+from fastapi import APIRouter, HTTPException, status, UploadFile, File, Query
+from sqlmodel import select, text
 
 from app.api.deps import CurrentUser, SessionDep
 from app.model.company import Company
@@ -12,7 +12,7 @@ from app.model.order import Order, OrderStatus
 from app.model.portfolio import (
     Portfolio, PortfolioCreate, PortfolioUpdate, PortfolioPublic,
     PortfolioPosition, PortfolioPositionPublic,
-    PortfolioSummary
+    PortfolioSummary, PortfolioAggregatedHistory, PortfolioSparklinePoint
 )
 from app.model.portfolio_statement import (
     PortfolioStatementResponse,
@@ -990,6 +990,98 @@ def get_portfolio_history(
     result = sorted(weekly_data.values(), key=lambda x: x["date"])
 
     return result
+
+
+def _get_aggregated_history(user_id: UUID, session: SessionDep, limit: int = 30):
+    """
+    Helper function to execute the aggregated history query.
+    Returns raw rows that need to be mapped to Pydantic models.
+    """
+    query = text("""
+        WITH aggregated_valuations AS (
+            SELECT 
+                valuation_date,
+                SUM(total_value) as total_value,
+                SUM(cash_value) as cash_value,
+                SUM(securities_value) as securities_value
+            FROM portfolio_daily_valuations pdv
+            WHERE pdv.portfolio_id IN (
+                SELECT p.id 
+                FROM portfolio p 
+                WHERE p.user_id = :user_id
+            )
+            GROUP BY pdv.valuation_date
+            ORDER BY pdv.valuation_date DESC
+            LIMIT :limit
+        ),
+        ordered_valuations AS (
+            SELECT * FROM aggregated_valuations ORDER BY valuation_date ASC
+        )
+        SELECT 
+            valuation_date,
+            total_value,
+            cash_value,
+            securities_value,
+            CASE 
+                WHEN LAG(total_value) OVER (ORDER BY valuation_date) IS NOT NULL 
+                THEN (total_value - LAG(total_value) OVER (ORDER BY valuation_date)) / 
+                     LAG(total_value) OVER (ORDER BY valuation_date)
+                ELSE 0
+            END as daily_return,
+            CASE 
+                WHEN FIRST_VALUE(total_value) OVER (ORDER BY valuation_date) > 0
+                THEN (total_value - FIRST_VALUE(total_value) OVER (ORDER BY valuation_date)) / 
+                     FIRST_VALUE(total_value) OVER (ORDER BY valuation_date)
+                ELSE 0
+            END as cumulative_return
+        FROM ordered_valuations
+        ORDER BY valuation_date ASC;
+    """)
+
+    result = session.exec(query, params={"user_id": user_id, "limit": limit}).all()
+    return result
+
+
+@router.get("/history/aggregated", response_model=List[PortfolioAggregatedHistory])
+def get_aggregated_portfolio_history(
+        current_user: CurrentUser,
+        session: SessionDep,
+        limit: int = Query(30, ge=5, le=365)
+):
+    """
+    Get aggregated history for all portfolios of the current user.
+    Returns detailed daily stats including returns.
+    """
+    rows = _get_aggregated_history(current_user.id, session, limit)
+    
+    return [
+        PortfolioAggregatedHistory(
+            valuation_date=row.valuation_date,
+            total_value=row.total_value,
+            cash_value=row.cash_value,
+            securities_value=row.securities_value,
+            daily_return=row.daily_return,
+            cumulative_return=row.cumulative_return
+        ) for row in rows
+    ]
+
+
+@router.get("/history/sparkline", response_model=List[PortfolioSparklinePoint])
+def get_aggregated_portfolio_sparkline(
+        current_user: CurrentUser,
+        session: SessionDep
+):
+    """
+    Get minimal aggregated history for sparklines (last 10 days only).
+    """
+    rows = _get_aggregated_history(current_user.id, session, limit=10)
+    
+    return [
+        PortfolioSparklinePoint(
+            valuation_date=row.valuation_date,
+            total_value=row.total_value
+        ) for row in rows
+    ]
 
 
 

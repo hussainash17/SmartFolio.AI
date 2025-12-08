@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
@@ -255,6 +255,21 @@ class AllocationTargetUpdate(SQLModel):
 class AllocationTargetPublic(AllocationTargetBase):
     id: uuid.UUID
     user_id: uuid.UUID
+
     portfolio_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+
+
+class PortfolioAggregatedHistory(SQLModel):
+    valuation_date: date | datetime
+    total_value: float
+    cash_value: float
+    securities_value: float
+    daily_return: float
+    cumulative_return: float
+
+
+class PortfolioSparklinePoint(SQLModel):
+    valuation_date: date | datetime
+    total_value: float
