@@ -13,6 +13,7 @@ import { PaperTradingSimulation } from './PaperTradingSimulation'
 import { BacktestingSimulation } from './backtesting/BacktestingSimulation'
 import type { MarketData } from '../types/trading'
 import { Plus, Minus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { AnalyticsToolLayout } from './analytics'
 
 interface ResearchWorkspaceProps {
   defaultSymbol?: string
@@ -21,16 +22,6 @@ interface ResearchWorkspaceProps {
 }
 
 const sanitizeSymbol = (symbol?: string | null) => symbol?.trim().toUpperCase() ?? ''
-
-const INTERVAL_OPTIONS = [
-  { value: '1D', label: '1 Day' },
-  { value: '1W', label: '1 Week' },
-  { value: '1M', label: '1 Month' },
-  { value: '3M', label: '3 Months' },
-  { value: '6M', label: '6 Months' },
-  { value: '1Y', label: '1 Year' },
-  { value: 'ALL', label: 'All' },
-]
 
 const MAX_LAYOUT = 6
 
@@ -61,10 +52,6 @@ export function ResearchWorkspace({ defaultSymbol, marketData, onQuickTrade }: R
   // Analytics mode state
   const [leftPanelVisible, setLeftPanelVisible] = useState(true)
   const [rightPanelVisible, setRightPanelVisible] = useState(true)
-  const [bottomPanelHeight, setBottomPanelHeight] = useState(240)
-
-  const MIN_BOTTOM_HEIGHT = 180
-  const MAX_BOTTOM_HEIGHT = 400
 
   useEffect(() => {
     setSymbols((prev) => {
@@ -92,9 +79,6 @@ export function ResearchWorkspace({ defaultSymbol, marketData, onQuickTrade }: R
     })
   }, [layoutCount, availableSymbols])
 
-  const rows = Math.ceil(layoutCount / Math.min(layoutCount, 2))
-  const columns = layoutCount === 1 ? 1 : layoutCount === 2 ? 2 : Math.min(layoutCount, 3)
-
   const handleSymbolChange = (slot: number, value: string) => {
     setSymbols((prev) => {
       const next = [...prev]
@@ -102,148 +86,6 @@ export function ResearchWorkspace({ defaultSymbol, marketData, onQuickTrade }: R
       return next
     })
   }
-
-  const handleAddChart = () => {
-    setLayoutCount((prev) => Math.min(prev + 1, MAX_LAYOUT))
-    setViewMode('multi')
-  }
-
-  const handleRemoveChart = () => {
-    setLayoutCount((prev) => Math.max(prev - 1, 1))
-  }
-
-  const handleBottomPanelResize = (deltaY: number) => {
-    setBottomPanelHeight(prev => {
-      const newHeight = prev - deltaY
-      return Math.min(Math.max(newHeight, MIN_BOTTOM_HEIGHT), MAX_BOTTOM_HEIGHT)
-    })
-  }
-
-  const renderMultiCharts = () => (
-    <div className="flex flex-col h-full gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={handleRemoveChart} disabled={layoutCount <= 1}>
-            <Minus className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon" onClick={handleAddChart} disabled={layoutCount >= MAX_LAYOUT}>
-            <Plus className="h-4 w-4" />
-          </Button>
-          <Badge variant="outline" className="px-3 py-1 text-sm">
-            {layoutCount} {layoutCount === 1 ? 'Chart' : 'Charts'}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Interval</span>
-          <Select value={interval} onValueChange={setInterval}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {INTERVAL_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div
-        className="grid flex-1 gap-4"
-        style={{
-          gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-          gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
-          minHeight: 0,
-        }}
-      >
-        {symbols.slice(0, layoutCount).map((sym, index) => (
-          <Card key={`${index}-${sym}`} className="flex flex-col min-h-0">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div className="flex items-center gap-2 w-full">
-                <Select value={sym} onValueChange={(value) => handleSymbolChange(index, value)}>
-                  <SelectTrigger className="w-full max-w-[220px]">
-                    <SelectValue placeholder="Select symbol" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-64">
-                    {availableSymbols.map((symbol) => (
-                      <SelectItem key={symbol} value={symbol}>
-                        {symbol}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button variant="outline" size="sm" onClick={() => onQuickTrade(sym)}>
-                  Trade
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="flex-1 min-h-0">
-              <div className="h-full border rounded-lg overflow-hidden">
-                <TradingViewChart
-                  key={`multi-${index}-${sym}-${interval}`}
-                  symbol={sym}
-                  interval={interval}
-                  theme="light"
-                  autosize
-                />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  )
-
-  const renderSingleChart = () => (
-    <div className="flex flex-col h-full gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Symbol</span>
-          <Select value={symbols[0] || initialDefault} onValueChange={(value) => handleSymbolChange(0, value)}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select symbol" />
-            </SelectTrigger>
-            <SelectContent className="max-h-64">
-              {availableSymbols.map((symbol) => (
-                <SelectItem key={symbol} value={symbol}>
-                  {symbol}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Interval</span>
-          <Select value={interval} onValueChange={setInterval}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {INTERVAL_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <Button variant="outline" onClick={() => onQuickTrade(symbols[0] || initialDefault)}>
-          Quick Trade
-        </Button>
-      </div>
-      <div className="flex-1 min-h-0 border rounded-lg overflow-hidden">
-        <TradingViewChart
-          key={`single-${symbols[0] || initialDefault}-${interval}`}
-          symbol={symbols[0] || initialDefault}
-          interval={interval}
-          theme="light"
-          autosize
-        />
-      </div>
-    </div>
-  )
 
   const renderAnalytics = () => (
     <div className="flex flex-col h-full">
@@ -280,50 +122,6 @@ export function ResearchWorkspace({ defaultSymbol, marketData, onQuickTrade }: R
                 autosize
               />
             </div>
-
-            {/* Right Panel */}
-            <div className={`relative transition-all duration-300 ease-in-out ${rightPanelVisible ? 'w-[320px]' : 'w-0'}`}>
-              {rightPanelVisible && (
-                <SymbolInfoPanel
-                  currentSymbol={symbols[0] || initialDefault}
-                  onPlaceOrder={onQuickTrade}
-                />
-              )}
-
-              <button
-                onClick={() => setRightPanelVisible(!rightPanelVisible)}
-                className="absolute -left-3 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-6 h-8 bg-card border rounded-md shadow-sm hover:bg-accent transition-colors"
-              >
-                {rightPanelVisible ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
-
-          {/* Bottom Panel */}
-          <div className="relative" style={{ height: `${bottomPanelHeight}px` }}>
-            {/* Resize Handle */}
-            <div
-              className="absolute top-0 left-0 right-0 h-1 cursor-ns-resize hover:bg-accent transition-colors z-10"
-              onMouseDown={(e) => {
-                e.preventDefault()
-                const startY = e.clientY
-
-                const handleMouseMove = (moveEvent: MouseEvent) => {
-                  const deltaY = startY - moveEvent.clientY
-                  handleBottomPanelResize(deltaY)
-                }
-
-                const handleMouseUp = () => {
-                  document.removeEventListener('mousemove', handleMouseMove)
-                  document.removeEventListener('mouseup', handleMouseUp)
-                }
-
-                document.addEventListener('mousemove', handleMouseMove)
-                document.addEventListener('mouseup', handleMouseUp)
-              }}
-            />
-
-            <OrdersPositionsPanel currentSymbol={symbols[0] || initialDefault} />
           </div>
         </div>
       </div>
@@ -337,11 +135,15 @@ export function ResearchWorkspace({ defaultSymbol, marketData, onQuickTrade }: R
     >
       <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as typeof viewMode)} className="h-full flex flex-col">
         <TabsList className="w-fit">
+          <TabsTrigger value="trade-decision">TradeDecision</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="multi">Multi Chart</TabsTrigger>
           <TabsTrigger value="paper-trading">Paper Trading</TabsTrigger>
           <TabsTrigger value="backtesting">Backtesting</TabsTrigger>
         </TabsList>
+        <TabsContent value="trade-decision" className="flex-1 min-h-0">
+          <AnalyticsToolLayout />
+        </TabsContent>
         <TabsContent value="analytics" className="flex-1 min-h-0">
           {renderAnalytics()}
         </TabsContent>

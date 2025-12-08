@@ -553,30 +553,6 @@ export const TradingViewChart = memo(({
     }
   }, [positions]);
 
-  const formattedPrice =
-    lastPrice !== null
-      ? lastPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      : '--';
-
-  const formattedChange =
-    priceChange !== null
-      ? `${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(2)}`
-      : null;
-
-  const formattedChangePercent =
-    priceChangePercent !== null
-      ? `${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toFixed(2)}%`
-      : null;
-
-  const priceColorClass =
-    priceDirection === 'up'
-      ? 'text-emerald-500'
-      : priceDirection === 'down'
-        ? 'text-rose-500'
-        : 'text-foreground';
-
-  const canPlaceOrder = Boolean(onPlaceOrder && actualSymbol);
-
   // Show loading state while fetching default symbol
   if (isLoadingDefault || !actualSymbol) {
     return (
@@ -604,48 +580,6 @@ export const TradingViewChart = memo(({
           height: '100%',
         }}
       />
-      <div className="pointer-events-none absolute right-5 top-20 z-20 hidden md:flex flex-col items-end gap-2">
-        <div className="flex gap-2 pointer-events-auto">
-          <button
-            type="button"
-            disabled={!canPlaceOrder}
-            onClick={() => onPlaceOrder && actualSymbol && onPlaceOrder(actualSymbol, 'sell')}
-            className="flex min-w-[84px] flex-col items-start rounded-md bg-rose-500 px-3 py-2 text-white shadow ring-1 ring-rose-500/40 transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <span className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
-              Sell
-            </span>
-            <span className="text-sm font-semibold">{formattedPrice}</span>
-          </button>
-          <button
-            type="button"
-            disabled={!canPlaceOrder}
-            onClick={() => onPlaceOrder && actualSymbol && onPlaceOrder(actualSymbol, 'buy')}
-            className="flex min-w-[84px] flex-col items-start rounded-md bg-emerald-500 px-3 py-2 text-white shadow ring-1 ring-emerald-500/40 transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <span className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
-              Buy
-            </span>
-            <span className="text-sm font-semibold">{formattedPrice}</span>
-          </button>
-        </div>
-
-        <div className="pointer-events-auto rounded-md border border-border bg-background/90 px-3 py-2 shadow backdrop-blur">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {actualSymbol}
-          </div>
-          <div className={`text-sm font-semibold ${priceColorClass}`}>
-            {formattedPrice}
-          </div>
-          {(formattedChange || formattedChangePercent) && (
-            <div className={`text-xs ${priceColorClass}`}>
-              {formattedChange ?? '--'}
-              {formattedChange && formattedChangePercent ? ' ' : ''}
-              {formattedChangePercent ?? ''}
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 });

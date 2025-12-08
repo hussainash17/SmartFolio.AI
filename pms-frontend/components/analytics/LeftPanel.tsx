@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Activity, Plus } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Activity, Plus, Search, ChevronDown, ChevronRight, Star, Briefcase, PieChart, ArrowUpDown } from 'lucide-react';
 import { MarketService } from '../../src/client';
 import { formatPrice, formatChange, getChangeColor, getChangeIcon } from '../../lib/formatting-utils';
 
@@ -13,63 +13,54 @@ interface WatchlistSymbol {
     last_trade_price?: number;
     change?: number;
     change_percent?: number;
+    volume?: number;
+    group?: string;
 }
 
-interface MarketMover {
-    symbol: string;
-    company_name?: string;
-    change_percent?: number;
-    last_trade_price?: number;
-}
+type SortOption = 'symbol' | 'price' | 'change' | 'volume';
+type GroupOption = 'all' | 'portfolio' | 'favorites' | 'sector';
 
 export function LeftPanel({ currentSymbol, onSymbolSelect }: LeftPanelProps) {
-    const [activeTab, setActiveTab] = useState<'watchlist' | 'movers' | 'active'>('watchlist');
+    const [activeTab, setActiveTab] = useState<'watchlist' | 'movers'>('watchlist');
     const [watchlistSymbols, setWatchlistSymbols] = useState<WatchlistSymbol[]>([]);
-    const [topMovers, setTopMovers] = useState<MarketMover[]>([]);
-    const [mostActive, setMostActive] = useState<MarketMover[]>([]);
     const [loading, setLoading] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortBy, setSortBy] = useState<SortOption>('symbol');
+    const [groupBy, setGroupBy] = useState<GroupOption>('all');
+    const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ 'Favorites': true, 'Portfolio': true });
 
-    // Load watchlist from localStorage
+    // Mock initial data
     useEffect(() => {
-        const savedWatchlist = localStorage.getItem('analytics_watchlist');
-        if (savedWatchlist) {
-            const symbols = JSON.parse(savedWatchlist);
-            loadWatchlistQuotes(symbols);
-        } else {
-            // Default watchlist
-            loadWatchlistQuotes(['GP', 'BRAC', 'SQUR', 'ACI', 'BATBC']);
-        }
+        const initialSymbols = [
+            { symbol: 'GP', group: 'Favorites' },
+            { symbol: 'BRACBANK', group: 'Favorites' },
+            { symbol: 'SQURPHARMA', group: 'Portfolio' },
+            { symbol: 'BATBC', group: 'Portfolio' },
+            { symbol: 'BEXIMCO', group: 'Sector: Pharma' },
+            { symbol: 'RENATA', group: 'Sector: Pharma' },
+            { symbol: 'LHBL', group: 'Sector: Cement' },
+        ];
+        loadWatchlistQuotes(initialSymbols);
     }, []);
 
-    // Load top movers
-    useEffect(() => {
-        if (activeTab === 'movers') {
-            loadTopMovers();
-        }
-    }, [activeTab]);
-
-    // Load most active
-    useEffect(() => {
-        if (activeTab === 'active') {
-            loadMostActive();
-        }
-    }, [activeTab]);
-
-    const loadWatchlistQuotes = async (symbols: string[]) => {
+    const loadWatchlistQuotes = async (items: { symbol: string, group: string }[]) => {
         setLoading(true);
         try {
             const quotes = await Promise.all(
-                symbols.map(async (symbol) => {
+                items.map(async (item) => {
                     try {
-                        const data = await MarketService.getStock({ symbol });
+                        const data = await MarketService.getStock({ symbol: item.symbol });
+                        const stockData = (data as any)?.data || data;
                         return {
-                            symbol,
-                            last_trade_price: (data as any)?.data?.last_trade_price ?? (data as any)?.last_trade_price,
-                            change: (data as any)?.data?.change ?? (data as any)?.change,
-                            change_percent: (data as any)?.data?.change_percent ?? (data as any)?.change_percent,
+                            symbol: item.symbol,
+                            group: item.group,
+                            last_trade_price: stockData?.last_trade_price ?? stockData?.last,
+                            change: stockData?.change,
+                            change_percent: stockData?.change_percent,
+                            volume: stockData?.volume,
                         };
                     } catch {
-                        return { symbol };
+                        return { symbol: item.symbol, group: item.group };
                     }
                 })
             );
@@ -81,172 +72,157 @@ export function LeftPanel({ currentSymbol, onSymbolSelect }: LeftPanelProps) {
         }
     };
 
-    const loadTopMovers = async () => {
-        setLoading(true);
-        try {
-            const data = await MarketService.getTopMovers({ limit: 10 });
-            setTopMovers(data as MarketMover[]);
-        } catch (error) {
-            console.error('Error loading top movers:', error);
-            setTopMovers([]);
-        } finally {
-            setLoading(false);
-        }
+    const toggleGroup = (group: string) => {
+        setExpandedGroups(prev => ({ ...prev, [group]: !prev[group] }));
     };
 
-    const loadMostActive = async () => {
-        setLoading(true);
-        try {
-            const data = await MarketService.getMostActive({ limit: 10 });
-            setMostActive(data as MarketMover[]);
-        } catch (error) {
-            console.error('Error loading most active:', error);
-            setMostActive([]);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const filteredAndSortedSymbols = useMemo(() => {
+        let result = [...watchlistSymbols];
 
+        // Filter by search
+        if (searchQuery) {
+            result = result.filter(s => s.symbol.toLowerCase().includes(searchQuery.toLowerCase()));
+        }
+
+        // Sort
+        result.sort((a, b) => {
+            switch (sortBy) {
+                case 'price': return (b.last_trade_price || 0) - (a.last_trade_price || 0);
+                case 'change': return (b.change_percent || 0) - (a.change_percent || 0);
+                case 'volume': return (b.volume || 0) - (a.volume || 0);
+                default: return a.symbol.localeCompare(b.symbol);
+            }
+        });
+
+        return result;
+    }, [watchlistSymbols, searchQuery, sortBy]);
+
+    const groupedSymbols = useMemo(() => {
+        if (groupBy === 'all') return { 'All Symbols': filteredAndSortedSymbols };
+
+        const groups: Record<string, WatchlistSymbol[]> = {};
+        filteredAndSortedSymbols.forEach(s => {
+            const groupName = s.group || 'Other';
+            if (!groups[groupName]) groups[groupName] = [];
+            groups[groupName].push(s);
+        });
+        return groups;
+    }, [filteredAndSortedSymbols, groupBy]);
 
     return (
-        <div className="flex flex-col h-full">
-            {/* Tabs */}
-            <div className="flex border-b border-border bg-card">
+        <div className="flex flex-col h-full bg-card">
+            {/* Header / Tabs */}
+            <div className="flex border-b border-border">
                 <button
                     onClick={() => setActiveTab('watchlist')}
-                    className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'watchlist'
-                            ? 'text-primary border-b-2 border-primary'
-                            : 'text-muted-foreground hover:text-foreground'
+                    className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'watchlist'
+                        ? 'text-primary border-b-2 border-primary'
+                        : 'text-muted-foreground hover:text-foreground'
                         }`}
                 >
                     Watchlist
                 </button>
                 <button
                     onClick={() => setActiveTab('movers')}
-                    className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'movers'
-                            ? 'text-primary border-b-2 border-primary'
-                            : 'text-muted-foreground hover:text-foreground'
+                    className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'movers'
+                        ? 'text-primary border-b-2 border-primary'
+                        : 'text-muted-foreground hover:text-foreground'
                         }`}
                 >
-                    Movers
-                </button>
-                <button
-                    onClick={() => setActiveTab('active')}
-                    className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'active'
-                            ? 'text-primary border-b-2 border-primary'
-                            : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                >
-                    Active
+                    Market
                 </button>
             </div>
 
-            {/* Content */}
+            {/* Controls */}
+            <div className="p-2 space-y-2 border-b border-border">
+                {/* Search */}
+                <div className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Add / Search..."
+                        className="w-full pl-7 pr-2 py-1.5 text-xs bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                </div>
+
+                {/* Sort & Group */}
+                <div className="flex gap-1">
+                    <div className="relative flex-1">
+                        <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value as SortOption)}
+                            className="w-full pl-2 pr-6 py-1 text-[10px] bg-background border border-border rounded appearance-none focus:outline-none"
+                        >
+                            <option value="symbol">Name</option>
+                            <option value="price">Price</option>
+                            <option value="change">Change %</option>
+                            <option value="volume">Volume</option>
+                        </select>
+                        <ArrowUpDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
+                    </div>
+                    <div className="relative flex-1">
+                        <select
+                            value={groupBy}
+                            onChange={(e) => setGroupBy(e.target.value as GroupOption)}
+                            className="w-full pl-2 pr-6 py-1 text-[10px] bg-background border border-border rounded appearance-none focus:outline-none"
+                        >
+                            <option value="all">No Grouping</option>
+                            <option value="portfolio">Portfolio</option>
+                            <option value="favorites">Favorites</option>
+                            <option value="sector">Sector</option>
+                        </select>
+                        <PieChart className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
+                    </div>
+                </div>
+            </div>
+
+            {/* List Content */}
             <div className="flex-1 overflow-y-auto">
                 {loading ? (
-                    <div className="flex items-center justify-center h-32">
-                        <div className="text-sm text-muted-foreground">Loading...</div>
-                    </div>
+                    <div className="flex items-center justify-center h-32 text-xs text-muted-foreground">Loading...</div>
                 ) : (
-                    <>
-                        {/* Watchlist Tab */}
-                        {activeTab === 'watchlist' && (
-                            <div className="divide-y divide-border">
-                                {watchlistSymbols.map((item) => (
+                    <div className="divide-y divide-border">
+                        {Object.entries(groupedSymbols).map(([groupName, symbols]) => (
+                            <div key={groupName}>
+                                {/* Group Header (only if grouping is active) */}
+                                {groupBy !== 'all' && (
+                                    <button
+                                        onClick={() => toggleGroup(groupName)}
+                                        className="w-full px-3 py-1.5 bg-muted/30 flex items-center justify-between text-xs font-semibold text-muted-foreground hover:bg-muted/50"
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            {expandedGroups[groupName] ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                            {groupName}
+                                        </div>
+                                        <span className="text-[10px]">{symbols.length}</span>
+                                    </button>
+                                )}
+
+                                {/* Symbols List */}
+                                {(groupBy === 'all' || expandedGroups[groupName]) && symbols.map((item) => (
                                     <button
                                         key={item.symbol}
                                         onClick={() => onSymbolSelect(item.symbol)}
-                                        className={`w-full px-4 py-3 text-left hover:bg-accent transition-colors ${currentSymbol === item.symbol ? 'bg-accent' : ''
+                                        className={`w-full px-3 py-2 text-left hover:bg-accent transition-colors ${currentSymbol === item.symbol ? 'bg-accent/50 border-l-2 border-primary' : ''
                                             }`}
                                     >
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex-1 min-w-0">
-                                                <div className="font-semibold text-sm">{item.symbol}</div>
-                                                <div className="text-lg font-mono">
-                                                    {formatPrice(item.last_trade_price)}
-                                                </div>
-                                            </div>
-                                            <div className={`flex items-center gap-1 text-xs font-medium ${getChangeColor(item.change)}`}>
-                                                {getChangeIcon(item.change)}
-                                                <span>{formatChange(item.change, item.change_percent)}</span>
-                                            </div>
+                                        <div className="flex items-center justify-between mb-0.5">
+                                            <span className="font-bold text-sm">{item.symbol}</span>
+                                            <span className="font-mono text-sm">{formatPrice(item.last_trade_price)}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="text-muted-foreground">Vol: {item.volume ? (item.volume / 1000).toFixed(1) + 'K' : '-'}</span>
+                                            <span className={`font-medium ${getChangeColor(item.change)}`}>
+                                                {formatChange(item.change, item.change_percent)}
+                                            </span>
                                         </div>
                                     </button>
                                 ))}
-
-                                <button
-                                    className="w-full px-4 py-3 text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex items-center justify-center gap-2"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    Add Symbol
-                                </button>
                             </div>
-                        )}
-
-                        {/* Top Movers Tab */}
-                        {activeTab === 'movers' && (
-                            <div className="divide-y divide-border">
-                                {topMovers.length > 0 ? (
-                                    topMovers.map((mover) => (
-                                        <button
-                                            key={mover.symbol}
-                                            onClick={() => onSymbolSelect(mover.symbol)}
-                                            className="w-full px-4 py-3 text-left hover:bg-accent transition-colors"
-                                        >
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="font-semibold text-sm">{mover.symbol}</div>
-                                                    <div className="text-xs text-muted-foreground truncate">
-                                                        {mover.company_name || mover.symbol}
-                                                    </div>
-                                                </div>
-                                                <div className={`text-sm font-medium ${getChangeColor(mover.change_percent)}`}>
-                                                    {mover.change_percent !== undefined && mover.change_percent !== null
-                                                        ? `${mover.change_percent >= 0 ? '+' : ''}${mover.change_percent.toFixed(2)}%`
-                                                        : '--'}
-                                                </div>
-                                            </div>
-                                        </button>
-                                    ))
-                                ) : (
-                                    <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                                        No data available
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Most Active Tab */}
-                        {activeTab === 'active' && (
-                            <div className="divide-y divide-border">
-                                {mostActive.length > 0 ? (
-                                    mostActive.map((stock) => (
-                                        <button
-                                            key={stock.symbol}
-                                            onClick={() => onSymbolSelect(stock.symbol)}
-                                            className="w-full px-4 py-3 text-left hover:bg-accent transition-colors"
-                                        >
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="font-semibold text-sm">{stock.symbol}</div>
-                                                    <div className="text-xs text-muted-foreground truncate">
-                                                        {stock.company_name || stock.symbol}
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                    <Activity className="w-3 h-3" />
-                                                </div>
-                                            </div>
-                                        </button>
-                                    ))
-                                ) : (
-                                    <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                                        No data available
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </>
+                        ))}
+                    </div>
                 )}
             </div>
         </div>
