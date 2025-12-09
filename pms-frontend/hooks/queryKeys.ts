@@ -101,4 +101,13 @@ export const queryKeys = {
 
   // Technical Indicators
   donchianChannel: (symbol: string, periods: string) => ['analytics', 'donchian-channel', symbol, periods] as const,
+
+  // TradingView
+  tradingViewQuote: (symbol: string) => ['tradingview', 'quote', symbol] as const,
+  tradingViewPositions: (symbol: string) => ['tradingview', 'positions', symbol] as const,
+
+  // Analytics Panel Hooks
+  symbolNews: (symbol: string, days?: number, limit?: number) => ['news', 'symbol', symbol, days ?? 30, limit ?? 10] as const,
+  symbolEvents: (symbol: string, limit?: number) => ['events', 'symbol', symbol, limit ?? 10] as const,
+  tradeHistory: (limit?: number) => ['trades', 'history', limit ?? 50] as const,
 };

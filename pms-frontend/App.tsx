@@ -7,8 +7,7 @@ import { usePortfolios } from "./hooks/usePortfolios";
 import { useTrading } from "./hooks/useTrading";
 import { useAuth } from "./hooks/useAuth";
 import { Portfolio, PortfolioSummary, Stock } from "./types/portfolio";
-import { Activity, FileText, HelpCircle, Receipt, Settings, ShieldCheck, TrendingUp, User, } from "lucide-react";
-import { MarketService, PortfolioService } from "./src/client";
+import { Activity, FileText, HelpCircle, Receipt, TrendingUp, User, } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "./hooks/queryKeys";
 
@@ -36,11 +35,8 @@ const MarketNewsInsights = lazy(() => import("./components/MarketNewsInsights").
 const InvestmentGoalsEnhanced = lazy(() => import("./components/InvestmentGoalsEnhanced").then(m => ({ default: m.InvestmentGoalsEnhanced })));
 const AssetAllocation = lazy(() => import("./components/AssetAllocation").then(m => ({ default: m.AssetAllocation })));
 const WatchlistManager = lazy(() => import("./components/WatchlistManager").then(m => ({ default: m.WatchlistManager })));
-const AddToWatchlistDialog = lazy(() => import("./components/AddToWatchlistDialog").then(m => ({ default: m.AddToWatchlistDialog })));
 const Fundamentals = lazy(() => import("./components/Fundamentals").then(m => ({ default: m.Fundamentals })));
-const TradingViewChart = lazy(() => import("./components/TradingViewChart").then(m => ({ default: m.TradingViewChart })));
 const ResearchWorkspace = lazy(() => import("./components/ResearchWorkspace").then(m => ({ default: m.ResearchWorkspace })));
-const AnalyticsToolLayout = lazy(() => import("./components/analytics").then(m => ({ default: m.AnalyticsToolLayout })));
 const SettingsView = lazy(() => import("./components/SettingsView").then(m => ({ default: m.SettingsView })));
 const HelpSupportView = lazy(() => import("./components/HelpSupportView").then(m => ({ default: m.HelpSupportView })));
 
@@ -552,16 +548,6 @@ export default function App() {
                             defaultSymbol={researchChartSymbol}
                             marketData={marketData}
                             onQuickTrade={handleQuickTrade}
-                        />
-                    </Suspense>
-                );
-
-            case "analytics":
-                return (
-                    <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading Analytics Tool...</div>}>
-                        <AnalyticsToolLayout
-                            initialSymbol={researchChartSymbol || "GP"}
-                            onPlaceOrder={handlePlaceOrder}
                         />
                     </Suspense>
                 );
