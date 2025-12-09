@@ -1,18 +1,6 @@
 import { useEffect, useRef, memo, useState, useCallback } from 'react';
-import { MarketService } from '../src/client';
-
-interface Position {
-  id: string;
-  portfolio_id: string;
-  portfolio_name: string;
-  symbol: string;
-  quantity: number;
-  price: number;
-  side: string;
-  timestamp: number | null;
-  unrealized_pnl: number;
-  current_value: number;
-}
+import { useTradingViewQuote } from '../hooks/useTradingViewQuote';
+import { useTradingViewPositions, TradingViewPosition } from '../hooks/useTradingViewPositions';
 
 interface TradingViewChartProps {
   symbol?: string;
@@ -50,16 +38,51 @@ export const TradingViewChart = memo(({
   const positionLinesRef = useRef<any[]>([]);
   const [actualSymbol, setActualSymbol] = useState<string>(symbol);
   const [isLoadingDefault, setIsLoadingDefault] = useState(false);
-  const [positions, setPositions] = useState<Position[]>([]);
   const [lastPrice, setLastPrice] = useState<number | null>(null);
   const [priceChange, setPriceChange] = useState<number | null>(null);
   const [priceChangePercent, setPriceChangePercent] = useState<number | null>(null);
   const [priceDirection, setPriceDirection] = useState<'up' | 'down' | null>(null);
   const datafeedRef = useRef<any>(null);
-  const quoteListenerIdRef = useRef<string | null>(null);
   const lastPriceRef = useRef<number | null>(null);
-  const tickHandlerRef = useRef<((bar: any) => void) | null>(null);
   const symbolChangedHandlerRef = useRef<((info: any) => void) | null>(null);
+
+  // Use custom hooks for data fetching
+  const { data: quoteData } = useTradingViewQuote({
+    symbol: actualSymbol,
+    enabled: !!actualSymbol && !isLoadingDefault,
+  });
+
+  const { data: positions = [] } = useTradingViewPositions({
+    symbol: actualSymbol,
+    enabled: !!actualSymbol && !isLoadingDefault,
+  });
+
+  // Update price display when quote data changes
+  useEffect(() => {
+    if (!quoteData) return;
+
+    const { lastPrice: newPrice, change, changePercent } = quoteData;
+
+    if (newPrice !== null && !Number.isNaN(newPrice)) {
+      if (lastPriceRef.current !== null) {
+        if (newPrice > lastPriceRef.current) {
+          setPriceDirection('up');
+        } else if (newPrice < lastPriceRef.current) {
+          setPriceDirection('down');
+        }
+      }
+      lastPriceRef.current = newPrice;
+      setLastPrice(newPrice);
+    }
+
+    if (change !== null && !Number.isNaN(change)) {
+      setPriceChange(change);
+    }
+
+    if (changePercent !== null && !Number.isNaN(changePercent)) {
+      setPriceChangePercent(changePercent);
+    }
+  }, [quoteData]);
 
   const resetQuoteState = useCallback(() => {
     lastPriceRef.current = null;
@@ -69,152 +92,7 @@ export const TradingViewChart = memo(({
     setPriceDirection(null);
   }, []);
 
-  const applyQuoteUpdate = useCallback(
-    (price?: number | null, change?: number | null, changePercentValue?: number | null) => {
-      if (price !== undefined && price !== null && !Number.isNaN(price)) {
-        if (lastPriceRef.current !== null) {
-          if (price > lastPriceRef.current) {
-            setPriceDirection('up');
-          } else if (price < lastPriceRef.current) {
-            setPriceDirection('down');
-          }
-        }
-        lastPriceRef.current = price;
-        setLastPrice(price);
-      }
 
-      if (change !== undefined && change !== null && !Number.isNaN(change)) {
-        setPriceChange(change);
-      }
-
-      if (
-        changePercentValue !== undefined &&
-        changePercentValue !== null &&
-        !Number.isNaN(changePercentValue)
-      ) {
-        setPriceChangePercent(changePercentValue);
-      }
-    },
-    []
-  );
-
-  const fetchLatestQuote = useCallback(
-    async (sym: string) => {
-      if (!sym) return;
-      try {
-        const stockResponse = await MarketService.getStock({ symbol: sym });
-        const last =
-          (stockResponse as any)?.data?.last_trade_price ??
-          (stockResponse as any)?.last ??
-          (stockResponse as any)?.close ??
-          (stockResponse as any)?.price ??
-          null;
-        const change =
-          (stockResponse as any)?.data?.change ??
-          (stockResponse as any)?.change ??
-          null;
-        const changePercentVal =
-          (stockResponse as any)?.data?.change_percent ??
-          (stockResponse as any)?.change_percent ??
-          null;
-
-        const parsedLast = last !== null ? Number(last) : null;
-        const parsedChange = change !== null ? Number(change) : null;
-        const parsedChangePercent = changePercentVal !== null ? Number(changePercentVal) : null;
-
-        applyQuoteUpdate(
-          parsedLast !== null && !Number.isNaN(parsedLast) ? parsedLast : null,
-          parsedChange !== null && !Number.isNaN(parsedChange) ? parsedChange : null,
-          parsedChangePercent !== null && !Number.isNaN(parsedChangePercent)
-            ? parsedChangePercent
-            : null
-        );
-      } catch (error) {
-        console.error('Error fetching latest price:', error);
-      }
-    },
-    [applyQuoteUpdate]
-  );
-
-  const unsubscribeQuotes = useCallback(() => {
-    if (datafeedRef.current && quoteListenerIdRef.current) {
-      try {
-        datafeedRef.current.unsubscribeQuotes(quoteListenerIdRef.current);
-      } catch (error) {
-        console.warn('Failed to unsubscribe quotes', error);
-      }
-      quoteListenerIdRef.current = null;
-    }
-  }, []);
-
-  const subscribeToQuotes = useCallback(
-    (sym: string) => {
-      if (!sym || !datafeedRef.current) {
-        return;
-      }
-
-      unsubscribeQuotes();
-      const listenerId = `tv_quotes_${sym}_${Date.now()}`;
-
-      try {
-        datafeedRef.current.subscribeQuotes(
-          [sym],
-          [],
-          (quotes: any[]) => {
-            if (!Array.isArray(quotes)) return;
-            quotes.forEach((quote) => {
-              if (!quote) return;
-              const values = quote.v ?? {};
-              const last =
-                values.lp ??
-                values.price ??
-                values.close ??
-                null;
-              const change = values.ch ?? null;
-              const changePercentVal = values.chp ?? null;
-
-              const parsedLast = last !== null ? Number(last) : null;
-              const parsedChange = change !== null ? Number(change) : null;
-              const parsedChangePercent = changePercentVal !== null ? Number(changePercentVal) : null;
-
-              applyQuoteUpdate(
-                parsedLast !== null && !Number.isNaN(parsedLast) ? parsedLast : null,
-                parsedChange !== null && !Number.isNaN(parsedChange) ? parsedChange : null,
-                parsedChangePercent !== null && !Number.isNaN(parsedChangePercent)
-                  ? parsedChangePercent
-                  : null
-              );
-            });
-          },
-          listenerId
-        );
-        quoteListenerIdRef.current = listenerId;
-      } catch (error) {
-        console.warn('Failed to subscribe to quotes', error);
-      }
-    },
-    [applyQuoteUpdate, unsubscribeQuotes]
-  );
-
-  // Fetch positions for the current symbol
-  const fetchPositions = useCallback(async (sym: string) => {
-    if (!sym || sym.trim() === '') return;
-    const normalizedSymbol = sym.trim().toUpperCase();
-
-    try {
-      const apiUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${apiUrl}/api/v1/tradingview/positions/${normalizedSymbol}`);
-      if (response.ok) {
-        const data = await response.json();
-        setPositions(data || []);
-      } else {
-        setPositions([]);
-      }
-    } catch (error) {
-      console.error('Error fetching positions:', error);
-      setPositions([]);
-    }
-  }, []);
 
   // Fetch default symbol if none provided
   useEffect(() => {
@@ -263,34 +141,7 @@ export const TradingViewChart = memo(({
     fetchDefaultSymbol();
   }, [symbol]);
 
-  // Fetch positions when symbol changes
-  useEffect(() => {
-    if (actualSymbol && !isLoadingDefault) {
-      fetchPositions(actualSymbol);
-    }
-  }, [actualSymbol, isLoadingDefault, fetchPositions]);
 
-  useEffect(() => {
-    if (!actualSymbol || isLoadingDefault) {
-      return;
-    }
-
-    const normalized = actualSymbol.toUpperCase();
-    resetQuoteState();
-    fetchLatestQuote(normalized);
-    subscribeToQuotes(normalized);
-
-    return () => {
-      unsubscribeQuotes();
-    };
-  }, [
-    actualSymbol,
-    isLoadingDefault,
-    resetQuoteState,
-    fetchLatestQuote,
-    subscribeToQuotes,
-    unsubscribeQuotes,
-  ]);
 
   useEffect(() => {
     // Wait for scripts to load
@@ -327,18 +178,109 @@ export const TradingViewChart = memo(({
         // Get API URL from environment or use default
         const apiUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
         const datafeedUrl = `${apiUrl}/api/v1/tradingview`;
-        const datafeedInstance = new window.Datafeeds.UDFCompatibleDatafeed(
-          datafeedUrl
-          // Remove limitedServerResponse to disable automatic pagination
-          // The backend will return all requested data in one response
-        );
-        datafeedRef.current = datafeedInstance;
+
+        // Create base UDF datafeed
+        const baseDatafeed = new window.Datafeeds.UDFCompatibleDatafeed(datafeedUrl);
+
+        // Create caching wrapper that properly proxies all methods
+        const cache = new Map<string, any>();
+        const pendingRequests = new Map<string, Promise<any>>();
+
+        // Store original getBars method
+        const originalGetBars = baseDatafeed.getBars.bind(baseDatafeed);
+
+        // Override only getBars method with caching logic
+        baseDatafeed.getBars = function (
+          symbolInfo: any,
+          resolution: string,
+          periodParams: any,
+          onHistoryCallback: any,
+          onErrorCallback: any
+        ) {
+          const { from, to, countBack, firstDataRequest } = periodParams;
+
+          // Create cache key
+          const cacheKey = `${symbolInfo.name}_${resolution}_${from}_${to}`;
+
+          // Check if we have cached data that covers this request
+          if (cache.has(cacheKey)) {
+            const cachedData = cache.get(cacheKey);
+            console.log('[Datafeed] Serving from cache:', cacheKey);
+            onHistoryCallback(cachedData.bars, cachedData.meta);
+            return;
+          }
+
+          // Check if there's a pending request for the same data
+          if (pendingRequests.has(cacheKey)) {
+            console.log('[Datafeed] Waiting for pending request:', cacheKey);
+            pendingRequests.get(cacheKey)!.then(
+              (result) => onHistoryCallback(result.bars, result.meta),
+              onErrorCallback
+            );
+            return;
+          }
+
+          // For small countBack requests, check if we have overlapping cached data
+          if (countBack && countBack < 100 && !firstDataRequest) {
+            // Try to find cached data that covers this range
+            for (const [key, value] of cache.entries()) {
+              if (key.startsWith(`${symbolInfo.name}_${resolution}_`)) {
+                const cachedBars = value.bars;
+                if (cachedBars && cachedBars.length > 0) {
+                  // Check if cached data covers the requested range
+                  const cachedFrom = cachedBars[0].time / 1000;
+                  const cachedTo = cachedBars[cachedBars.length - 1].time / 1000;
+
+                  if (cachedFrom <= from && cachedTo >= to) {
+                    // Filter bars that fall within the requested range
+                    const filteredBars = cachedBars.filter(
+                      (bar: any) => bar.time / 1000 >= from && bar.time / 1000 <= to
+                    );
+
+                    if (filteredBars.length > 0) {
+                      console.log('[Datafeed] Serving filtered from existing cache:', filteredBars.length, 'bars');
+                      onHistoryCallback(filteredBars, { noData: false });
+                      return;
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          // Make actual request and cache the result
+          console.log('[Datafeed] Fetching new data:', cacheKey, { from, to, countBack, firstDataRequest });
+
+          const requestPromise = new Promise((resolve, reject) => {
+            originalGetBars(
+              symbolInfo,
+              resolution,
+              periodParams,
+              (bars: any[], meta: any) => {
+                // Cache the response
+                cache.set(cacheKey, { bars, meta });
+                pendingRequests.delete(cacheKey);
+                resolve({ bars, meta });
+                onHistoryCallback(bars, meta);
+              },
+              (error: any) => {
+                pendingRequests.delete(cacheKey);
+                reject(error);
+                onErrorCallback(error);
+              }
+            );
+          });
+
+          pendingRequests.set(cacheKey, requestPromise);
+        };
+
+        datafeedRef.current = baseDatafeed;
 
         const widget = new window.TradingView.widget({
           symbol: actualSymbol,
           interval: interval,
           container: containerRef.current,
-          datafeed: datafeedInstance,
+          datafeed: baseDatafeed,
           library_path: '/charting_library/',
           locale: 'en',
           enabled_features: ['study_templates', 'move_logo_to_main_pane'],
@@ -378,12 +320,8 @@ export const TradingViewChart = memo(({
           const chart = widget.chart();
           chartRef.current = chart;
 
-          const upperSymbol = actualSymbol?.toUpperCase();
-          if (upperSymbol) {
-            resetQuoteState();
-            fetchLatestQuote(upperSymbol);
-            subscribeToQuotes(upperSymbol);
-          }
+          // Quote updates are now handled by useTradingViewQuote hook
+          // Position updates are handled by useTradingViewPositions hook
 
           const symbolChangedHandler = (symbolInfo: any) => {
             const nextSymbol =
@@ -396,27 +334,14 @@ export const TradingViewChart = memo(({
             const normalized = String(nextSymbol).toUpperCase().trim();
             if (normalized && normalized !== actualSymbol) {
               setActualSymbol(normalized);
-            } else if (normalized) {
-              fetchLatestQuote(normalized);
             }
+            // Quote updates for the new symbol will be handled automatically by useTradingViewQuote hook
           };
 
           chart.onSymbolChanged().subscribe(null, symbolChangedHandler);
           symbolChangedHandlerRef.current = symbolChangedHandler;
 
-          const tickHandler = (bar: any) => {
-            if (bar && typeof bar.close !== 'undefined') {
-              const closeValue = Number(bar.close);
-              if (!Number.isNaN(closeValue)) {
-                applyQuoteUpdate(closeValue);
-              }
-            }
-          };
-
-          if (typeof widget.subscribe === 'function') {
-            widget.subscribe('onTick', tickHandler);
-          }
-          tickHandlerRef.current = tickHandler;
+          // Tick handler removed - real-time updates now handled by useTradingViewQuote hook
         });
       } catch (error) {
         console.error('Error initializing TradingView widget:', error);
@@ -476,16 +401,8 @@ export const TradingViewChart = memo(({
         symbolChangedHandlerRef.current = null;
       }
 
-      if (widgetRef.current && tickHandlerRef.current && typeof widgetRef.current.unsubscribe === 'function') {
-        try {
-          widgetRef.current.unsubscribe('onTick', tickHandlerRef.current);
-        } catch (error) {
-          // ignore
-        }
-      }
-      tickHandlerRef.current = null;
-
-      unsubscribeQuotes();
+      // Tick handler and quote subscriptions are now managed by React Query hooks
+      // No manual cleanup needed
 
       if (widgetRef.current) {
         try {
@@ -507,11 +424,6 @@ export const TradingViewChart = memo(({
     autosize,
     height,
     isLoadingDefault,
-    resetQuoteState,
-    fetchLatestQuote,
-    subscribeToQuotes,
-    unsubscribeQuotes,
-    applyQuoteUpdate,
   ]);
 
   // Update position lines when positions change

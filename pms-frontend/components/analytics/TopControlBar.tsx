@@ -1,15 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, Sun, Moon, Settings, TrendingUp, BarChart3, LineChart, CandlestickChart, LayoutTemplate, ChevronDown } from 'lucide-react';
+import { Search, Sun, Moon, Settings, LayoutTemplate } from 'lucide-react';
 import { MarketService } from '../../src/client';
 import { formatPrice, formatNumber, getChangeColor } from '../../lib/formatting-utils';
 
 interface TopControlBarProps {
     currentSymbol: string;
     onSymbolChange: (symbol: string) => void;
-    timeframe: string;
-    onTimeframeChange: (timeframe: string) => void;
-    chartType: 'candlestick' | 'line' | 'bar' | 'heikin_ashi';
-    onChartTypeChange: (type: 'candlestick' | 'line' | 'bar' | 'heikin_ashi') => void;
     theme: 'light' | 'dark';
     onThemeToggle: () => void;
     onLayoutChange: (layout: { left: boolean; right: boolean; bottom: boolean }) => void;
@@ -23,25 +19,9 @@ interface SymbolSearchResult {
     type?: string;
 }
 
-const TIMEFRAMES = [
-    { value: '1D', label: '1D' },
-    { value: '1W', label: '1W' },
-    { value: '1M', label: '1M' },
-    { value: '3M', label: '3M' },
-    { value: '1Y', label: '1Y' },
-    { value: '5Y', label: '5Y' },
-    { value: 'ALL', label: 'MAX' },
-];
-
-const ASSET_CLASSES = ['Stocks', 'Crypto', 'Forex'];
-
 export function TopControlBar({
     currentSymbol,
     onSymbolChange,
-    timeframe,
-    onTimeframeChange,
-    chartType,
-    onChartTypeChange,
     theme,
     onThemeToggle,
     onLayoutChange,
@@ -49,9 +29,7 @@ export function TopControlBar({
 }: TopControlBarProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<SymbolSearchResult[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
     const [showSearchResults, setShowSearchResults] = useState(false);
-    const [currentAssetClass, setCurrentAssetClass] = useState('Stocks');
     const [showLayoutMenu, setShowLayoutMenu] = useState(false);
 
     // Real-time data state (mock for now, would come from websocket/context)
@@ -91,7 +69,6 @@ export function TopControlBar({
         }
 
         const timer = setTimeout(async () => {
-            setIsSearching(true);
             try {
                 const results = await MarketService.listStocks({
                     limit: 10,
@@ -117,8 +94,6 @@ export function TopControlBar({
             } catch (error) {
                 console.error('Symbol search error:', error);
                 setSearchResults([]);
-            } finally {
-                setIsSearching(false);
             }
         }, 300);
 
@@ -146,37 +121,8 @@ export function TopControlBar({
         setShowSearchResults(false);
     };
 
-    const getChartTypeIcon = (type: string) => {
-        switch (type) {
-            case 'candlestick': return <TrendingUp className="w-4 h-4" />;
-            case 'line': return <LineChart className="w-4 h-4" />;
-            case 'bar': return <BarChart3 className="w-4 h-4" />;
-            case 'heikin_ashi': return <CandlestickChart className="w-4 h-4" />; // Using Candlestick icon as proxy
-            default: return <TrendingUp className="w-4 h-4" />;
-        }
-    };
-
     return (
         <div className="flex items-center gap-3 px-4 py-2 bg-card border-b border-border shadow-sm h-14">
-            {/* Asset Class Dropdown (Mock) */}
-            <div className="relative group">
-                <button className="flex items-center gap-1 px-2 py-1 text-sm font-medium hover:bg-accent rounded-md">
-                    {currentAssetClass}
-                    <ChevronDown className="w-3 h-3 text-muted-foreground" />
-                </button>
-                <div className="absolute top-full left-0 mt-1 w-32 bg-card border border-border rounded-md shadow-lg hidden group-hover:block z-50">
-                    {ASSET_CLASSES.map(cls => (
-                        <button
-                            key={cls}
-                            onClick={() => setCurrentAssetClass(cls)}
-                            className="w-full px-4 py-2 text-left text-sm hover:bg-accent transition-colors"
-                        >
-                            {cls}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
             {/* Symbol Search */}
             <div ref={searchRef} className="relative">
                 <div className="relative">
@@ -221,50 +167,6 @@ export function TopControlBar({
                     </span>
                 </div>
             )}
-
-            <div className="flex-1" />
-
-            {/* Center Controls Group */}
-            <div className="flex items-center gap-2">
-                {/* Timeframe */}
-                <div className="flex items-center bg-background rounded-md p-0.5 border border-border">
-                    {TIMEFRAMES.map((tf) => (
-                        <button
-                            key={tf.value}
-                            onClick={() => onTimeframeChange(tf.value)}
-                            className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${timeframe === tf.value
-                                ? 'bg-primary text-primary-foreground shadow-sm'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                                }`}
-                        >
-                            {tf.label}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Chart Type */}
-                <div className="flex items-center bg-background rounded-md p-0.5 border border-border">
-                    {(['candlestick', 'line', 'bar', 'heikin_ashi'] as const).map((type) => (
-                        <button
-                            key={type}
-                            onClick={() => onChartTypeChange(type)}
-                            className={`p-1.5 rounded transition-colors ${chartType === type
-                                ? 'bg-primary text-primary-foreground shadow-sm'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                                }`}
-                            title={type.replace('_', ' ')}
-                        >
-                            {getChartTypeIcon(type)}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Indicators (Mock) */}
-                <button className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-background border border-border rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground">
-                    <TrendingUp className="w-3 h-3" />
-                    <span>Indicators</span>
-                </button>
-            </div>
 
             <div className="flex-1" />
 

@@ -1,7 +1,11 @@
-import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Info, FileText, Calendar, Newspaper, DollarSign } from 'lucide-react';
+import { useState } from 'react';
+import { Calendar, DollarSign, ExternalLink } from 'lucide-react';
 import { MarketService } from '../../src/client';
 import { formatPrice, formatNumber, getChangeColor } from '../../lib/formatting-utils';
+import { useQuery } from '@tanstack/react-query';
+import { useSymbolMarketSummary, useSymbolEarnings, useSymbolDividends } from '../../hooks/useSymbolFundamentals';
+import { useSymbolNews } from '../../hooks/useSymbolNews';
+import { useSymbolEvents } from '../../hooks/useSymbolEvents';
 
 interface RightPanelProps {
     currentSymbol: string;
@@ -30,51 +34,82 @@ type Tab = 'fundamentals' | 'financials' | 'news' | 'events';
 
 export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
     const [activeTab, setActiveTab] = useState<Tab>('fundamentals');
-    const [symbolInfo, setSymbolInfo] = useState<SymbolInfo | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
-    const [quantity, setQuantity] = useState('');
-    const [limitPrice, setLimitPrice] = useState('');
 
-    // Load symbol info when symbol changes
-    useEffect(() => {
-        if (currentSymbol) {
-            loadSymbolInfo();
-        }
-    }, [currentSymbol]);
-
-    const loadSymbolInfo = async () => {
-        if (!currentSymbol) return;
-
-        setLoading(true);
-        try {
+    // Fetch basic stock data from market API
+    const { data: stockData, isLoading: stockLoading } = useQuery({
+        queryKey: ['market', 'stock', currentSymbol],
+        enabled: !!currentSymbol,
+        queryFn: async () => {
             const data = await MarketService.getStock({ symbol: currentSymbol });
-            const stockData = (data as any)?.data || data;
-
-            setSymbolInfo({
+            const stock = (data as any)?.data || data;
+            return {
                 symbol: currentSymbol,
-                company_name: stockData?.company_name,
-                last_trade_price: Number(stockData?.last_trade_price ?? stockData?.last ?? 0),
-                change: Number(stockData?.change ?? 0),
-                change_percent: Number(stockData?.change_percent ?? 0),
-                high: Number(stockData?.high ?? stockData?.day_high ?? 0),
-                low: Number(stockData?.low ?? stockData?.day_low ?? 0),
-                volume: Number(stockData?.volume ?? 0),
-                market_cap: Number(stockData?.market_cap ?? 0),
-                pe_ratio: Number(stockData?.pe_ratio ?? 0),
-                week_52_high: Number(stockData?.week_52_high ?? 0),
-                week_52_low: Number(stockData?.week_52_low ?? 0),
-                eps: Number(stockData?.eps || 12.5), // Mock
-                dividend_yield: Number(stockData?.dividend_yield || 2.5), // Mock
-                sector: stockData?.sector || 'Pharma', // Mock
-            });
-        } catch (error) {
-            console.error('Error loading symbol info:', error);
-            setSymbolInfo(null);
-        } finally {
-            setLoading(false);
-        }
-    };
+                company_name: stock?.company_name,
+                last_trade_price: Number(stock?.last_trade_price ?? stock?.last ?? 0),
+                change: Number(stock?.change ?? 0),
+                change_percent: Number(stock?.change_percent ?? 0),
+                high: Number(stock?.high ?? stock?.day_high ?? 0),
+                low: Number(stock?.low ?? stock?.day_low ?? 0),
+                volume: Number(stock?.volume ?? 0),
+                market_cap: Number(stock?.market_cap ?? 0),
+                pe_ratio: Number(stock?.pe_ratio ?? 0),
+                week_52_high: Number(stock?.week_52_high ?? 0),
+                week_52_low: Number(stock?.week_52_low ?? 0),
+            } as SymbolInfo;
+        },
+        staleTime: 30 * 1000, // 30 seconds
+    });
+
+    // Fetch fundamental data
+    const { data: marketSummary, isLoading: fundamentalsLoading } = useSymbolMarketSummary({
+        symbol: currentSymbol,
+        enabled: !!currentSymbol && activeTab === 'fundamentals',
+    });
+
+    // Fetch earnings data for financials tab
+    const { data: earningsData, isLoading: earningsLoading } = useSymbolEarnings({
+        symbol: currentSymbol,
+        enabled: !!currentSymbol && activeTab === 'financials',
+    });
+
+    // Fetch dividends
+    const { data: dividendsData } = useSymbolDividends({
+        symbol: currentSymbol,
+        limit: 3,
+        enabled: !!currentSymbol && activeTab === 'fundamentals',
+    });
+
+    // Fetch news
+    const { data: newsData, isLoading: newsLoading } = useSymbolNews({
+        symbol: currentSymbol,
+        days: 30,
+        limit: 5,
+        enabled: !!currentSymbol && activeTab === 'news',
+    });
+
+    // Fetch events
+    const { data: eventsData, isLoading: eventsLoading } = useSymbolEvents({
+        symbol: currentSymbol,
+        limit: 5,
+        enabled: !!currentSymbol && activeTab === 'events',
+    });
+
+    const loading = stockLoading || 
+        (activeTab === 'fundamentals' && fundamentalsLoading) ||
+        (activeTab === 'financials' && earningsLoading) ||
+        (activeTab === 'news' && newsLoading) ||
+        (activeTab === 'events' && eventsLoading);
+
+    const symbolInfo: SymbolInfo | null = stockData ? {
+        ...stockData,
+        eps: marketSummary?.eps ?? stockData.pe_ratio ? stockData.last_trade_price / stockData.pe_ratio : undefined,
+        dividend_yield: marketSummary?.dividend_yield,
+        sector: marketSummary?.sector,
+        market_cap: marketSummary?.market_cap ?? stockData.market_cap,
+        pe_ratio: marketSummary?.pe_ratio ?? stockData.pe_ratio,
+        week_52_high: marketSummary?.week_52_high ?? stockData.week_52_high,
+        week_52_low: marketSummary?.week_52_low ?? stockData.week_52_low,
+    } : null;
 
     const handleBuy = () => {
         if (onPlaceOrder && currentSymbol) {
@@ -88,27 +123,36 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
         }
     };
 
+    // Helper to safely format numbers
+    const safeToFixed = (value: any, decimals: number = 2): string => {
+        const num = Number(value);
+        return isNaN(num) ? '--' : num.toFixed(decimals);
+    };
+
     const renderFundamentals = () => (
         <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
                 <div className="p-2 bg-muted/30 rounded">
                     <div className="text-xs text-muted-foreground">Market Cap</div>
-                    <div className="font-semibold text-sm">{formatNumber(symbolInfo?.market_cap)}</div>
+                    <div className="font-semibold text-sm">
+                        {symbolInfo?.market_cap ? `${safeToFixed(symbolInfo.market_cap)} Cr` : '--'}
+                    </div>
                 </div>
                 <div className="p-2 bg-muted/30 rounded">
                     <div className="text-xs text-muted-foreground">P/E Ratio</div>
-                    <div className="font-semibold text-sm">{symbolInfo?.pe_ratio?.toFixed(2) || '--'}</div>
+                    <div className="font-semibold text-sm">{symbolInfo?.pe_ratio ? safeToFixed(symbolInfo.pe_ratio) : '--'}</div>
                 </div>
                 <div className="p-2 bg-muted/30 rounded">
                     <div className="text-xs text-muted-foreground">EPS (TTM)</div>
-                    <div className="font-semibold text-sm flex items-center gap-1">
-                        {symbolInfo?.eps?.toFixed(2)}
-                        <span className="text-[10px] text-emerald-500">(+5% YoY)</span>
+                    <div className="font-semibold text-sm">
+                        {symbolInfo?.eps ? safeToFixed(symbolInfo.eps) : '--'}
                     </div>
                 </div>
                 <div className="p-2 bg-muted/30 rounded">
                     <div className="text-xs text-muted-foreground">Div Yield</div>
-                    <div className="font-semibold text-sm">{symbolInfo?.dividend_yield?.toFixed(2)}%</div>
+                    <div className="font-semibold text-sm">
+                        {symbolInfo?.dividend_yield ? `${safeToFixed(symbolInfo.dividend_yield)}%` : '--'}
+                    </div>
                 </div>
                 <div className="p-2 bg-muted/30 rounded">
                     <div className="text-xs text-muted-foreground">52W High</div>
@@ -120,19 +164,51 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
                 </div>
             </div>
 
-            <div className="p-3 border border-border rounded-md">
-                <h4 className="text-xs font-semibold mb-2">Analyst Rating</h4>
-                <div className="flex items-center gap-2">
-                    <div className="flex-1 h-2 bg-emerald-500 rounded-full opacity-80" />
-                    <div className="flex-1 h-2 bg-emerald-200 rounded-full opacity-50" />
-                    <div className="flex-1 h-2 bg-gray-200 rounded-full" />
-                    <div className="flex-1 h-2 bg-gray-200 rounded-full" />
-                    <div className="flex-1 h-2 bg-gray-200 rounded-full" />
+            {/* Sector */}
+            {symbolInfo?.sector && (
+                <div className="p-2 bg-muted/30 rounded">
+                    <div className="text-xs text-muted-foreground">Sector</div>
+                    <div className="font-semibold text-sm">{symbolInfo.sector}</div>
                 </div>
-                <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
-                    <span>Strong Buy</span>
-                    <span>Hold</span>
-                    <span>Sell</span>
+            )}
+
+            {/* Recent Dividends */}
+            {dividendsData && dividendsData.length > 0 && (
+                <div className="p-3 border border-border rounded-md">
+                    <h4 className="text-xs font-semibold mb-2">Recent Dividends</h4>
+                    <div className="space-y-1">
+                        {dividendsData.slice(0, 3).map((div, idx) => (
+                            <div key={idx} className="flex justify-between text-xs">
+                                <span className="text-muted-foreground">{div.year}</span>
+                                <span>
+                                    {div.cash_dividend ? `${div.cash_dividend}% Cash` : ''}
+                                    {div.cash_dividend && div.stock_dividend ? ' + ' : ''}
+                                    {div.stock_dividend ? `${div.stock_dividend}% Stock` : ''}
+                                    {!div.cash_dividend && !div.stock_dividend ? '--' : ''}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Day Range */}
+            <div className="p-3 border border-border rounded-md">
+                <h4 className="text-xs font-semibold mb-2">Today's Range</h4>
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{formatPrice(symbolInfo?.low)}</span>
+                    <div className="flex-1 h-2 bg-muted rounded-full relative">
+                        {symbolInfo?.low && symbolInfo?.high && symbolInfo?.last_trade_price && (
+                            <div 
+                                className="absolute top-0 w-2 h-2 bg-primary rounded-full"
+                                style={{
+                                    left: `${Math.max(0, Math.min(100, ((symbolInfo.last_trade_price - symbolInfo.low) / (symbolInfo.high - symbolInfo.low)) * 100))}%`,
+                                    transform: 'translateX(-50%)',
+                                }}
+                            />
+                        )}
+                    </div>
+                    <span className="text-xs text-muted-foreground">{formatPrice(symbolInfo?.high)}</span>
                 </div>
             </div>
         </div>
@@ -140,87 +216,121 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
 
     const renderFinancials = () => (
         <div className="space-y-4">
-            <div className="flex justify-end mb-2">
-                <div className="flex bg-muted rounded p-0.5">
-                    <button className="px-2 py-0.5 text-[10px] bg-background rounded shadow-sm">Annual</button>
-                    <button className="px-2 py-0.5 text-[10px] text-muted-foreground">Quarterly</button>
+            {earningsData?.quarterly_eps && earningsData.quarterly_eps.length > 0 ? (
+                <>
+                    <h4 className="text-xs font-semibold">Quarterly EPS</h4>
+                    <table className="w-full text-xs">
+                        <thead>
+                            <tr className="text-muted-foreground border-b border-border">
+                                <th className="text-left py-1 font-medium">Quarter</th>
+                                <th className="text-right py-1 font-medium">EPS</th>
+                                <th className="text-right py-1 font-medium">Growth</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/50">
+                            {earningsData.quarterly_eps.slice(0, 8).map((q, idx) => (
+                                <tr key={idx}>
+                                    <td className="py-2">{q.quarter} {q.year}</td>
+                                    <td className="text-right font-mono">{safeToFixed(q.eps)}</td>
+                                    <td className={`text-right font-mono ${q.growth_percent && Number(q.growth_percent) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                        {q.growth_percent ? `${Number(q.growth_percent) >= 0 ? '+' : ''}${safeToFixed(q.growth_percent, 1)}%` : '--'}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </>
+            ) : (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                    No financial data available
                 </div>
-            </div>
+            )}
 
-            <table className="w-full text-xs">
-                <thead>
-                    <tr className="text-muted-foreground border-b border-border">
-                        <th className="text-left py-1 font-medium">Metric</th>
-                        <th className="text-right py-1 font-medium">2024</th>
-                        <th className="text-right py-1 font-medium">2023</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-border/50">
-                    <tr>
-                        <td className="py-2">Revenue</td>
-                        <td className="text-right font-mono">12.5B</td>
-                        <td className="text-right font-mono text-muted-foreground">11.2B</td>
-                    </tr>
-                    <tr>
-                        <td className="py-2">Net Income</td>
-                        <td className="text-right font-mono">2.1B</td>
-                        <td className="text-right font-mono text-muted-foreground">1.8B</td>
-                    </tr>
-                    <tr>
-                        <td className="py-2">Op. Cash Flow</td>
-                        <td className="text-right font-mono">3.5B</td>
-                        <td className="text-right font-mono text-muted-foreground">3.1B</td>
-                    </tr>
-                    <tr>
-                        <td className="py-2">Profit Margin</td>
-                        <td className="text-right font-mono text-emerald-500">16.8%</td>
-                        <td className="text-right font-mono text-muted-foreground">16.1%</td>
-                    </tr>
-                </tbody>
-            </table>
+            {earningsData?.annual_profit && earningsData.annual_profit.length > 0 && (
+                <>
+                    <h4 className="text-xs font-semibold mt-4">Annual Profit</h4>
+                    <table className="w-full text-xs">
+                        <thead>
+                            <tr className="text-muted-foreground border-b border-border">
+                                <th className="text-left py-1 font-medium">Year</th>
+                                <th className="text-right py-1 font-medium">Profit</th>
+                                <th className="text-right py-1 font-medium">EPS</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/50">
+                            {earningsData.annual_profit.slice(0, 5).map((a, idx) => (
+                                <tr key={idx}>
+                                    <td className="py-2">{a.year}</td>
+                                    <td className="text-right font-mono">{formatNumber(a.profit)}</td>
+                                    <td className="text-right font-mono">{safeToFixed(a.eps)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </>
+            )}
         </div>
     );
 
     const renderNews = () => (
         <div className="space-y-3">
-            <div className="flex items-center justify-between p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
-                <span className="text-xs font-medium text-emerald-500">Market Sentiment</span>
-                <span className="text-sm font-bold text-emerald-500">Bullish (72%)</span>
-            </div>
-
-            <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                    <div key={i} className="group cursor-pointer">
-                        <div className="text-xs text-muted-foreground mb-0.5">2 hours ago • Financial Express</div>
-                        <h4 className="text-sm font-medium group-hover:text-primary transition-colors line-clamp-2">
-                            {symbolInfo?.symbol} reports strong Q3 earnings growth, beating analyst expectations by 15%
-                        </h4>
-                    </div>
-                ))}
-            </div>
+            {newsData && newsData.length > 0 ? (
+                <div className="space-y-3">
+                    {newsData.map((news) => (
+                        <div key={news.id} className="group cursor-pointer">
+                            <div className="text-xs text-muted-foreground mb-0.5">
+                                {new Date(news.published_at).toLocaleDateString()} • {news.source || 'News'}
+                            </div>
+                            <h4 className="text-sm font-medium group-hover:text-primary transition-colors line-clamp-2">
+                                {news.title}
+                            </h4>
+                            {news.summary && (
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                    {news.summary}
+                                </p>
+                            )}
+                            {news.url && (
+                                <a 
+                                    href={news.url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1"
+                                >
+                                    Read more <ExternalLink className="w-3 h-3" />
+                                </a>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                    No recent news for {currentSymbol}
+                </div>
+            )}
         </div>
     );
 
     const renderEvents = () => (
         <div className="space-y-3">
-            <div className="flex items-start gap-3 p-3 border border-border rounded-md">
-                <div className="p-2 bg-primary/10 rounded text-primary">
-                    <Calendar className="w-4 h-4" />
+            {eventsData && eventsData.length > 0 ? (
+                eventsData.map((event) => (
+                    <div key={event.id} className="flex items-start gap-3 p-3 border border-border rounded-md">
+                        <div className={`p-2 rounded ${event.type === 'AGM' ? 'bg-primary/10 text-primary' : 
+                            event.type === 'Record Date' ? 'bg-emerald-500/10 text-emerald-500' : 
+                            'bg-blue-500/10 text-blue-500'}`}>
+                            {event.type === 'Record Date' ? <DollarSign className="w-4 h-4" /> : <Calendar className="w-4 h-4" />}
+                        </div>
+                        <div className="flex-1">
+                            <h4 className="text-sm font-medium">{event.type}</h4>
+                            <p className="text-xs text-muted-foreground">{event.date} • {event.time}</p>
+                        </div>
+                    </div>
+                ))
+            ) : (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                    No upcoming events for {currentSymbol}
                 </div>
-                <div>
-                    <h4 className="text-sm font-medium">Q4 Earnings Report</h4>
-                    <p className="text-xs text-muted-foreground">Oct 24, 2025 (Estimated)</p>
-                </div>
-            </div>
-            <div className="flex items-start gap-3 p-3 border border-border rounded-md">
-                <div className="p-2 bg-emerald-500/10 rounded text-emerald-500">
-                    <DollarSign className="w-4 h-4" />
-                </div>
-                <div>
-                    <h4 className="text-sm font-medium">Dividend Payout</h4>
-                    <p className="text-xs text-muted-foreground">Nov 15, 2025 • ₹2.50 / share</p>
-                </div>
-            </div>
+            )}
         </div>
     );
 
@@ -237,11 +347,11 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
                     </div>
                     <div className="text-right">
                         <div className="font-mono font-bold text-lg">
-                            ₹{formatPrice(symbolInfo?.last_trade_price)}
+                            ৳{formatPrice(symbolInfo?.last_trade_price)}
                         </div>
                         <div className={`text-xs font-medium ${getChangeColor(symbolInfo?.change)}`}>
-                            {symbolInfo?.change !== undefined && symbolInfo.change >= 0 ? '+' : ''}
-                            {symbolInfo?.change?.toFixed(2)} ({symbolInfo?.change_percent?.toFixed(2)}%)
+                            {symbolInfo?.change !== undefined && Number(symbolInfo.change) >= 0 ? '+' : ''}
+                            {safeToFixed(symbolInfo?.change)} ({safeToFixed(symbolInfo?.change_percent)}%)
                         </div>
                     </div>
                 </div>
@@ -311,7 +421,7 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
                     <div className="flex items-center justify-center h-32 text-xs text-muted-foreground">
                         Loading...
                     </div>
-                ) : !symbolInfo ? (
+                ) : !currentSymbol ? (
                     <div className="flex items-center justify-center h-32 text-xs text-muted-foreground">
                         Select a symbol to view details
                     </div>

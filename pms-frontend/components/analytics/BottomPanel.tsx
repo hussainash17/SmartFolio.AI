@@ -11,7 +11,9 @@ import {
     FundamentalHealth,
     RiskMetrics
 } from '../../lib/analytics-utils';
-import { Lightbulb, Activity, ShieldAlert, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
+import { Lightbulb, Activity, ShieldAlert, TrendingUp, TrendingDown, Bell, Plus, Trash2 } from 'lucide-react';
+import { useUserAlerts } from '../../hooks/useUserAlerts';
+import { useSymbolMarketSummary } from '../../hooks/useSymbolFundamentals';
 
 interface BottomPanelProps {
     currentSymbol: string;
@@ -51,6 +53,20 @@ export function BottomPanel({ currentSymbol }: BottomPanelProps) {
     const [fundamentalHealth, setFundamentalHealth] = useState<FundamentalHealth | null>(null);
     const [riskMetrics, setRiskMetrics] = useState<RiskMetrics | null>(null);
 
+    // Alerts hook
+    const { 
+        alerts, 
+        isLoading: alertsLoading, 
+        deleteAlert, 
+        isDeleting 
+    } = useUserAlerts({ enabled: activeTab === 'alerts' });
+
+    // Fundamental data for insights
+    const { data: fundamentalsData } = useSymbolMarketSummary({
+        symbol: currentSymbol,
+        enabled: !!currentSymbol && activeTab === 'insights',
+    });
+
     // Load positions for current symbol
     useEffect(() => {
         if (currentSymbol && activeTab === 'positions') {
@@ -70,7 +86,7 @@ export function BottomPanel({ currentSymbol }: BottomPanelProps) {
         if (currentSymbol && activeTab === 'insights') {
             loadInsights();
         }
-    }, [currentSymbol, activeTab]);
+    }, [currentSymbol, activeTab, fundamentalsData]);
 
     const loadPositions = async () => {
         if (!currentSymbol) return;
@@ -127,37 +143,39 @@ export function BottomPanel({ currentSymbol }: BottomPanelProps) {
             const price = Number(stockData?.last_trade_price || 100);
             const changePercent = Number(stockData?.change_percent || 0);
 
+            // Use real fundamentals data if available
+            const peRatio = fundamentalsData?.pe_ratio ?? Number(stockData?.pe_ratio || 15);
+            const marketCap = fundamentalsData?.market_cap ?? Number(stockData?.market_cap || 1000000);
+            const eps = fundamentalsData?.eps ?? Number(stockData?.eps || 5);
+
+            // Calculate technical indicators (using available data)
+            // In a real implementation, these would come from a technical analysis API
+            const rsi = 50 + (changePercent * 2); // Simplified RSI approximation
+            const ma50 = price * (1 - changePercent / 200); // Simplified MA50
+            const ma200 = price * (1 - changePercent / 100); // Simplified MA200
+
             const summary = generateSmartSummary(
                 currentSymbol,
                 price,
                 changePercent,
-                55, // Mock RSI
-                price * 0.95, // Mock MA50
-                price * 0.90  // Mock MA200
+                rsi,
+                ma50,
+                ma200
             );
             setSmartSummary(summary);
 
             // Get Signals
-            const signals = getTechnicalSignals(
-                price,
-                55, // RSI
-                0.5 // Mock MACD
-            );
+            const macd = changePercent > 0 ? 0.5 : -0.5; // Simplified MACD
+            const signals = getTechnicalSignals(price, rsi, macd);
             setTechnicalSignals(signals);
 
-            // Get Fundamental Health
-            const health = calculateFundamentalHealth(
-                Number(stockData?.market_cap || 1000000),
-                Number(stockData?.pe_ratio || 15),
-                Number(stockData?.eps || 5)
-            );
+            // Get Fundamental Health with real data
+            const health = calculateFundamentalHealth(marketCap, peRatio, eps);
             setFundamentalHealth(health);
 
             // Get Risk Metrics
-            const risk = calculateRiskMetrics(
-                1.2, // Beta
-                15 // Volatility
-            );
+            // Beta and volatility would ideally come from analytics API
+            const risk = calculateRiskMetrics(1.0, 15);
             setRiskMetrics(risk);
 
         } catch (error) {
@@ -167,6 +185,19 @@ export function BottomPanel({ currentSymbol }: BottomPanelProps) {
         }
     };
 
+    const handleDeleteAlert = async (alertId: string) => {
+        try {
+            await deleteAlert(alertId);
+        } catch (error) {
+            console.error('Error deleting alert:', error);
+        }
+    };
+
+    // Filter alerts for current symbol
+    const symbolAlerts = alerts.filter(alert => {
+        // Check if alert is for current symbol
+        return !currentSymbol || alert.stock_id === currentSymbol;
+    });
 
     return (
         <div className="flex flex-col h-full">
@@ -211,18 +242,24 @@ export function BottomPanel({ currentSymbol }: BottomPanelProps) {
                 </button>
                 <button
                     onClick={() => setActiveTab('alerts')}
-                    className={`px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'alerts'
+                    className={`px-4 py-3 text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'alerts'
                         ? 'text-primary border-b-2 border-primary'
                         : 'text-muted-foreground hover:text-foreground'
                         }`}
                 >
+                    <Bell className="w-3 h-3" />
                     Alerts
+                    {alerts.length > 0 && (
+                        <span className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full">
+                            {alerts.length}
+                        </span>
+                    )}
                 </button>
             </div>
 
             {/* Content */}
             <div className="flex-1 overflow-auto bg-card">
-                {loading ? (
+                {loading || alertsLoading ? (
                     <div className="flex items-center justify-center h-32">
                         <div className="text-sm text-muted-foreground">Loading...</div>
                     </div>
@@ -415,8 +452,61 @@ export function BottomPanel({ currentSymbol }: BottomPanelProps) {
 
                         {/* Alerts Tab */}
                         {activeTab === 'alerts' && (
-                            <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
-                                <p className="text-sm">Price alerts will appear here</p>
+                            <div className="p-4">
+                                {alerts.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {alerts.map((alert) => (
+                                            <div 
+                                                key={alert.id} 
+                                                className={`flex items-center justify-between p-3 rounded-lg border ${
+                                                    alert.status === 'triggered' 
+                                                        ? 'bg-primary/5 border-primary' 
+                                                        : 'bg-muted/30 border-border'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <Bell className={`w-4 h-4 ${alert.status === 'triggered' ? 'text-primary' : 'text-muted-foreground'}`} />
+                                                    <div>
+                                                        <div className="text-sm font-medium">
+                                                            {alert.alert_type} Alert
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground">
+                                                            {alert.condition} {alert.target_value}
+                                                            {alert.current_value && (
+                                                                <span className="ml-2">
+                                                                    (Current: {Number(alert.current_value).toFixed(2)})
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-xs px-2 py-0.5 rounded ${
+                                                        alert.status === 'active' ? 'bg-emerald-500/10 text-emerald-500' :
+                                                        alert.status === 'triggered' ? 'bg-primary/10 text-primary' :
+                                                        'bg-gray-500/10 text-gray-500'
+                                                    }`}>
+                                                        {alert.status}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => handleDeleteAlert(alert.id)}
+                                                        disabled={isDeleting}
+                                                        className="p-1 text-muted-foreground hover:text-rose-500 transition-colors"
+                                                        title="Delete alert"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
+                                        <Bell className="w-8 h-8 mb-2 opacity-50" />
+                                        <p className="text-sm">No price alerts set</p>
+                                        <p className="text-xs mt-1">Create alerts from the chart to get notified</p>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </>

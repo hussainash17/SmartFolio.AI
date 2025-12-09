@@ -2,8 +2,9 @@
 TradingView UDF-compatible API endpoints
 Provides historical OHLC data and symbol information for TradingView charts
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Query
 from sqlmodel import select
@@ -12,6 +13,10 @@ from app.api.deps import SessionDep
 from app.model.company import Company
 from app.model.portfolio import Portfolio, PortfolioPosition
 from app.model.stock import DailyOHLC, StockData
+
+# Dhaka timezone for local date calculations
+# Data in the database is stored in Dhaka local time
+DHAKA_TZ = ZoneInfo("Asia/Dhaka")
 
 router = APIRouter(prefix="/tradingview", tags=["tradingview"])
 
@@ -249,6 +254,9 @@ def get_history(
     """
     Returns historical bars for a symbol.
     https://www.tradingview.com/charting-library-docs/latest/connecting_data/UDF#history
+    
+    Optimization: Enforces minimum countback of 50 bars to prevent excessive small requests
+    from TradingView's panning/zooming behavior (which can request as few as 2-3 bars).
     """
     # Look up company by trading code
     company = session.exec(
@@ -269,9 +277,16 @@ def get_history(
     from_date_only = from_date.date()
     to_date_only = to_date.date()
 
+    # Enforce minimum countback to reduce excessive small requests
+    # TradingView can request as few as 2-3 bars during panning/zooming
+    MIN_COUNTBACK = 50
+    effective_countback = countback
+    if countback and countback < MIN_COUNTBACK:
+        effective_countback = MIN_COUNTBACK
+
     # When countback is provided, get the last N bars before 'to'
     # This is the standard UDF behavior - countback takes precedence over 'from'
-    if countback:
+    if effective_countback:
         # Get the last countback bars before 'to' date, ordered by date descending
         # Then reverse to get chronological order (oldest first)
         stmt = (
@@ -279,7 +294,7 @@ def get_history(
             .where(DailyOHLC.company_id == company.id)
             .where(DailyOHLC.date <= to_date_only)  # Only filter by 'to', ignore 'from' when countback is provided
             .order_by(DailyOHLC.date.desc())
-            .limit(countback)
+            .limit(effective_countback)
         )
         bars = session.exec(stmt).all()
 
@@ -297,6 +312,53 @@ def get_history(
         )
         bars = session.exec(stmt).all()
 
+    # Check if we need to add today's data from StockData table
+    # DailyOHLC is populated by a scheduled job after market close
+    # During trading hours, today's data only exists in StockData
+    # 
+    # IMPORTANT: Use Dhaka timezone for "today" since database stores data in Dhaka local time
+    today_dhaka = datetime.now(DHAKA_TZ).date()
+    
+    # Check if today's data already exists in the bars
+    has_today_data = False
+    if bars:
+        for bar in bars:
+            # Convert bar.date to date if it's datetime
+            bar_date = bar.date.date() if isinstance(bar.date, datetime) else bar.date
+            if bar_date == today_dhaka:
+                has_today_data = True
+                break
+    
+    if not has_today_data and to_date_only >= today_dhaka:
+        # Try to get today's data from StockData table
+        latest_stock_data = session.exec(
+            select(StockData)
+            .where(StockData.company_id == company.id)
+            .order_by(StockData.timestamp.desc())
+            .limit(1)
+        ).first()
+        
+        # Check if the latest stock data is from today (Dhaka time)
+        # The database stores timestamps in Dhaka local time (without timezone info)
+        if latest_stock_data:
+            stock_data_date = latest_stock_data.timestamp.date()
+            
+            if stock_data_date == today_dhaka:
+                # Create a synthetic DailyOHLC bar from StockData
+                # This allows TradingView to show current day data during trading hours
+                class TodayBar:
+                    def __init__(self, stock_data):
+                        self.date = stock_data.timestamp.date()
+                        self.open_price = stock_data.open_price
+                        self.high = stock_data.high
+                        self.low = stock_data.low
+                        self.close_price = stock_data.last_trade_price
+                        self.volume = stock_data.volume
+                
+                today_bar = TodayBar(latest_stock_data)
+                bars = list(bars) if bars else []
+                bars.append(today_bar)
+
     if not bars:
         return {
             "s": "no_data",
@@ -312,9 +374,21 @@ def get_history(
     volumes = []
 
     for bar in bars:
-        # Convert date to Unix timestamp (seconds) - combine date with midnight time
-        bar_datetime = datetime.combine(bar.date, datetime.min.time())
-        times.append(int(bar_datetime.timestamp()))
+        # Convert date to Unix timestamp (seconds) at UTC midnight
+        # 
+        # CRITICAL: TradingView UDF expects timestamps in UTC seconds.
+        # TradingView determines the candle date based on the UTC date of the timestamp,
+        # NOT based on the display timezone setting.
+        # 
+        # The timezone setting in the widget (Asia/Dhaka) only affects how time labels
+        # are displayed, not how candle dates are determined.
+        # 
+        # Therefore, for a bar dated Dec 9, we must send the timestamp for
+        # Dec 9 00:00:00 UTC (not Dec 9 00:00:00 Dhaka which would be Dec 8 18:00 UTC
+        # and would show as Dec 8's candle).
+        bar_date = bar.date.date() if isinstance(bar.date, datetime) else bar.date
+        bar_datetime_utc = datetime.combine(bar_date, datetime.min.time(), tzinfo=timezone.utc)
+        times.append(int(bar_datetime_utc.timestamp()))
         opens.append(float(bar.open_price))
         highs.append(float(bar.high))
         lows.append(float(bar.low))

@@ -32,13 +32,15 @@ const PortfolioTabs: React.FC<PortfolioTabsProps> = ({ portfolioId, transactions
         if (userAllocation?.sector_wise_allocation) {
             return userAllocation.sector_wise_allocation.map((s: any, idx: number) => ({
                 name: s.sector,
-                value: Number(s.allocation_percent || 0),
+                allocation_percent: Number(s.allocation_percent || 0),
+                allocation_value: Number(s.value || 0),
                 color: PALETTE[idx % PALETTE.length]
             }));
         }
 
         return [];
     }, [portfolioId, allocationData, userAllocation]);
+    console.log(effectiveAllocationData);
 
     return (
         <Card className="h-full min-h-[420px] flex flex-col">

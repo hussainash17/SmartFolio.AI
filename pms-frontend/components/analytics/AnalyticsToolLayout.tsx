@@ -34,8 +34,6 @@ export function AnalyticsToolLayout({
 
     // Chart state
     const [currentSymbol, setCurrentSymbol] = useState(initialSymbol);
-    const [timeframe, setTimeframe] = useState('1D');
-    const [chartType, setChartType] = useState<'candlestick' | 'line' | 'bar' | 'heikin_ashi'>('candlestick');
     const [theme, setTheme] = useState<'light' | 'dark'>('dark');
 
     // Panel width constants
@@ -64,14 +62,6 @@ export function AnalyticsToolLayout({
 
     const handleSymbolChange = useCallback((symbol: string) => {
         setCurrentSymbol(symbol);
-    }, []);
-
-    const handleTimeframeChange = useCallback((tf: string) => {
-        setTimeframe(tf);
-    }, []);
-
-    const handleChartTypeChange = useCallback((type: 'candlestick' | 'line' | 'bar' | 'heikin_ashi') => {
-        setChartType(type);
     }, []);
 
     const handleThemeToggle = useCallback(() => {
@@ -107,10 +97,6 @@ export function AnalyticsToolLayout({
             <TopControlBar
                 currentSymbol={currentSymbol}
                 onSymbolChange={handleSymbolChange}
-                timeframe={timeframe}
-                onTimeframeChange={handleTimeframeChange}
-                chartType={chartType}
-                onChartTypeChange={handleChartTypeChange}
                 theme={theme}
                 onThemeToggle={handleThemeToggle}
                 layoutState={layoutState}
@@ -179,7 +165,6 @@ export function AnalyticsToolLayout({
                         <div className="flex-1 relative">
                             <TradingViewChart
                                 symbol={currentSymbol}
-                                interval={timeframe}
                                 theme={theme}
                                 autosize={true}
                                 onPlaceOrder={onPlaceOrder}
