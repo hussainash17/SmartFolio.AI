@@ -110,4 +110,5 @@ export const queryKeys = {
   symbolNews: (symbol: string, days?: number, limit?: number) => ['news', 'symbol', symbol, days ?? 30, limit ?? 10] as const,
   symbolEvents: (symbol: string, limit?: number) => ['events', 'symbol', symbol, limit ?? 10] as const,
   tradeHistory: (limit?: number) => ['trades', 'history', limit ?? 50] as const,
+  aggregatedPortfolioHistory: (limit?: number) => ['portfolio', 'history', 'aggregated', limit ?? 30] as const,
 };

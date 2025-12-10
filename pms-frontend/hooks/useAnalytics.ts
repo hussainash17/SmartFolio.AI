@@ -43,3 +43,21 @@ export function usePortfolioImpact() {
         enabled: !!(OpenAPI as any).TOKEN,
     });
 }
+
+export interface AggregatedHistoryPoint {
+    valuation_date: string;
+    total_value: number;
+    cash_value: number;
+    securities_value: number;
+    daily_return: number;
+    cumulative_return: number;
+}
+
+export function useAggregatedPortfolioHistory(limit: number = 30) {
+    return useQuery({
+        queryKey: queryKeys.aggregatedPortfolioHistory(limit),
+        queryFn: () => fetchFromApi(`/api/v1/portfolio/history/aggregated?limit=${limit}`),
+        enabled: !!(OpenAPI as any).TOKEN,
+    });
+}
+

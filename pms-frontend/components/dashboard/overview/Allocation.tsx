@@ -60,7 +60,7 @@ const renderActiveShape = ({
             />
             <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
             <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
-            <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} textAnchor={textAnchor} fill="#333">{`Allocation ${value}`}</text>
+            <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} textAnchor={textAnchor} fill="#333">{`${payload.name} ${value?.toLocaleString()}`}</text>
             <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} dy={18} textAnchor={textAnchor} fill="#999">
                 {`(${((percent ?? 1) * 100).toFixed(2)}%)`}
             </text>
@@ -70,9 +70,18 @@ const renderActiveShape = ({
 
 
 const Allocation: React.FC<AllocationProps> = ({ data = DEFAULT_DATA }) => {
+    const [activeIndex, setActiveIndex] = React.useState<number | undefined>(undefined);
 
     // Ensure we have valid data, fallback to default if empty or undefined
     const chartData = data && data.length > 0 ? data : DEFAULT_DATA;
+
+    const onPieEnter = (_: any, index: number) => {
+        setActiveIndex(index);
+    };
+
+    const onPieLeave = () => {
+        setActiveIndex(undefined);
+    };
 
     return (
         <Card className="h-full border-none shadow-none">
@@ -83,6 +92,7 @@ const Allocation: React.FC<AllocationProps> = ({ data = DEFAULT_DATA }) => {
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <Pie
+                            activeIndex={activeIndex}
                             activeShape={renderActiveShape}
                             data={chartData}
                             cx="50%"
@@ -91,21 +101,14 @@ const Allocation: React.FC<AllocationProps> = ({ data = DEFAULT_DATA }) => {
                             outerRadius={80}
                             paddingAngle={5}
                             dataKey="allocation_value"
+                            onMouseEnter={onPieEnter}
+                            onMouseLeave={onPieLeave}
                         >
                             {chartData.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={entry.color || DEFAULT_DATA[index % DEFAULT_DATA.length].color} />
                             ))}
                         </Pie>
-                        <Tooltip
-                            formatter={(allocation_percent: number) => [`${allocation_percent}%`, 'Allocation']}
-                            contentStyle={{
-                                borderRadius: '8px',
-                                border: '1px solid var(--border)',
-                                backgroundColor: 'var(--background)',
-                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                            }}
-                            labelStyle={{ color: 'var(--foreground)' }}
-                        />
+
                         <Legend verticalAlign="bottom" height={36} iconType="circle" />
                     </PieChart>
                 </ResponsiveContainer>

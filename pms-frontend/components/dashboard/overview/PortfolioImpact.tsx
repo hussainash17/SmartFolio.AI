@@ -98,7 +98,6 @@ const PortfolioImpact: React.FC = () => {
                             <div className="bg-muted/50 rounded-lg p-4">
                                 <div className="flex justify-between items-center mb-3">
                                     <h4 className="text-xs font-bold text-muted-foreground uppercase">Composition vs Performance</h4>
-                                    <span className="text-[10px] text-muted-foreground">Real-time</span>
                                 </div>
                                 <div className="space-y-1">
                                     {data.sector_composition.slice(0, 5).map((sector: any, index: number) => (

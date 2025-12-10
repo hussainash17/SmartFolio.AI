@@ -128,13 +128,19 @@ public class DailyOHLCAggregator {
                                                                                                                      // trade
                                                                                                                      // price
                 .volume(stockData.getVolume() != null ? stockData.getVolume() : 0L)
-                .turnover(stockData.getTurnover() != null ? stockData.getTurnover().multiply(BigDecimal.valueOf(1000000)) : BigDecimal.ZERO)
+                .turnover(
+                        stockData.getTurnover() != null ? stockData.getTurnover().multiply(BigDecimal.valueOf(1000000))
+                                : BigDecimal.ZERO)
                 .tradesCount(stockData.getTradesCount() != null ? stockData.getTradesCount() : 0)
                 .change(stockData.getChange() != null ? stockData.getChange() : BigDecimal.ZERO)
                 .changePercent(stockData.getChangePercent() != null ? stockData.getChangePercent() : BigDecimal.ZERO)
                 .build();
 
         dailyOHLCRepository.save(dailyOHLC);
+
+        // Reset open price for next day's scraping
+        stockData.setOpenPrice(null);
+        stockDataRepository.save(stockData);
 
         log.info("Migrated StockData to DailyOHLC for company: {}", companyId);
     }

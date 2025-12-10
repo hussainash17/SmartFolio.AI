@@ -55,30 +55,33 @@ public class ScraperProperties {
     public static class Schedule {
         private boolean enabled = true;
         private String timezone = "Asia/Dhaka";
-        
+
         // Real-time scraper runs every 1 minute during market hours
         private String realtimeCron = "0 */1 10-3 * * SUN-THU";
-        
+
         // Fundamental data scraper runs daily at 4 PM after market close
         private String fundamentalCron = "0 0 16 * * MON-THU";
-        
+
         // Daily OHLC aggregation runs at 3:30 PM
         private String dailyAggregationCron = "0 32 14 * * SUN-THU";
 
         // Portfolio daily valuation runs at 2:30 PM
         private String portfolioValuationCron = "0 30 15 * * MON-THU";
-        
+
         // Company list sync runs weekly on Saturday at 10 AM
         private String companyListSyncCron = "0 0 10 * * SAT";
-        
+
         // Cleanup runs monthly on 1st day at 2 AM
         private String cleanupCron = "0 0 2 1 * *";
-        
+
         // DSE news scraper runs every 30 seconds
         private String newsCron = "0/30 * * * * *";
 
         // Index instrument scraper runs every 30 seconds
         private String indexCron = "0 */1 10-3 * * SUN-THU";
+
+        // Open price scraper runs every 5 minutes during market hours
+        private String openPriceCron = "0 */5 10-13 * * SUN-THU";
     }
 
     @Data
@@ -105,4 +108,3 @@ public class ScraperProperties {
         private boolean parallelProcessing = true;
     }
 }
-

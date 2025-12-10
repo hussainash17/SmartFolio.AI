@@ -233,8 +233,248 @@ class PerformanceCalculator:
         return ((1 + total_return) ** (365.25 / days)) - 1
 
     # ============================================================================
+    # MULTI-PORTFOLIO RETURN CALCULATIONS (Client-Level)
+    # ============================================================================
+
+    def calculate_aggregated_daily_valuations(
+        self,
+        portfolio_ids: List[str],
+        start_date: date,
+        end_date: date
+    ) -> List[Dict]:
+        """
+        Aggregate daily valuations across multiple portfolios.
+        
+        For each date, sums the portfolio values across all provided portfolios.
+        This is used to calculate combined TWR/MWR for a client with multiple portfolios.
+        
+        Args:
+            portfolio_ids: List of portfolio IDs to aggregate
+            start_date: Start date for valuations
+            end_date: End date for valuations
+            
+        Returns:
+            List of dicts with 'date', 'value', and 'daily_return' keys
+        """
+        if not portfolio_ids:
+            return []
+        
+        # Get valuations for each portfolio
+        all_valuations: Dict[date, float] = {}
+        
+        for pid in portfolio_ids:
+            valuations = self._get_daily_valuations(pid, start_date, end_date)
+            for v in valuations:
+                val_date = v['date'] if isinstance(v['date'], date) else datetime.fromisoformat(v['date']).date()
+                if val_date not in all_valuations:
+                    all_valuations[val_date] = 0.0
+                all_valuations[val_date] += float(v['value'])
+        
+        if not all_valuations:
+            return []
+        
+        # Sort by date
+        sorted_dates = sorted(all_valuations.keys())
+        
+        # Build result with daily returns
+        results = []
+        prev_value = None
+        
+        for d in sorted_dates:
+            value = all_valuations[d]
+            daily_return = 0.0
+            
+            if prev_value is not None and prev_value > 0:
+                daily_return = (value - prev_value) / prev_value
+            
+            results.append({
+                'date': d,
+                'value': value,
+                'daily_return': daily_return
+            })
+            prev_value = value
+        
+        return results
+
+    def calculate_combined_twr(
+        self,
+        portfolio_ids: List[str],
+        start_date: date,
+        end_date: date
+    ) -> float:
+        """
+        Calculate Time-Weighted Return (TWR) for multiple portfolios combined.
+        
+        This method:
+        1. Aggregates daily values across all portfolios (V_Total = V_A + V_B + ...)
+        2. Aggregates cash flows from all portfolios
+        3. Calculates subperiod returns on the combined values
+        4. Chain-links the returns to get combined TWR
+        
+        Args:
+            portfolio_ids: List of portfolio IDs to combine
+            start_date: Start date for calculation
+            end_date: End date for calculation
+            
+        Returns:
+            Combined TWR as a decimal (e.g., 0.05 for 5%)
+        """
+        if not portfolio_ids:
+            return 0.0
+        
+        # Step 1: Get aggregated valuations
+        valuations = self.calculate_aggregated_daily_valuations(portfolio_ids, start_date, end_date)
+        
+        if len(valuations) < 2:
+            return 0.0
+        
+        # Step 2: Get aggregated cash flows from all portfolios
+        all_cash_flows: Dict[date, float] = {}
+        for pid in portfolio_ids:
+            cf = self._get_cash_flows_by_date(pid, start_date, end_date)
+            for d, amt in cf.items():
+                if d not in all_cash_flows:
+                    all_cash_flows[d] = 0.0
+                all_cash_flows[d] += amt
+        
+        # Step 3: Calculate subperiod returns using Modified Dietz
+        sub_returns = []
+        for i in range(len(valuations) - 1):
+            begin_value = float(valuations[i]['value'])
+            end_value = float(valuations[i + 1]['value'])
+            period_date = valuations[i + 1]['date']
+            period_cf = all_cash_flows.get(period_date, 0.0)
+            
+            # Modified Dietz formula for sub-period
+            # Weight = 0.5 (assumes cash flow occurs mid-period)
+            weight = 0.5
+            denominator = begin_value + (weight * period_cf)
+            
+            if denominator > 0:
+                sub_return = (end_value - begin_value - period_cf) / denominator
+                sub_returns.append(sub_return)
+        
+        # Step 4: Chain-link the sub-period returns
+        if not sub_returns:
+            return 0.0
+        
+        twr = np.prod([1 + r for r in sub_returns]) - 1
+        return float(twr)
+
+    def calculate_combined_mwr(
+        self,
+        portfolio_ids: List[str],
+        start_date: date,
+        end_date: date
+    ) -> float:
+        """
+        Calculate Money-Weighted Return (IRR) for multiple portfolios combined.
+        
+        This method:
+        1. Sums initial and final values across all portfolios
+        2. Aggregates all cash flows from all portfolios
+        3. Calculates IRR on the combined cash flow stream
+        
+        Args:
+            portfolio_ids: List of portfolio IDs to combine
+            start_date: Start date for calculation
+            end_date: End date for calculation
+            
+        Returns:
+            Combined MWR as a decimal (e.g., 0.05 for 5%)
+        """
+        if not portfolio_ids:
+            return 0.0
+        
+        # Step 1: Get combined initial and final values
+        total_initial = sum(
+            self._get_portfolio_value_on_date_optimized(pid, start_date)
+            for pid in portfolio_ids
+        )
+        total_final = sum(
+            self._get_portfolio_value_on_date_optimized(pid, end_date)
+            for pid in portfolio_ids
+        )
+        
+        # Step 2: Get all cash flows from all portfolios
+        all_cash_flows = []
+        for pid in portfolio_ids:
+            cf = self._get_all_cash_flows(pid, start_date, end_date)
+            all_cash_flows.extend(cf)
+        
+        if not all_cash_flows and total_initial == 0:
+            return 0.0
+        
+        # Calculate simple return as fallback
+        simple_return = (total_final - total_initial) / total_initial if total_initial > 0 else 0.0
+        
+        # For very short periods or when cash flows are negligible, use simple return
+        days = (end_date - start_date).days
+        total_cash_flow = sum(abs(cf['amount']) for cf in all_cash_flows)
+        cash_flow_ratio = total_cash_flow / total_initial if total_initial > 0 else 0.0
+        
+        if days < 30 and cash_flow_ratio < 0.05:
+            return simple_return
+        
+        # Step 3: Build cash flow stream for IRR calculation
+        all_flows = [{'date': start_date, 'amount': -total_initial}]
+        all_flows.extend(all_cash_flows)
+        all_flows.append({'date': end_date, 'amount': total_final})
+        
+        def npv_at(rate):
+            """Calculate NPV for given rate with domain guard."""
+            if (1 + rate) <= 0:
+                return np.inf
+            total = 0.0
+            for cf in all_flows:
+                days_diff = (cf['date'] - start_date).days
+                years = days_diff / 365.25
+                if not np.isfinite(years):
+                    continue
+                total += cf['amount'] / ((1 + rate) ** years)
+            return total
+        
+        try:
+            # Prefer a bracketed solver to keep (1 + rate) > 0
+            low, high = -0.9999, 10.0
+            f_low, f_high = npv_at(low), npv_at(high)
+            
+            if np.sign(f_low) == np.sign(f_high):
+                # Attempt to expand the upper bound to find a sign change
+                bracket_found = False
+                for high_bound in [20.0, 50.0, 100.0]:
+                    f_high = npv_at(high_bound)
+                    if np.sign(f_low) != np.sign(f_high):
+                        bracket_found = True
+                        high = high_bound
+                        break
+                
+                if not bracket_found:
+                    # Try Newton method, but validate the result
+                    try:
+                        irr = newton(npv_at, 0.1, maxiter=100)
+                        if -0.99 <= irr <= 10.0:
+                            return float(irr)
+                        else:
+                            return simple_return
+                    except (RuntimeError, ValueError, OverflowError, ZeroDivisionError):
+                        return simple_return
+            
+            # Use bracketed solver
+            irr = brentq(npv_at, low, high, maxiter=200)
+            
+            if -0.99 <= irr <= 10.0:
+                return float(irr)
+            else:
+                return simple_return
+                
+        except (RuntimeError, ValueError, OverflowError, ZeroDivisionError):
+            return simple_return
+
+    # ============================================================================
     # RISK METRICS
     # ============================================================================
+
 
     def calculate_volatility(
         self,

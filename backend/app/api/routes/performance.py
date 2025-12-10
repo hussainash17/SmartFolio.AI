@@ -1480,3 +1480,100 @@ def backfill_all_portfolios(
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat()
     }
+
+
+# ============================================================================
+# CLIENT-LEVEL PERFORMANCE (Multi-Portfolio)
+# ============================================================================
+
+@router.get("/clients/me/performance/returns")
+def get_client_performance_returns(
+        current_user: CurrentUser,
+        session: SessionDep,
+        period: str = Query("YTD", regex="^(1W|1M|3M|6M|YTD|1Y|3Y|5Y|ALL)$")
+):
+    """
+    Get combined TWR and MWR for all portfolios belonging to the current user.
+    
+    This endpoint aggregates portfolio values across all user's active portfolios,
+    then calculates:
+    - Combined Time-Weighted Return (TWR) - neutralizes impact of cash flows
+    - Combined Money-Weighted Return (MWR) - accounts for timing of cash flows
+    - Annualized return based on TWR
+    
+    The TWR calculation:
+    1. Aggregates daily values across all portfolios (V_Total = V_A + V_B + ...)
+    2. Calculates subperiod returns on the combined values
+    3. Chain-links the returns for final TWR
+    
+    - **period**: Time period (1W, 1M, 3M, 6M, YTD, 1Y, 3Y, 5Y, ALL)
+    """
+    # Get all active portfolios for the user
+    statement = select(Portfolio).where(
+        Portfolio.user_id == current_user.id,
+        Portfolio.is_active == True
+    )
+    portfolios = session.exec(statement).all()
+    
+    if not portfolios:
+        return {
+            "user_id": str(current_user.id),
+            "period": period,
+            "portfolio_count": 0,
+            "time_weighted_return": 0.0,
+            "money_weighted_return": 0.0,
+            "annualized_return": 0.0,
+            "days": 0,
+            "start_date": None,
+            "end_date": None,
+            "total_start_value": 0.0,
+            "total_end_value": 0.0
+        }
+    
+    # Get portfolio IDs
+    portfolio_ids = [str(p.id) for p in portfolios]
+    
+    # Calculate date range
+    start_date, end_date = get_date_range_from_period(period)
+    days = (end_date - start_date).days
+    
+    # Calculate combined metrics directly (no caching for client-level as cache expects UUID portfolio_id)
+    try:
+        calc = PerformanceCalculator(session)
+        
+        # Calculate combined TWR and MWR
+        twr = calc.calculate_combined_twr(portfolio_ids, start_date, end_date)
+        mwr = calc.calculate_combined_mwr(portfolio_ids, start_date, end_date)
+        
+        # Calculate annualized return
+        annualized = calc.annualize_return(twr, days)
+        
+        # Calculate total start and end values
+        total_start_value = sum(
+            calc._get_portfolio_value_on_date_optimized(pid, start_date)
+            for pid in portfolio_ids
+        )
+        total_end_value = sum(
+            calc._get_portfolio_value_on_date_optimized(pid, end_date)
+            for pid in portfolio_ids
+        )
+        
+        return {
+            "user_id": str(current_user.id),
+            "period": period,
+            "portfolio_count": len(portfolio_ids),
+            "time_weighted_return": round(twr * 100, 2),
+            "money_weighted_return": round(mwr * 100, 2),
+            "annualized_return": round(annualized * 100, 2),
+            "days": days,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "total_start_value": round(total_start_value, 2),
+            "total_end_value": round(total_end_value, 2)
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error calculating client performance: {str(e)}"
+        )
+

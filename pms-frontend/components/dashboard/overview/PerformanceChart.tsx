@@ -1,20 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { useValueHistory } from '../../../hooks/usePerformance';
+import { useAggregatedPortfolioHistory, AggregatedHistoryPoint } from '../../../hooks/useAnalytics';
 import { formatCurrency } from '../../../lib/utils';
 import { cn } from '../../../lib/utils';
 
 const timeFilters = ['1W', '1M', '3M', '6M', 'YTD', '1Y', 'ALL'];
+
+// Helper function to get the start date based on filter
+const getStartDate = (filter: string): Date | null => {
+    const now = new Date();
+    switch (filter) {
+        case '1W':
+            return new Date(now.setDate(now.getDate() - 7));
+        case '1M':
+            return new Date(now.setMonth(now.getMonth() - 1));
+        case '3M':
+            return new Date(now.setMonth(now.getMonth() - 3));
+        case '6M':
+            return new Date(now.setMonth(now.getMonth() - 6));
+        case 'YTD':
+            return new Date(now.getFullYear(), 0, 1); // January 1st of current year
+        case '1Y':
+            return new Date(now.setFullYear(now.getFullYear() - 1));
+        case 'ALL':
+        default:
+            return null; // No filter, show all data
+    }
+};
 
 interface PerformanceChartProps {
     portfolioId?: string;
 }
 
 const PerformanceChart: React.FC<PerformanceChartProps> = ({ portfolioId }) => {
-    const [activeFilter, setActiveFilter] = useState('YTD');
-    const { data: valueHistory, isLoading } = useValueHistory(
+    const [activeFilter, setActiveFilter] = useState('1M');
+    const { data: valueHistory, isLoading: isLoadingPortfolio } = useValueHistory(
         portfolioId || null,
         activeFilter,
         'DSEX',
@@ -22,26 +45,34 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ portfolioId }) => {
         { enabled: !!portfolioId }
     );
 
-    // Mock data for overall view (when no portfolioId is provided)
-    const mockData = [
-        { date: '2024-01-01', portfolio_value: 1000000 },
-        { date: '2024-02-01', portfolio_value: 1050000 },
-        { date: '2024-03-01', portfolio_value: 1030000 },
-        { date: '2024-04-01', portfolio_value: 1080000 },
-        { date: '2024-05-01', portfolio_value: 1120000 },
-        { date: '2024-06-01', portfolio_value: 1150000 },
-        { date: '2024-07-01', portfolio_value: 1140000 },
-        { date: '2024-08-01', portfolio_value: 1180000 },
-        { date: '2024-09-01', portfolio_value: 1200000 },
-        { date: '2024-10-01', portfolio_value: 1250000 },
-    ];
+    // Fetch aggregated history when no portfolioId is provided (get more data to support filtering)
+    const { data: aggregatedHistory, isLoading: isLoadingAggregated } = useAggregatedPortfolioHistory(365);
 
-    const dataToUse = portfolioId ? valueHistory?.data : mockData;
+    const isLoading = portfolioId ? isLoadingPortfolio : isLoadingAggregated;
 
-    const chartData = dataToUse?.map((d: any) => ({
-        date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        value: d.portfolio_value
-    })) || [];
+    // Filter and format data based on activeFilter
+    const chartData = useMemo(() => {
+        if (portfolioId) {
+            return valueHistory?.data?.map((d: any) => ({
+                date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                value: d.portfolio_value
+            })) || [];
+        }
+
+        const rawData = aggregatedHistory as AggregatedHistoryPoint[] | undefined;
+        if (!rawData) return [];
+
+        const startDate = getStartDate(activeFilter);
+
+        const filteredData = startDate
+            ? rawData.filter(d => new Date(d.valuation_date) >= startDate)
+            : rawData;
+
+        return filteredData.map((d) => ({
+            date: new Date(d.valuation_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            value: d.total_value
+        }));
+    }, [portfolioId, valueHistory, aggregatedHistory, activeFilter]);
 
     return (
         <Card className="h-full border-none shadow-none">
@@ -66,7 +97,7 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ portfolioId }) => {
             </CardHeader>
 
             <div className="h-[280px] w-full">
-                {isLoading && portfolioId ? (
+                {isLoading ? (
                     <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">
                         Loading chart data...
                     </div>

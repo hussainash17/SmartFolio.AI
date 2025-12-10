@@ -1131,3 +1131,196 @@ def get_most_volatile_stocks(
         })
     
     return volatile_stocks
+
+
+@router.get("/depth/{symbol}")
+def get_market_depth(
+    symbol: str,
+) -> Dict[str, Any]:
+    """
+    Get real-time market depth (order book) for a stock from DSE.
+    
+    This endpoint fetches live market depth data from the Dhaka Stock Exchange,
+    including:
+    - Buy orders (bid prices and volumes)
+    - Sell orders (ask prices and volumes)
+    - Price statistics (open, high, low, close, volume, trades, etc.)
+    
+    Args:
+        symbol: Stock trading code (e.g., 'AFTABAUTO', 'GP', 'BATBC')
+    
+    Returns:
+        Dict containing buy_orders, sell_orders, and price_statistics
+    """
+    import requests
+    from bs4 import BeautifulSoup
+    import re
+    
+    url = "https://dsebd.org/ajax/load-instrument.php"
+    
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+        "X-Requested-With": "XMLHttpRequest",
+        "Origin": "https://dsebd.org",
+        "Referer": "https://dsebd.org/mkt_depth_3.php",
+        "Accept": "*/*",
+    }
+    
+    data = {"inst": symbol.upper()}
+    
+    try:
+        response = requests.post(url, headers=headers, data=data, timeout=10)
+        response.raise_for_status()
+    except requests.exceptions.Timeout:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="DSE server timed out"
+        )
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to fetch data from DSE: {str(e)}"
+        )
+    
+    html_content = response.text
+    soup = BeautifulSoup(html_content, "html.parser")
+    
+    # Parse buy orders
+    buy_orders: List[Dict[str, Any]] = []
+    sell_orders: List[Dict[str, Any]] = []
+    
+    # Find all tables with bgcolor="#E8FFFB" (buy table background) or look for specific structure
+    # The buy/sell tables have specific structure:
+    # - Buy table: contains header row with "Buy" in <strong><font color="#FFFFFF">
+    # - Sell table: contains header row with "Sell" in <strong><font color="#FFFFFF">
+    
+    # Find Buy table - look for the innermost table containing "Buy" header
+    buy_fonts = soup.find_all("font", string=lambda x: x and x.strip() == "Buy")
+    if buy_fonts:
+        # Get the parent table of the font tag
+        for buy_font in buy_fonts:
+            buy_table = buy_font.find_parent("table")
+            if buy_table:
+                # Get all rows except header rows
+                rows = buy_table.find_all("tr")
+                for row in rows:
+                    cells = row.find_all("td")
+                    if len(cells) >= 2:
+                        # Skip if this is a header row
+                        cell_text = cells[0].get_text(strip=True)
+                        if "Price" in cell_text or "Buy" in cell_text:
+                            continue
+                        # Check cell has bgcolor (data rows have #CCCCCC or similar)
+                        if cells[0].get("bgcolor"):
+                            try:
+                                price = float(cells[0].get_text(strip=True))
+                                volume = int(cells[1].get_text(strip=True).replace(",", ""))
+                                buy_orders.append({"price": price, "volume": volume})
+                            except (ValueError, TypeError):
+                                continue
+                # Only process first matching table
+                break
+    
+    # Find Sell table
+    sell_fonts = soup.find_all("font", string=lambda x: x and x.strip() == "Sell")
+    if sell_fonts:
+        for sell_font in sell_fonts:
+            sell_table = sell_font.find_parent("table")
+            if sell_table:
+                rows = sell_table.find_all("tr")
+                for row in rows:
+                    cells = row.find_all("td")
+                    if len(cells) >= 2:
+                        cell_text = cells[0].get_text(strip=True)
+                        if "Price" in cell_text or "Sell" in cell_text:
+                            continue
+                        if cells[0].get("bgcolor"):
+                            try:
+                                price = float(cells[0].get_text(strip=True))
+                                volume = int(cells[1].get_text(strip=True).replace(",", ""))
+                                sell_orders.append({"price": price, "volume": volume})
+                            except (ValueError, TypeError):
+                                continue
+                break
+
+    
+    # Parse price statistics
+    price_statistics: Dict[str, Any] = {}
+    
+    # Find the Price Statistics table
+    stat_header = soup.find("strong", string=lambda x: x and "Price Statistics" in x if x else False)
+    if stat_header:
+        stat_table = stat_header.find_parent("table")
+        if stat_table:
+            rows = stat_table.find_all("tr")
+            for row in rows:
+                cells = row.find_all("td")
+                text = row.get_text()
+                
+                # Parse each statistic
+                if "Open Price" in text:
+                    match = re.search(r"Open Price\s*:\s*([\d.]+)", text)
+                    if match:
+                        price_statistics["open_price"] = float(match.group(1))
+                
+                if "Last Trade Price" in text:
+                    match = re.search(r"Last Trade Price\s*:\s*([\d.]+)", text)
+                    if match:
+                        price_statistics["last_trade_price"] = float(match.group(1))
+                
+                if "Yesterday Close Price" in text:
+                    match = re.search(r"Yesterday Close Price\s*:\s*([\d.]+)", text)
+                    if match:
+                        price_statistics["yesterday_close"] = float(match.group(1))
+                
+                if "Close Price" in text and "Yesterday" not in text:
+                    match = re.search(r"Close Price\s*:\s*([\d.]+)", text)
+                    if match:
+                        price_statistics["close_price"] = float(match.group(1))
+                
+                if "Day's High" in text or "Day's High" in text:
+                    match = re.search(r"Day'?s High\s*:\s*([\d.]+)", text)
+                    if match:
+                        price_statistics["days_high"] = float(match.group(1))
+                
+                if "Day's Low" in text or "Day's Low" in text:
+                    match = re.search(r"Day'?s Low\s*:\s*([\d.]+)", text)
+                    if match:
+                        price_statistics["days_low"] = float(match.group(1))
+                
+                if "No. of Trade" in text:
+                    match = re.search(r"No\. of Trade\s*:\s*([\d,]+)", text)
+                    if match:
+                        price_statistics["trades"] = int(match.group(1).replace(",", ""))
+                
+                if "Total Volume" in text:
+                    match = re.search(r"Total Volume\s*:\s*([\d,]+)", text)
+                    if match:
+                        price_statistics["total_volume"] = int(match.group(1).replace(",", ""))
+                
+                if "Total Value" in text:
+                    match = re.search(r"Total Value.*?:\s*([\d.]+)", text)
+                    if match:
+                        price_statistics["total_value_mn"] = float(match.group(1))
+    
+    # Calculate spread if we have both buy and sell orders
+    spread = None
+    spread_percent = None
+    if buy_orders and sell_orders:
+        best_bid = max(order["price"] for order in buy_orders)
+        best_ask = min(order["price"] for order in sell_orders)
+        spread = round(best_ask - best_bid, 2)
+        if best_bid > 0:
+            spread_percent = round((spread / best_bid) * 100, 4)
+    
+    return {
+        "symbol": symbol.upper(),
+        "buy_orders": buy_orders,
+        "sell_orders": sell_orders,
+        "price_statistics": price_statistics,
+        "spread": spread,
+        "spread_percent": spread_percent,
+        "best_bid": max(order["price"] for order in buy_orders) if buy_orders else None,
+        "best_ask": min(order["price"] for order in sell_orders) if sell_orders else None,
+    }
