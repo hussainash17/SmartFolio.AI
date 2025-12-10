@@ -50,12 +50,59 @@ public class HtmlParserUtil {
 
         Elements rows = table.select("tr");
         for (Element row : rows) {
-            Elements headers = row.select("th");
-            Elements values = row.select("td");
+            // Some rows contain multiple th/td pairs, others are uneven.
+            // Walk the cells in order and pair each header with the very next
+            // non-header cell so we don't lose data when the counts differ.
+            Elements cells = row.select("th, td");
+            for (int i = 0; i < cells.size(); i++) {
+                Element cell = cells.get(i);
 
-            for (int i = 0; i < headers.size() && i < values.size(); i++) {
-                String key = cleanText(headers.get(i).text());
-                String value = cleanText(values.get(i).text());
+                if (!cell.tagName().equalsIgnoreCase("th")) {
+                    continue;
+                }
+
+                String key = cleanText(cell.text());
+                String value = "";
+
+                // Find the next non-th cell as the value (td or another element).
+                for (int j = i + 1; j < cells.size(); j++) {
+                    if (!cells.get(j).tagName().equalsIgnoreCase("th")) {
+                        value = cleanText(cells.get(j).text());
+                        i = j; // skip the value cell in the outer loop
+                        break;
+                    }
+                }
+
+                if (!key.isEmpty()) {
+                    data.put(key, value);
+                }
+            }
+        }
+
+        return data;
+    }
+
+    /**
+     * Parse colon-separated label/value blocks that are not in tables.
+     * Example: "Last AGM held on: 31-12-2024"
+     *
+     * @param elements elements that contain label/value text
+     * @return map of key-value pairs
+     */
+    public Map<String, String> parseLabeledElements(Elements elements) {
+        Map<String, String> data = new HashMap<>();
+
+        if (elements == null) {
+            return data;
+        }
+
+        for (Element element : elements) {
+            String text = cleanText(element.text());
+
+            if (text.contains(":")) {
+                String[] parts = text.split(":", 2);
+                String key = cleanText(parts[0]);
+                String value = parts.length > 1 ? cleanText(parts[1]) : "";
 
                 if (!key.isEmpty()) {
                     data.put(key, value);

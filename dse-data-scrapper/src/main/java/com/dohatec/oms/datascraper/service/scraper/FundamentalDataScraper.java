@@ -324,6 +324,13 @@ public class FundamentalDataScraper {
             if (lastAgmDate != null) {
                 dataMap.put("Last AGM Date", lastAgmDate);
             }
+
+            // Capture labeled values that are rendered outside tables (e.g., AGM date blocks)
+            Elements labeledBlocks = document.select("div.col-sm-6.pull-left, div.col-sm-6.pull-right, div.pull-left, div.pull-right");
+            Map<String, String> labeledData = htmlParserUtil.parseLabeledElements(labeledBlocks);
+            if (!labeledData.isEmpty()) {
+                dataMap.putAll(labeledData);
+            }
             
             // Select all tables
             Elements tables = document.select("table.table.table-bordered.background-white");
