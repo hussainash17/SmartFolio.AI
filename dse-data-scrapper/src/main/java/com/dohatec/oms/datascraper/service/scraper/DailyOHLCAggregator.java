@@ -128,7 +128,7 @@ public class DailyOHLCAggregator {
                                                                                                                      // trade
                                                                                                                      // price
                 .volume(stockData.getVolume() != null ? stockData.getVolume() : 0L)
-                .turnover(stockData.getTurnover() != null ? stockData.getTurnover() * 1000000 : BigDecimal.ZERO)
+                .turnover(stockData.getTurnover() != null ? stockData.getTurnover().multiply(BigDecimal.valueOf(1000000)) : BigDecimal.ZERO)
                 .tradesCount(stockData.getTradesCount() != null ? stockData.getTradesCount() : 0)
                 .change(stockData.getChange() != null ? stockData.getChange() : BigDecimal.ZERO)
                 .changePercent(stockData.getChangePercent() != null ? stockData.getChangePercent() : BigDecimal.ZERO)
