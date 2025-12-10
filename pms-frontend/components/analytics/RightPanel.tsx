@@ -86,6 +86,7 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
         limit: 5,
         enabled: !!currentSymbol && activeTab === 'news',
     });
+    console.log(newsData);
 
     // Fetch events
     const { data: eventsData, isLoading: eventsLoading } = useSymbolEvents({
@@ -99,16 +100,16 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
         (activeTab === 'financials' && earningsLoading) ||
         (activeTab === 'news' && newsLoading) ||
         (activeTab === 'events' && eventsLoading);
-
+    console.log(earningsData);
     const symbolInfo: SymbolInfo | null = stockData ? {
         ...stockData,
-        eps: marketSummary?.eps ?? stockData.pe_ratio ? stockData.last_trade_price / stockData.pe_ratio : undefined,
-        dividend_yield: marketSummary?.dividend_yield,
+        eps: earningsData?.annual_profit?.[0]?.eps ?? (stockData.pe_ratio && stockData.pe_ratio !== 0 ? stockData.last_trade_price / stockData.pe_ratio : undefined),
+        dividend_yield: marketSummary?.dividend_yield ? Number(marketSummary.dividend_yield) : undefined,
         sector: marketSummary?.sector,
-        market_cap: marketSummary?.market_cap ?? stockData.market_cap,
-        pe_ratio: marketSummary?.pe_ratio ?? stockData.pe_ratio,
-        week_52_high: marketSummary?.week_52_high ?? stockData.week_52_high,
-        week_52_low: marketSummary?.week_52_low ?? stockData.week_52_low,
+        market_cap: marketSummary?.market_cap ? Number(marketSummary.market_cap) : stockData.market_cap,
+        pe_ratio: marketSummary?.current_pe ? Number(marketSummary.current_pe) : stockData.pe_ratio,
+        week_52_high: marketSummary?.week_52_range?.high ? Number(marketSummary.week_52_range.high) : stockData.week_52_high,
+        week_52_low: marketSummary?.week_52_range?.low ? Number(marketSummary.week_52_range.low) : stockData.week_52_low,
     } : null;
 
     const handleBuy = () => {
@@ -135,7 +136,7 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
                 <div className="p-2 bg-muted/30 rounded">
                     <div className="text-xs text-muted-foreground">Market Cap</div>
                     <div className="font-semibold text-sm">
-                        {symbolInfo?.market_cap ? `${safeToFixed(symbolInfo.market_cap)} Cr` : '--'}
+                        {symbolInfo?.market_cap ? `${safeToFixed(symbolInfo.market_cap)} Million` : '--'}
                     </div>
                 </div>
                 <div className="p-2 bg-muted/30 rounded">
@@ -214,7 +215,8 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
         </div>
     );
 
-    const renderFinancials = () => (
+    const renderFinancials = () => {
+        return (
         <div className="space-y-4">
             {earningsData?.quarterly_eps && earningsData.quarterly_eps.length > 0 ? (
                 <>
@@ -270,23 +272,24 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
                 </>
             )}
         </div>
-    );
+        );
+    };
 
     const renderNews = () => (
         <div className="space-y-3">
             {newsData && newsData.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-4">
                     {newsData.map((news) => (
-                        <div key={news.id} className="group cursor-pointer">
-                            <div className="text-xs text-muted-foreground mb-0.5">
+                        <div key={news.id} className="border-b border-border pb-3 last:border-b-0">
+                            <div className="text-xs text-muted-foreground mb-1">
                                 {new Date(news.published_at).toLocaleDateString()} • {news.source || 'News'}
                             </div>
-                            <h4 className="text-sm font-medium group-hover:text-primary transition-colors line-clamp-2">
+                            <h4 className="text-sm font-semibold mb-2">
                                 {news.title}
                             </h4>
-                            {news.summary && (
-                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                                    {news.summary}
+                            {news.content && (
+                                <p className="text-xs text-foreground leading-relaxed">
+                                    {news.content}
                                 </p>
                             )}
                             {news.url && (
@@ -294,7 +297,7 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
                                     href={news.url} 
                                     target="_blank" 
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1"
+                                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-2"
                                 >
                                     Read more <ExternalLink className="w-3 h-3" />
                                 </a>

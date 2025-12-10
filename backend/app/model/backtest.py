@@ -27,9 +27,67 @@ class BacktestParams(BaseModel):
     macd_fast: int = Field(default=12, description="MACD fast period")
     macd_slow: int = Field(default=26, description="MACD slow period")
     macd_signal: int = Field(default=9, description="MACD signal period")
+    
+    # Stochastic Oscillator parameters
+    stoch_k_window: int = Field(default=14, description="Stochastic %K calculation window")
+    stoch_d_window: int = Field(default=3, description="Stochastic %D smoothing period")
+    stoch_buy_below: float = Field(default=20.0, description="Stochastic oversold threshold (buy signal)")
+    stoch_sell_above: float = Field(default=80.0, description="Stochastic overbought threshold (sell signal)")
+    
+    # ATR Breakout parameters
+    atr_window: int = Field(default=14, description="ATR calculation window")
+    atr_lookback: int = Field(default=20, description="Lookback period for high/low bands")
+    atr_multiplier: float = Field(default=1.5, description="ATR multiplier for breakout bands")
+    
+    # Triple MA parameters
+    ma_short: int = Field(default=10, description="Short moving average period")
+    ma_medium: int = Field(default=30, description="Medium moving average period")
+    ma_long: int = Field(default=50, description="Long moving average period")
+    
+    # Z-Score Mean Reversion parameters
+    zscore_window: int = Field(default=20, description="Window for z-score calculation")
+    zscore_threshold: float = Field(default=2.0, description="Z-score threshold for mean reversion signals")
+    
+    # ADX Trend Following parameters
+    adx_window: int = Field(default=14, description="ADX calculation window")
+    adx_threshold: float = Field(default=25.0, description="ADX threshold for trend strength")
+    
+    # Ichimoku Cloud parameters
+    ichimoku_conversion: int = Field(default=9, description="Tenkan-sen (conversion line) period")
+    ichimoku_base: int = Field(default=26, description="Kijun-sen (base line) period")
+    ichimoku_span_b: int = Field(default=52, description="Senkou Span B period")
+    
+    # Williams %R parameters
+    williams_period: int = Field(default=14, description="Williams %R calculation period")
+    williams_buy_below: float = Field(default=-80.0, description="Williams %R oversold threshold")
+    williams_sell_above: float = Field(default=-20.0, description="Williams %R overbought threshold")
+    
+    # CCI (Commodity Channel Index) parameters
+    cci_window: int = Field(default=20, description="CCI calculation window")
+    cci_buy_below: float = Field(default=-100.0, description="CCI oversold threshold")
+    cci_sell_above: float = Field(default=100.0, description="CCI overbought threshold")
+    
+    # VWMA (Volume Weighted Moving Average) parameters
+    vwma_period: int = Field(default=20, description="VWMA calculation period")
+    
+    # Donchian Channel parameters
+    donchian_period: int = Field(default=20, description="Donchian Channel period")
+    
+    # Momentum Strategy parameters
+    momentum_period: int = Field(default=10, description="Momentum calculation period")
+    momentum_threshold: float = Field(default=0.05, description="Momentum threshold (5% change)")
+    
+    # Support/Resistance Mean Reversion parameters
+    sr_lookback: int = Field(default=20, description="Lookback period for support/resistance levels")
+    sr_touch_threshold: float = Field(default=0.02, description="Price touch threshold (2% from level)")
 
 
-StrategyType = Literal["buy_hold", "sma", "ema", "rsi", "bbands", "macd"]
+StrategyType = Literal[
+    "buy_hold", "sma", "ema", "rsi", "bbands", "macd",
+    "stochastic", "atr_breakout", "triple_ma", "zscore_reversion",
+    "adx_trend", "ichimoku", "williams_r", "cci", "vwma_crossover",
+    "donchian", "momentum", "sr_reversion"
+]
 
 
 class BacktestRequest(BaseModel):

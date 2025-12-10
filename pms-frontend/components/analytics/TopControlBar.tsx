@@ -71,16 +71,13 @@ export function TopControlBar({
         const timer = setTimeout(async () => {
             try {
                 const results = await MarketService.listStocks({
+                    q: searchQuery,
                     limit: 10,
                     offset: 0,
                 });
 
-                // Filter results based on search query
-                const filtered = results
-                    .filter((stock: any) =>
-                        stock.symbol?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        stock.company_name?.toLowerCase().includes(searchQuery.toLowerCase())
-                    )
+                // Map results to SymbolSearchResult format
+                const mapped = results
                     .slice(0, 10)
                     .map((stock: any) => ({
                         symbol: stock.symbol || '',
@@ -89,7 +86,7 @@ export function TopControlBar({
                         type: 'stock'
                     }));
 
-                setSearchResults(filtered);
+                setSearchResults(mapped);
                 setShowSearchResults(true);
             } catch (error) {
                 console.error('Symbol search error:', error);

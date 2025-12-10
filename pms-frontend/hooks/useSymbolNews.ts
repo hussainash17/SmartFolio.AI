@@ -50,23 +50,29 @@ export function useSymbolNews(options: UseSymbolNewsOptions) {
 
   return useQuery({
     queryKey: queryKeys.symbolNews(symbol, days, limit),
-    enabled: enabled && !!symbol,
+    enabled: enabled && !!symbol && !!(OpenAPI as any).TOKEN,
     queryFn: async (): Promise<NewsItem[]> => {
       const params = new URLSearchParams({
-        symbol,
-        days: String(days),
         limit: String(limit),
       });
 
-      const data = await fetchNewsAPI<any[]>(`/api/v1/news/?${params.toString()}`);
+      const response = await fetchNewsAPI<{
+        symbol?: string;
+        stock_name?: string;
+        total_articles?: number;
+        articles?: any[];
+      }>(`/api/v1/research/stock/${symbol}/news?${params.toString()}`);
       
-      return (data || []).map((item: any) => ({
+      // Extract articles array from response
+      const articles = response?.articles || [];
+      
+      return articles.map((item: any) => ({
         id: item.id,
         title: item.title,
         summary: item.summary,
         content: item.content,
         source: item.source,
-        url: item.url,
+        url: item.source_url || item.url,
         category: item.category,
         published_at: item.published_at,
         symbols: item.symbols || [],

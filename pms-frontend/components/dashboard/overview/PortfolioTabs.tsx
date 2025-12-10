@@ -43,9 +43,9 @@ const PortfolioTabs: React.FC<PortfolioTabsProps> = ({ portfolioId, transactions
     console.log(effectiveAllocationData);
 
     return (
-        <Card className="h-full min-h-[420px] flex flex-col">
-            <CardContent className="p-6 flex-1 flex flex-col">
-                <Tabs defaultValue="performance" className="flex-1 flex flex-col">
+        <Card className="min-h-[420px] flex flex-col">
+            <CardContent className="p-6 flex flex-col">
+                <Tabs defaultValue="performance" className="flex flex-col">
                     <TabsList className="w-full justify-start mb-4 bg-transparent border-b rounded-none h-auto p-0 space-x-6">
                         <TabsTrigger
                             value="performance"
@@ -77,29 +77,29 @@ const PortfolioTabs: React.FC<PortfolioTabsProps> = ({ portfolioId, transactions
                         </TabsTrigger>
                     </TabsList>
 
-                    <div className="flex-1 mt-2">
-                        <TabsContent value="performance" className="h-full m-0">
+                    <div className="mt-2">
+                        <TabsContent value="performance" className="m-0">
                             <PerformanceChart portfolioId={portfolioId} />
                         </TabsContent>
-                        <TabsContent value="holdings" className="h-full m-0">
+                        <TabsContent value="holdings" className="m-0">
                             {isHoldingsLoading && !portfolioId ? (
-                                <div className="flex justify-center items-center h-full">
+                                <div className="flex justify-center items-center py-8">
                                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                                 </div>
                             ) : (
                                 <HoldingsSnapshot portfolioId={portfolioId} holdings={!portfolioId ? userHoldings : undefined} />
                             )}
                         </TabsContent>
-                        <TabsContent value="allocation" className="h-full m-0">
+                        <TabsContent value="allocation" className="m-0">
                             {isAllocationLoading && !portfolioId ? (
-                                <div className="flex justify-center items-center h-full">
+                                <div className="flex justify-center items-center py-8">
                                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                                 </div>
                             ) : (
                                 <Allocation data={effectiveAllocationData} />
                             )}
                         </TabsContent>
-                        <TabsContent value="activity" className="h-full m-0">
+                        <TabsContent value="activity" className="m-0">
                             <RecentActivity transactions={transactions} />
                         </TabsContent>
                     </div>

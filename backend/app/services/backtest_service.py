@@ -58,6 +58,18 @@ class BacktestService:
             "rsi": self._run_rsi_strategy,
             "bbands": self._run_bollinger_bands,
             "macd": self._run_macd_strategy,
+            "stochastic": self._run_stochastic_strategy,
+            "atr_breakout": self._run_atr_breakout,
+            "triple_ma": self._run_triple_ma,
+            "zscore_reversion": self._run_zscore_reversion,
+            "adx_trend": self._run_adx_trend,
+            "ichimoku": self._run_ichimoku,
+            "williams_r": self._run_williams_r,
+            "cci": self._run_cci_strategy,
+            "vwma_crossover": self._run_vwma_crossover,
+            "donchian": self._run_donchian,
+            "momentum": self._run_momentum,
+            "sr_reversion": self._run_sr_reversion,
         }
         
         runner = strategy_runners.get(request.strategy)
@@ -288,6 +300,416 @@ class BacktestService:
         signals_df["macd"] = macd_line
         signals_df["signal_line"] = signal_line
         signals_df["histogram"] = histogram
+        signals_df["signal"] = "hold"
+        signals_df.loc[entries, "signal"] = "buy"
+        signals_df.loc[exits, "signal"] = "sell"
+        
+        return entries.fillna(False), exits.fillna(False), signals_df
+    
+    def _run_stochastic_strategy(
+        self, 
+        df: pd.DataFrame, 
+        params: BacktestParams
+    ) -> Tuple[pd.Series, pd.Series, pd.DataFrame]:
+        """Stochastic Oscillator strategy: buy when oversold, sell when overbought."""
+        close = df["close"]
+        high = df["high"]
+        low = df["low"]
+        
+        # Calculate Stochastic Oscillator
+        low_min = low.rolling(window=params.stoch_k_window).min()
+        high_max = high.rolling(window=params.stoch_k_window).max()
+        
+        k_percent = 100 * ((close - low_min) / (high_max - low_min))
+        d_percent = k_percent.rolling(window=params.stoch_d_window).mean()
+        
+        # Generate signals
+        entries = (k_percent < params.stoch_buy_below) & (k_percent.shift(1) >= params.stoch_buy_below)
+        exits = (k_percent > params.stoch_sell_above) & (k_percent.shift(1) <= params.stoch_sell_above)
+        
+        signals_df = pd.DataFrame(index=df.index)
+        signals_df["k_percent"] = k_percent
+        signals_df["d_percent"] = d_percent
+        signals_df["signal"] = "hold"
+        signals_df.loc[entries, "signal"] = "buy"
+        signals_df.loc[exits, "signal"] = "sell"
+        
+        return entries.fillna(False), exits.fillna(False), signals_df
+    
+    def _run_atr_breakout(
+        self, 
+        df: pd.DataFrame, 
+        params: BacktestParams
+    ) -> Tuple[pd.Series, pd.Series, pd.DataFrame]:
+        """ATR Breakout: buy when price breaks above high + ATR threshold."""
+        close = df["close"]
+        high = df["high"]
+        low = df["low"]
+        
+        # Calculate True Range
+        hl = high - low
+        hc = abs(high - close.shift(1))
+        lc = abs(low - close.shift(1))
+        tr = pd.concat([hl, hc, lc], axis=1).max(axis=1)
+        
+        atr = tr.rolling(window=params.atr_window).mean()
+        
+        # Upper and lower bands
+        upper_band = high.rolling(window=params.atr_lookback).max() + (atr * params.atr_multiplier)
+        lower_band = low.rolling(window=params.atr_lookback).min() - (atr * params.atr_multiplier)
+        
+        # Generate signals
+        entries = (close > upper_band) & (close.shift(1) <= upper_band.shift(1))
+        exits = (close < lower_band) & (close.shift(1) >= lower_band.shift(1))
+        
+        signals_df = pd.DataFrame(index=df.index)
+        signals_df["atr"] = atr
+        signals_df["upper_band"] = upper_band
+        signals_df["lower_band"] = lower_band
+        signals_df["signal"] = "hold"
+        signals_df.loc[entries, "signal"] = "buy"
+        signals_df.loc[exits, "signal"] = "sell"
+        
+        return entries.fillna(False), exits.fillna(False), signals_df
+    
+    def _run_triple_ma(
+        self, 
+        df: pd.DataFrame, 
+        params: BacktestParams
+    ) -> Tuple[pd.Series, pd.Series, pd.DataFrame]:
+        """Triple MA: buy when all three MAs align bullishly."""
+        close = df["close"]
+        
+        ma_short = close.rolling(window=params.ma_short).mean()
+        ma_medium = close.rolling(window=params.ma_medium).mean()
+        ma_long = close.rolling(window=params.ma_long).mean()
+        
+        # Buy when short > medium > long (all aligned)
+        bullish = (ma_short > ma_medium) & (ma_medium > ma_long)
+        prev_bullish = (ma_short.shift(1) > ma_medium.shift(1)) & (ma_medium.shift(1) > ma_long.shift(1))
+        
+        entries = bullish & ~prev_bullish
+        
+        # Sell when alignment breaks
+        exits = ~bullish & prev_bullish
+        
+        signals_df = pd.DataFrame(index=df.index)
+        signals_df["ma_short"] = ma_short
+        signals_df["ma_medium"] = ma_medium
+        signals_df["ma_long"] = ma_long
+        signals_df["signal"] = "hold"
+        signals_df.loc[entries, "signal"] = "buy"
+        signals_df.loc[exits, "signal"] = "sell"
+        
+        return entries.fillna(False), exits.fillna(False), signals_df
+    
+    def _run_zscore_reversion(
+        self, 
+        df: pd.DataFrame, 
+        params: BacktestParams
+    ) -> Tuple[pd.Series, pd.Series, pd.DataFrame]:
+        """Z-Score Mean Reversion: buy when oversold, sell when overbought."""
+        close = df["close"]
+        
+        # Calculate rolling mean and std
+        rolling_mean = close.rolling(window=params.zscore_window).mean()
+        rolling_std = close.rolling(window=params.zscore_window).std()
+        
+        # Calculate z-score
+        zscore = (close - rolling_mean) / rolling_std
+        
+        # Generate signals
+        entries = (zscore < -params.zscore_threshold) & (zscore.shift(1) >= -params.zscore_threshold)
+        exits = (zscore > params.zscore_threshold) & (zscore.shift(1) <= params.zscore_threshold)
+        
+        signals_df = pd.DataFrame(index=df.index)
+        signals_df["zscore"] = zscore
+        signals_df["rolling_mean"] = rolling_mean
+        signals_df["signal"] = "hold"
+        signals_df.loc[entries, "signal"] = "buy"
+        signals_df.loc[exits, "signal"] = "sell"
+        
+        return entries.fillna(False), exits.fillna(False), signals_df
+    
+    def _run_adx_trend(
+        self, 
+        df: pd.DataFrame, 
+        params: BacktestParams
+    ) -> Tuple[pd.Series, pd.Series, pd.DataFrame]:
+        """ADX Trend Following: buy when strong uptrend, sell when strong downtrend."""
+        close = df["close"]
+        high = df["high"]
+        low = df["low"]
+        
+        # Calculate True Range
+        hl = high - low
+        hc = abs(high - close.shift(1))
+        lc = abs(low - close.shift(1))
+        tr = pd.concat([hl, hc, lc], axis=1).max(axis=1)
+        
+        # Calculate Directional Movement
+        plus_dm = high.diff()
+        minus_dm = -low.diff()
+        plus_dm[plus_dm < 0] = 0
+        minus_dm[minus_dm < 0] = 0
+        
+        # Smooth the values
+        atr = tr.rolling(window=params.adx_window).mean()
+        plus_di = 100 * (plus_dm.rolling(window=params.adx_window).mean() / atr)
+        minus_di = 100 * (minus_dm.rolling(window=params.adx_window).mean() / atr)
+        
+        # Calculate ADX
+        dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di)
+        adx = dx.rolling(window=params.adx_window).mean()
+        
+        # Generate signals: buy when ADX > threshold and +DI > -DI
+        strong_trend = adx > params.adx_threshold
+        bullish = plus_di > minus_di
+        bearish = minus_di > plus_di
+        
+        entries = strong_trend & bullish & ~(strong_trend.shift(1) & bullish.shift(1))
+        exits = strong_trend & bearish & ~(strong_trend.shift(1) & bearish.shift(1))
+        
+        signals_df = pd.DataFrame(index=df.index)
+        signals_df["adx"] = adx
+        signals_df["plus_di"] = plus_di
+        signals_df["minus_di"] = minus_di
+        signals_df["signal"] = "hold"
+        signals_df.loc[entries, "signal"] = "buy"
+        signals_df.loc[exits, "signal"] = "sell"
+        
+        return entries.fillna(False), exits.fillna(False), signals_df
+    
+    def _run_ichimoku(
+        self, 
+        df: pd.DataFrame, 
+        params: BacktestParams
+    ) -> Tuple[pd.Series, pd.Series, pd.DataFrame]:
+        """Ichimoku Cloud: buy when price above cloud, sell when below."""
+        close = df["close"]
+        high = df["high"]
+        low = df["low"]
+        
+        # Tenkan-sen (Conversion Line)
+        tenkan_high = high.rolling(window=params.ichimoku_conversion).max()
+        tenkan_low = low.rolling(window=params.ichimoku_conversion).min()
+        tenkan_sen = (tenkan_high + tenkan_low) / 2
+        
+        # Kijun-sen (Base Line)
+        kijun_high = high.rolling(window=params.ichimoku_base).max()
+        kijun_low = low.rolling(window=params.ichimoku_base).min()
+        kijun_sen = (kijun_high + kijun_low) / 2
+        
+        # Senkou Span A (Leading Span A)
+        senkou_span_a = (tenkan_sen + kijun_sen) / 2
+        senkou_span_a = senkou_span_a.shift(params.ichimoku_base)
+        
+        # Senkou Span B (Leading Span B)
+        senkou_high = high.rolling(window=params.ichimoku_span_b).max()
+        senkou_low = low.rolling(window=params.ichimoku_span_b).min()
+        senkou_span_b = (senkou_high + senkou_low) / 2
+        senkou_span_b = senkou_span_b.shift(params.ichimoku_base)
+        
+        # Cloud top and bottom
+        cloud_top = pd.concat([senkou_span_a, senkou_span_b], axis=1).max(axis=1)
+        cloud_bottom = pd.concat([senkou_span_a, senkou_span_b], axis=1).min(axis=1)
+        
+        # Generate signals
+        # Buy when price crosses above cloud and tenkan > kijun
+        above_cloud = close > cloud_top
+        bullish_cross = (tenkan_sen > kijun_sen) & (tenkan_sen.shift(1) <= kijun_sen.shift(1))
+        entries = above_cloud & bullish_cross
+        
+        # Sell when price crosses below cloud and tenkan < kijun
+        below_cloud = close < cloud_bottom
+        bearish_cross = (tenkan_sen < kijun_sen) & (tenkan_sen.shift(1) >= kijun_sen.shift(1))
+        exits = below_cloud & bearish_cross
+        
+        signals_df = pd.DataFrame(index=df.index)
+        signals_df["tenkan_sen"] = tenkan_sen
+        signals_df["kijun_sen"] = kijun_sen
+        signals_df["senkou_span_a"] = senkou_span_a
+        signals_df["senkou_span_b"] = senkou_span_b
+        signals_df["cloud_top"] = cloud_top
+        signals_df["cloud_bottom"] = cloud_bottom
+        signals_df["signal"] = "hold"
+        signals_df.loc[entries, "signal"] = "buy"
+        signals_df.loc[exits, "signal"] = "sell"
+        
+        return entries.fillna(False), exits.fillna(False), signals_df
+    
+    def _run_williams_r(
+        self, 
+        df: pd.DataFrame, 
+        params: BacktestParams
+    ) -> Tuple[pd.Series, pd.Series, pd.DataFrame]:
+        """Williams %R: buy when oversold, sell when overbought."""
+        close = df["close"]
+        high = df["high"]
+        low = df["low"]
+        
+        # Calculate Williams %R
+        highest_high = high.rolling(window=params.williams_period).max()
+        lowest_low = low.rolling(window=params.williams_period).min()
+        
+        williams_r = -100 * ((highest_high - close) / (highest_high - lowest_low))
+        
+        # Generate signals
+        entries = (williams_r < params.williams_buy_below) & (williams_r.shift(1) >= params.williams_buy_below)
+        exits = (williams_r > params.williams_sell_above) & (williams_r.shift(1) <= params.williams_sell_above)
+        
+        signals_df = pd.DataFrame(index=df.index)
+        signals_df["williams_r"] = williams_r
+        signals_df["signal"] = "hold"
+        signals_df.loc[entries, "signal"] = "buy"
+        signals_df.loc[exits, "signal"] = "sell"
+        
+        return entries.fillna(False), exits.fillna(False), signals_df
+    
+    def _run_cci_strategy(
+        self, 
+        df: pd.DataFrame, 
+        params: BacktestParams
+    ) -> Tuple[pd.Series, pd.Series, pd.DataFrame]:
+        """CCI (Commodity Channel Index): buy when oversold, sell when overbought."""
+        close = df["close"]
+        high = df["high"]
+        low = df["low"]
+        
+        # Calculate Typical Price
+        typical_price = (high + low + close) / 3
+        
+        # Calculate CCI
+        sma = typical_price.rolling(window=params.cci_window).mean()
+        mad = typical_price.rolling(window=params.cci_window).apply(
+            lambda x: np.abs(x - x.mean()).mean()
+        )
+        
+        cci = (typical_price - sma) / (0.015 * mad)
+        
+        # Generate signals
+        entries = (cci < params.cci_buy_below) & (cci.shift(1) >= params.cci_buy_below)
+        exits = (cci > params.cci_sell_above) & (cci.shift(1) <= params.cci_sell_above)
+        
+        signals_df = pd.DataFrame(index=df.index)
+        signals_df["cci"] = cci
+        signals_df["typical_price"] = typical_price
+        signals_df["signal"] = "hold"
+        signals_df.loc[entries, "signal"] = "buy"
+        signals_df.loc[exits, "signal"] = "sell"
+        
+        return entries.fillna(False), exits.fillna(False), signals_df
+    
+    def _run_vwma_crossover(
+        self, 
+        df: pd.DataFrame, 
+        params: BacktestParams
+    ) -> Tuple[pd.Series, pd.Series, pd.DataFrame]:
+        """VWMA Crossover: buy when price crosses above VWMA."""
+        close = df["close"]
+        volume = df["volume"]
+        
+        # Calculate Volume Weighted Moving Average
+        vwma = (close * volume).rolling(window=params.vwma_period).sum() / volume.rolling(window=params.vwma_period).sum()
+        
+        # Calculate regular SMA for comparison
+        sma = close.rolling(window=params.vwma_period).mean()
+        
+        # Generate signals
+        entries = (close > vwma) & (close.shift(1) <= vwma.shift(1))
+        exits = (close < vwma) & (close.shift(1) >= vwma.shift(1))
+        
+        signals_df = pd.DataFrame(index=df.index)
+        signals_df["vwma"] = vwma
+        signals_df["sma"] = sma
+        signals_df["signal"] = "hold"
+        signals_df.loc[entries, "signal"] = "buy"
+        signals_df.loc[exits, "signal"] = "sell"
+        
+        return entries.fillna(False), exits.fillna(False), signals_df
+    
+    def _run_donchian(
+        self, 
+        df: pd.DataFrame, 
+        params: BacktestParams
+    ) -> Tuple[pd.Series, pd.Series, pd.DataFrame]:
+        """Donchian Channel Breakout: buy on upper breakout, sell on lower breakout."""
+        close = df["close"]
+        high = df["high"]
+        low = df["low"]
+        
+        # Calculate Donchian Channels
+        upper_band = high.rolling(window=params.donchian_period).max()
+        lower_band = low.rolling(window=params.donchian_period).min()
+        middle_band = (upper_band + lower_band) / 2
+        
+        # Generate signals
+        entries = (close > upper_band) & (close.shift(1) <= upper_band.shift(1))
+        exits = (close < lower_band) & (close.shift(1) >= lower_band.shift(1))
+        
+        signals_df = pd.DataFrame(index=df.index)
+        signals_df["upper_band"] = upper_band
+        signals_df["middle_band"] = middle_band
+        signals_df["lower_band"] = lower_band
+        signals_df["signal"] = "hold"
+        signals_df.loc[entries, "signal"] = "buy"
+        signals_df.loc[exits, "signal"] = "sell"
+        
+        return entries.fillna(False), exits.fillna(False), signals_df
+    
+    def _run_momentum(
+        self, 
+        df: pd.DataFrame, 
+        params: BacktestParams
+    ) -> Tuple[pd.Series, pd.Series, pd.DataFrame]:
+        """Momentum Strategy: buy on positive momentum, sell on negative momentum."""
+        close = df["close"]
+        
+        # Calculate momentum as percentage change
+        momentum = close.pct_change(periods=params.momentum_period) * 100
+        
+        # Generate signals
+        entries = (momentum > params.momentum_threshold) & (momentum.shift(1) <= params.momentum_threshold)
+        exits = (momentum < -params.momentum_threshold) & (momentum.shift(1) >= -params.momentum_threshold)
+        
+        signals_df = pd.DataFrame(index=df.index)
+        signals_df["momentum"] = momentum
+        signals_df["signal"] = "hold"
+        signals_df.loc[entries, "signal"] = "buy"
+        signals_df.loc[exits, "signal"] = "sell"
+        
+        return entries.fillna(False), exits.fillna(False), signals_df
+    
+    def _run_sr_reversion(
+        self, 
+        df: pd.DataFrame, 
+        params: BacktestParams
+    ) -> Tuple[pd.Series, pd.Series, pd.DataFrame]:
+        """Support/Resistance Mean Reversion: buy at support, sell at resistance."""
+        close = df["close"]
+        high = df["high"]
+        low = df["low"]
+        
+        # Identify support (local minima) and resistance (local maxima)
+        support_levels = low.rolling(window=params.sr_lookback).min()
+        resistance_levels = high.rolling(window=params.sr_lookback).max()
+        
+        # Calculate distance from support/resistance
+        dist_to_support = (close - support_levels) / support_levels
+        dist_to_resistance = (resistance_levels - close) / resistance_levels
+        
+        # Generate signals
+        # Buy when price touches or gets close to support
+        entries = (dist_to_support <= params.sr_touch_threshold) & (dist_to_support.shift(1) > params.sr_touch_threshold)
+        
+        # Sell when price touches or gets close to resistance
+        exits = (dist_to_resistance <= params.sr_touch_threshold) & (dist_to_resistance.shift(1) > params.sr_touch_threshold)
+        
+        signals_df = pd.DataFrame(index=df.index)
+        signals_df["support"] = support_levels
+        signals_df["resistance"] = resistance_levels
+        signals_df["dist_to_support"] = dist_to_support
+        signals_df["dist_to_resistance"] = dist_to_resistance
         signals_df["signal"] = "hold"
         signals_df.loc[entries, "signal"] = "buy"
         signals_df.loc[exits, "signal"] = "sell"
