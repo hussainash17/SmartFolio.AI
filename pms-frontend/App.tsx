@@ -106,9 +106,8 @@ export default function App() {
     const [editingStock, setEditingStock] = useState<Stock | null>(null);
     const [quickTradeSymbol, setQuickTradeSymbol] = useState<string | undefined>();
     const [quickTradeSide, setQuickTradeSide] = useState<"buy" | "sell" | undefined>();
-    const [selectedChartStock, setSelectedChartStock] = useState<string>("AAPL");
-    const [researchChartSymbol, setResearchChartSymbol] = useState<string>("");
-    const [fundamentalsSymbol, setFundamentalsSymbol] = useState<string>("");
+    const [researchChartSymbol, setResearchChartSymbol] = useState<string>("DSEX");
+    const [fundamentalsSymbol, setFundamentalsSymbol] = useState<string>("GP");
     const [detailBackTarget, setDetailBackTarget] = useState<View>("portfolios");
 
     useEffect(() => {

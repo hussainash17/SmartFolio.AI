@@ -9,6 +9,7 @@ interface WatchlistSymbol {
     last_trade_price?: number
     change?: number
     change_percent?: number
+    volume?: number
     notes?: string | null
     added_at: string
 }
@@ -55,12 +56,13 @@ export function useWatchlistItems(watchlistId: string | null): UseWatchlistItems
                 if (Array.isArray(detailedData)) {
                     // Map the detailed response
                     const enrichedItems: WatchlistSymbol[] = detailedData.map((item: any) => ({
-                        symbol: item.symbol || item.stock?.symbol || '',
-                        stock_id: item.stock_id,
+                        symbol: item.symbol || item.stock?.symbol || item.stock?.trading_code || '',
+                        stock_id: item.stock_id || item.stock?.id || '',
                         item_id: item.id,
-                        last_trade_price: item.last_trade_price || item.stock?.last_trade_price,
-                        change: item.change || item.stock?.change,
-                        change_percent: item.change_percent || item.stock?.change_percent,
+                        last_trade_price: item.last_trade_price ?? item.stock?.last_trade_price,
+                        change: item.change ?? item.stock?.change,
+                        change_percent: item.change_percent ?? item.stock?.change_percent,
+                        volume: item.volume ?? item.stock?.volume,
                         notes: item.notes,
                         added_at: item.added_at
                     }))
@@ -95,6 +97,7 @@ export function useWatchlistItems(watchlistId: string | null): UseWatchlistItems
                             last_trade_price: stockData?.data?.last_trade_price ?? stockData?.last_trade_price,
                             change: stockData?.data?.change ?? stockData?.change,
                             change_percent: stockData?.data?.change_percent ?? stockData?.change_percent,
+                            volume: stockData?.data?.volume ?? stockData?.volume,
                             notes: item.notes,
                             added_at: item.added_at
                         }

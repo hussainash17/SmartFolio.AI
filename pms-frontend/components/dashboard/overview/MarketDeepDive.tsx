@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../ui/tabs';
 import { ArrowUp, ArrowDown, Zap, Globe, AlertTriangle, Layers } from 'lucide-react';
-import { useMarketTopMovers, useMarketMostActive } from '../../../hooks/useDashboardMarket';
+import { useMarketTopMovers, useMarketMostActive, useMarketMostVolatile } from '../../../hooks/useDashboardMarket';
 import { cn } from '../../../lib/utils';
 
 // --- Sub-components ---
@@ -10,13 +10,15 @@ import { cn } from '../../../lib/utils';
 const MarketMovers = () => {
     const { data } = useMarketTopMovers();
     const { data: mostActiveData } = useMarketMostActive();
+    const { data: mostVolatileData } = useMarketMostVolatile();
 
     const gainers = data?.gainers || [];
     const losers = data?.losers || [];
     const mostActive = mostActiveData || [];
+    const mostVolatile = mostVolatileData || [];
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Top Gainers */}
             <div>
                 <h4 className="text-sm font-medium text-green-600 mb-3 flex items-center gap-2">
@@ -62,6 +64,22 @@ const MarketMovers = () => {
                         </div>
                     ))}
                     {mostActive.length === 0 && <div className="text-xs text-muted-foreground">No active data</div>}
+                </div>
+            </div>
+
+            {/* Most Volatile */}
+            <div>
+                <h4 className="text-sm font-medium text-orange-600 mb-3 flex items-center gap-2">
+                    <AlertTriangle size={16} /> Most Volatile (%)
+                </h4>
+                <div className="space-y-2">
+                    {mostVolatile.slice(0, 5).map((stock, i) => (
+                        <div key={i} className="flex justify-between items-center gap-2 p-2 bg-orange-50/50 dark:bg-orange-900/10 rounded-md">
+                            <span className="font-medium text-sm">{stock.symbol}</span>
+                            <span className="font-bold text-sm text-orange-600">{stock.true_range_pct.toFixed(2)}%</span>
+                        </div>
+                    ))}
+                    {mostVolatile.length === 0 && <div className="text-xs text-muted-foreground">No volatile data</div>}
                 </div>
             </div>
         </div>

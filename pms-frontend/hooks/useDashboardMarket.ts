@@ -81,6 +81,12 @@ export interface MostActive {
   turnover: number;
 }
 
+export interface MostVolatile {
+  symbol: string;
+  true_range_pct: number;
+  change_percent: number;
+}
+
 // Hook for market indices
 export function useMarketIndices() {
   return useQuery({
@@ -118,6 +124,16 @@ export function useMarketMostActive() {
     enabled: !!(OpenAPI as any).TOKEN,
     staleTime: 30 * 1000,
     queryFn: () => fetchMarketAPI<MostActive[]>('/api/v1/market/most-active?limit=10'),
+  });
+}
+
+// Hook for most volatile stocks
+export function useMarketMostVolatile() {
+  return useQuery({
+    queryKey: ['market', 'most-volatile'],
+    enabled: !!(OpenAPI as any).TOKEN,
+    staleTime: 30 * 1000,
+    queryFn: () => fetchMarketAPI<MostVolatile[]>('/api/v1/market/most-volatile?limit=5&min_trades=100&min_volume=10000'),
   });
 }
 

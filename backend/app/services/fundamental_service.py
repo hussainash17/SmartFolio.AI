@@ -127,16 +127,51 @@ class FundamentalAnalysisService(BaseService[Company, Any, Any]):
         company = self._get_company_by_trading_code(trading_code)
         stock_data = self._get_latest_stock_data(company.id)
         
-        # Get latest financial performance for audited PE
+        # Get latest financial performance for audited PE and EPS
         latest_financial = self.session.exec(
             select(FinancialPerformance)
             .where(FinancialPerformance.company_id == company.id)
             .order_by(desc(FinancialPerformance.year))
         ).first()
         
+        # Get latest dividend information for dividend yield
+        latest_dividend = self.session.exec(
+            select(DividendInformation)
+            .where(DividendInformation.company_id == company.id)
+            .order_by(desc(DividendInformation.year))
+        ).first()
+        
         ltp = stock_data.last_trade_price if stock_data else None
         ycp = stock_data.previous_close if stock_data else None
         ltp_change = stock_data.change if stock_data else None
+        
+        # Calculate current_pe using LTP and EPS from latest financial performance
+        current_pe = None
+        if ltp and latest_financial and latest_financial.eps_basic and latest_financial.eps_basic > 0:
+            current_pe = Decimal(str(ltp)) / latest_financial.eps_basic
+        
+        # Calculate audited_pe using LTP and EPS_basic from latest financial performance
+        audited_pe = None
+        if ltp and latest_financial and latest_financial.eps_basic and latest_financial.eps_basic > 0:
+            audited_pe = Decimal(str(ltp)) / latest_financial.eps_basic
+        
+        # Get dividend_yield from latest dividend information
+        dividend_yield = None
+        if latest_dividend and latest_dividend.yield_percentage is not None:
+            dividend_yield = latest_dividend.yield_percentage
+        
+        # Calculate market_cap using LTP and total_outstanding_securities
+        # Market cap = LTP × total_outstanding_securities (convert to millions)
+        market_cap = None
+        if ltp and company.total_outstanding_securities:
+            try:
+                # Calculate in base units, then convert to millions
+                market_cap_base = Decimal(str(ltp)) * Decimal(str(company.total_outstanding_securities))
+                # Convert to millions (divide by 1,000,000)
+                market_cap = market_cap_base / Decimal('1000000')
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Failed to calculate market cap for {trading_code}: {e}")
+                market_cap = None
         
         week_52_range = self._parse_52_week_range(company.fifty_two_weeks_moving_range)
         
@@ -144,12 +179,12 @@ class FundamentalAnalysisService(BaseService[Company, Any, Any]):
             ltp=ltp,
             ltp_change=ltp_change,
             ycp=ycp,
-            current_pe=company.pe_ratio,
-            audited_pe=latest_financial.pe_ratio if latest_financial else None,
-            dividend_yield=company.dividend_yield,
+            current_pe=current_pe,
+            audited_pe=audited_pe,
+            dividend_yield=dividend_yield,
             nav=company.nav,
             face_value=Decimal(str(company.face_value)) if company.face_value else None,
-            market_cap=company.market_cap,
+            market_cap=market_cap,
             paid_up_capital=Decimal(str(company.paid_up_capital)) if company.paid_up_capital else None,
             authorized_capital=Decimal(str(company.authorized_capital)) if company.authorized_capital else None,
             reserve_and_surplus=Decimal(str(company.reserve_and_surplus)) if company.reserve_and_surplus else None,

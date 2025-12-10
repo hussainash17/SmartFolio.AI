@@ -12,7 +12,25 @@ interface BacktestingSimulationProps {
     defaultSymbol?: string
 }
 
-export type StrategyType = 'buy_hold' | 'sma' | 'ema' | 'rsi' | 'bbands' | 'macd'
+export type StrategyType = 
+    | 'buy_hold' 
+    | 'sma' 
+    | 'ema' 
+    | 'rsi' 
+    | 'bbands' 
+    | 'macd'
+    | 'stochastic'
+    | 'atr_breakout'
+    | 'triple_ma'
+    | 'zscore_reversion'
+    | 'adx_trend'
+    | 'ichimoku'
+    | 'williams_r'
+    | 'cci'
+    | 'vwma_crossover'
+    | 'donchian'
+    | 'momentum'
+    | 'sr_reversion'
 
 export interface BacktestParams {
     init_cash: number
@@ -26,6 +44,35 @@ export interface BacktestParams {
     macd_fast: number
     macd_slow: number
     macd_signal: number
+    stoch_k_window: number
+    stoch_d_window: number
+    stoch_buy_below: number
+    stoch_sell_above: number
+    atr_window: number
+    atr_lookback: number
+    atr_multiplier: number
+    ma_short: number
+    ma_medium: number
+    ma_long: number
+    zscore_window: number
+    zscore_threshold: number
+    adx_window: number
+    adx_threshold: number
+    ichimoku_conversion: number
+    ichimoku_base: number
+    ichimoku_span_b: number
+    williams_period: number
+    williams_buy_below: number
+    williams_sell_above: number
+    cci_window: number
+    cci_buy_below: number
+    cci_sell_above: number
+    vwma_period: number
+    donchian_period: number
+    momentum_period: number
+    momentum_threshold: number
+    sr_lookback: number
+    sr_touch_threshold: number
 }
 
 export interface BacktestRequest {
@@ -88,6 +135,35 @@ const DEFAULT_PARAMS: BacktestParams = {
     macd_fast: 12,
     macd_slow: 26,
     macd_signal: 9,
+    stoch_k_window: 14,
+    stoch_d_window: 3,
+    stoch_buy_below: 20,
+    stoch_sell_above: 80,
+    atr_window: 14,
+    atr_lookback: 20,
+    atr_multiplier: 1.5,
+    ma_short: 10,
+    ma_medium: 30,
+    ma_long: 50,
+    zscore_window: 20,
+    zscore_threshold: 2.0,
+    adx_window: 14,
+    adx_threshold: 25.0,
+    ichimoku_conversion: 9,
+    ichimoku_base: 26,
+    ichimoku_span_b: 52,
+    williams_period: 14,
+    williams_buy_below: -80,
+    williams_sell_above: -20,
+    cci_window: 20,
+    cci_buy_below: -100,
+    cci_sell_above: 100,
+    vwma_period: 20,
+    donchian_period: 20,
+    momentum_period: 10,
+    momentum_threshold: 0.05,
+    sr_lookback: 20,
+    sr_touch_threshold: 0.02,
 }
 
 export function BacktestingSimulation({ availableSymbols, defaultSymbol }: BacktestingSimulationProps) {

@@ -1045,3 +1045,89 @@ def get_sector_analysis(session: SessionDep) -> Dict[str, Any]:
         "advances_declines": advances_declines,
         "turnover": turnover
     }
+
+
+@router.get("/most-volatile")
+def get_most_volatile_stocks(
+        session: SessionDep,
+        limit: int = Query(10, ge=1, le=100, description="Number of stocks to return"),
+        min_trades: int = Query(10, ge=0, description="Minimum trades count filter"),
+        min_volume: int = Query(1000, ge=0, description="Minimum volume filter"),
+) -> List[Dict[str, Any]]:
+    """Get the most volatile stocks based on True Range calculation.
+    
+    True Range considers:
+    - High - Low (intraday range)
+    - High - Previous Close (gap up)
+    - Low - Previous Close (gap down)
+    
+    Returns stocks with highest True Range percentage, filtered by minimum
+    trades count and volume to ensure meaningful liquidity.
+    
+    Args:
+        limit: Maximum number of stocks to return (default: 10, max: 100)
+        min_trades: Minimum trades count filter (default: 10)
+        min_volume: Minimum volume filter (default: 1000)
+    
+    Returns:
+        List of stocks with volatility metrics including:
+        - company_name, stock_symbol
+        - high, low, previous_close
+        - true_range (absolute value)
+        - true_range_pct (percentage of previous close)
+        - volume, change_percent
+    """
+    from sqlalchemy import text
+    
+    # Get latest timestamp to ensure we're using current data
+    latest_timestamp = session.exec(
+        select(func.max(StockData.timestamp))
+    ).first()
+    
+    if not latest_timestamp:
+        return []
+    
+    # Query to calculate True Range and return most volatile stocks
+    query = text("""
+        SELECT
+            c.trading_code as stock_symbol,
+            -- True Range as percentage
+            ROUND(
+                GREATEST(
+                    s.high - s.low,
+                    ABS(s.high - s.previous_close),
+                    ABS(s.low - s.previous_close)
+                ) / s.previous_close * 100,
+                2
+            ) as true_range_pct,
+            s.change_percent
+        FROM stockdata s
+        JOIN company c ON s.company_id = c.id
+        WHERE s.timestamp = :latest_timestamp
+          AND s.trades_count > :min_trades
+          AND s.volume > :min_volume
+          AND s.previous_close > 0
+          AND c.is_active = true
+        ORDER BY true_range_pct DESC
+        LIMIT :limit
+    """)
+    
+    # Bind parameters to the text query
+    bound_query = query.bindparams(
+        latest_timestamp=latest_timestamp,
+        min_trades=min_trades,
+        min_volume=min_volume,
+        limit=limit
+    )
+    result = session.exec(bound_query).all()
+    
+    # Format response
+    volatile_stocks: List[Dict[str, Any]] = []
+    for row in result:
+        volatile_stocks.append({
+            "symbol": row.stock_symbol,
+            "true_range_pct": float(row.true_range_pct) if row.true_range_pct is not None else None,
+            "change_percent": float(row.change_percent) if row.change_percent is not None else None,
+        })
+    
+    return volatile_stocks

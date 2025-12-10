@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { OrdersService, MarketService } from '../../src/client';
+import { MarketService } from '../../src/client';
 import { formatPrice, formatPnL, getPnLColor, getStatusColor } from '../../lib/formatting-utils';
 import {
     generateSmartSummary,
@@ -14,20 +14,11 @@ import {
 import { Lightbulb, Activity, ShieldAlert, TrendingUp, TrendingDown, Bell, Plus, Trash2 } from 'lucide-react';
 import { useUserAlerts } from '../../hooks/useUserAlerts';
 import { useSymbolMarketSummary } from '../../hooks/useSymbolFundamentals';
+import { useTradingViewPositions } from '../../hooks/useTradingViewPositions';
+import { useOrders } from '../../hooks/useOrders';
 
 interface BottomPanelProps {
     currentSymbol: string;
-}
-
-interface Position {
-    id: string;
-    symbol: string;
-    quantity: number;
-    avg_price: number;
-    current_price?: number;
-    unrealized_pnl?: number;
-    unrealized_pnl_percent?: number;
-    portfolio_name?: string;
 }
 
 interface Order {
@@ -43,15 +34,29 @@ interface Order {
 
 export function BottomPanel({ currentSymbol }: BottomPanelProps) {
     const [activeTab, setActiveTab] = useState<'positions' | 'orders' | 'insights' | 'history' | 'alerts'>('positions');
-    const [positions, setPositions] = useState<Position[]>([]);
-    const [orders, setOrders] = useState<Order[]>([]);
-    const [loading, setLoading] = useState(false);
 
     // Insights State
     const [smartSummary, setSmartSummary] = useState<SmartSummary | null>(null);
     const [technicalSignals, setTechnicalSignals] = useState<SmartSignal[]>([]);
     const [fundamentalHealth, setFundamentalHealth] = useState<FundamentalHealth | null>(null);
     const [riskMetrics, setRiskMetrics] = useState<RiskMetrics | null>(null);
+
+    // Positions hook
+    const { 
+        data: positionsData = [], 
+        isLoading: positionsLoading 
+    } = useTradingViewPositions({
+        symbol: currentSymbol || '',
+        enabled: !!currentSymbol && activeTab === 'positions',
+    });
+
+    // Orders hook
+    const { 
+        data: ordersData = [], 
+        isLoading: ordersLoading 
+    } = useOrders({
+        enabled: activeTab === 'orders',
+    });
 
     // Alerts hook
     const { 
@@ -67,19 +72,31 @@ export function BottomPanel({ currentSymbol }: BottomPanelProps) {
         enabled: !!currentSymbol && activeTab === 'insights',
     });
 
-    // Load positions for current symbol
-    useEffect(() => {
-        if (currentSymbol && activeTab === 'positions') {
-            loadPositions();
-        }
-    }, [currentSymbol, activeTab]);
+    // Transform positions data to match component interface
+    const positions = positionsData.map((pos) => ({
+        id: pos.id,
+        symbol: pos.symbol,
+        quantity: pos.quantity,
+        avg_price: pos.price,
+        current_price: pos.quantity > 0 ? pos.current_value / pos.quantity : pos.price,
+        unrealized_pnl: pos.unrealized_pnl,
+        unrealized_pnl_percent: pos.unrealized_pnl_percent,
+        portfolio_name: pos.portfolio_name,
+    }));
 
-    // Load orders
-    useEffect(() => {
-        if (activeTab === 'orders') {
-            loadOrders();
-        }
-    }, [activeTab]);
+    // Transform orders data to match component interface
+    const orders: Order[] = ordersData.map((order: any) => ({
+        id: order.id,
+        symbol: order.stock_id || order.symbol || '',
+        side: order.side?.toLowerCase() || '',
+        order_type: order.order_type?.toLowerCase() || '',
+        quantity: order.quantity || 0,
+        price: order.price ? parseFloat(order.price) : undefined,
+        status: order.status?.toLowerCase() || '',
+        created_at: order.placed_at || order.created_at || new Date().toISOString()
+    }));
+
+    const loading = positionsLoading || ordersLoading;
 
     // Load Insights
     useEffect(() => {
@@ -88,52 +105,8 @@ export function BottomPanel({ currentSymbol }: BottomPanelProps) {
         }
     }, [currentSymbol, activeTab, fundamentalsData]);
 
-    const loadPositions = async () => {
-        if (!currentSymbol) return;
-
-        setLoading(true);
-        try {
-            const apiUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
-            const response = await fetch(`${apiUrl}/api/v1/tradingview/positions/${currentSymbol}`);
-            if (response.ok) {
-                const data = await response.json();
-                setPositions(data || []);
-            }
-        } catch (error) {
-            console.error('Error loading positions:', error);
-            setPositions([]);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const loadOrders = async () => {
-        setLoading(true);
-        try {
-            const data = await OrdersService.getUserOrders({});
-            // Transform OrderPublic to Order format
-            const transformedOrders: Order[] = data.map((order: any) => ({
-                id: order.id,
-                symbol: order.stock_id || order.symbol || '',
-                side: order.side?.toLowerCase() || '',
-                order_type: order.order_type?.toLowerCase() || '',
-                quantity: order.quantity || 0,
-                price: order.price ? parseFloat(order.price) : undefined,
-                status: order.status?.toLowerCase() || '',
-                created_at: order.placed_at || order.created_at || new Date().toISOString()
-            }));
-            setOrders(transformedOrders);
-        } catch (error) {
-            console.error('Error loading orders:', error);
-            setOrders([]);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const loadInsights = async () => {
         if (!currentSymbol) return;
-        setLoading(true);
         try {
             // Fetch basic data to generate insights
             const data = await MarketService.getStock({ symbol: currentSymbol });
@@ -180,8 +153,6 @@ export function BottomPanel({ currentSymbol }: BottomPanelProps) {
 
         } catch (error) {
             console.error('Error loading insights:', error);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -259,7 +230,7 @@ export function BottomPanel({ currentSymbol }: BottomPanelProps) {
 
             {/* Content */}
             <div className="flex-1 overflow-auto bg-card">
-                {loading || alertsLoading ? (
+                {(loading || alertsLoading) ? (
                     <div className="flex items-center justify-center h-32">
                         <div className="text-sm text-muted-foreground">Loading...</div>
                     </div>

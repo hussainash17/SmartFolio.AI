@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Query
 from sqlmodel import select
 
-from app.api.deps import SessionDep
+from app.api.deps import CurrentUser, SessionDep
 from app.model.company import Company
 from app.model.portfolio import Portfolio, PortfolioPosition
 from app.model.stock import DailyOHLC, StockData
@@ -468,12 +468,13 @@ def get_quotes(
 @router.get("/positions/{symbol}")
 def get_positions_for_tradingview(
         symbol: str,
+        current_user: CurrentUser,
         session: SessionDep,
 ):
     """
     Get positions for a symbol formatted for TradingView marks.
-    This endpoint is public (no auth) since TradingView widget needs to access it.
-    Returns position marks with timestamp, price, quantity, and portfolio info.
+    Returns position marks with timestamp, price, quantity, and portfolio info
+    for positions belonging to the authenticated user.
     """
     # Find the stock by symbol
     stock = session.exec(
@@ -483,30 +484,66 @@ def get_positions_for_tradingview(
     if not stock:
         return []
 
-    # Get all positions for this stock across all portfolios
-    # Note: This returns all positions, not filtered by user
-    # If you need user-specific positions, you'll need authentication
+    # Get the latest StockData for current price calculation
+    latest_stock_data = session.exec(
+        select(StockData)
+        .where(StockData.company_id == stock.id)
+        .order_by(StockData.timestamp.desc())
+        .limit(1)
+    ).first()
+
+    # Get current price from StockData, fallback to None if not available
+    current_price = float(latest_stock_data.last_trade_price) if latest_stock_data else None
+
+    # Get all positions for this stock across all user's portfolios
+    # Each portfolio can have a separate position for the same symbol,
+    # so we return each position as a separate entry in the list
     positions = session.exec(
         select(PortfolioPosition, Portfolio, Company)
         .join(Portfolio, PortfolioPosition.portfolio_id == Portfolio.id)
         .join(Company, PortfolioPosition.stock_id == Company.id)
-        .where(PortfolioPosition.stock_id == stock.id)
+        .where(
+            PortfolioPosition.stock_id == stock.id,
+            Portfolio.user_id == current_user.id
+        )
+        .order_by(Portfolio.name, PortfolioPosition.last_updated.desc())
     ).all()
 
     result = []
     for position, portfolio, company in positions:
+        # Calculate values using current price from StockData
+        average_price = float(position.average_price)
+        quantity = position.quantity
+        
+        if current_price is not None:
+            # Calculate unrealized PnL: (current_price - average_price) * quantity
+            unrealized_pnl = (current_price - average_price) * quantity
+            
+            # Calculate unrealized PnL percentage: ((current_price - average_price) / average_price) * 100
+            unrealized_pnl_percent = ((current_price - average_price) / average_price * 100) if average_price > 0 else 0.0
+            
+            # Calculate current value: current_price * quantity
+            current_value = current_price * quantity
+        else:
+            # Fallback to stored values if StockData not available
+            unrealized_pnl = float(position.unrealized_pnl) if position.unrealized_pnl else 0.0
+            unrealized_pnl_percent = float(position.unrealized_pnl_percent) if position.unrealized_pnl_percent else 0.0
+            current_value = float(position.current_value) if position.current_value else 0.0
+        
+        # Each position is separate, even if the same symbol exists in multiple portfolios
         # Format for TradingView position marks
         result.append({
             "id": str(position.id),
             "portfolio_id": str(portfolio.id),
             "portfolio_name": portfolio.name,
             "symbol": company.trading_code,
-            "quantity": position.quantity,
-            "price": float(position.average_price),
+            "quantity": quantity,
+            "price": average_price,
             "side": "buy",  # Positions are entries, so they're all "buy" marks
             "timestamp": int(position.last_updated.timestamp()) if position.last_updated else None,
-            "unrealized_pnl": float(position.unrealized_pnl) if position.unrealized_pnl else 0,
-            "current_value": float(position.current_value) if position.current_value else 0,
+            "unrealized_pnl": round(unrealized_pnl, 2),
+            "unrealized_pnl_percent": round(unrealized_pnl_percent, 2),
+            "current_value": round(current_value, 2),
         })
 
     return result

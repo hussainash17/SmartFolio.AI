@@ -266,19 +266,6 @@ export function LoginPage({ onSwitchToSignup }: LoginPageProps) {
             </div>
           </CardContent>
         </Card>
-
-        {/* Demo Credentials */}
-        <Card className="border-dashed bg-muted/50">
-          <CardContent className="pt-6">
-            <div className="text-center space-y-2">
-              <p className="text-xs text-muted-foreground font-medium">Demo Credentials:</p>
-              <div className="text-xs text-muted-foreground space-y-1">
-                <p><strong>Email/Phone:</strong> Any valid format</p>
-                <p><strong>Password:</strong> password123</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

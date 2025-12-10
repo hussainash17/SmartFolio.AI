@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict
 from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
 from sqlmodel import select
@@ -8,6 +8,7 @@ from app.model.portfolio import (
     WatchlistItem, WatchlistItemCreate, WatchlistItemPublic
 )
 from app.model.company import Company
+from app.model.stock import StockData
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/watchlist", tags=["watchlist"])
@@ -557,7 +558,7 @@ def get_watchlist_items_with_details(
     current_user: CurrentUser,
     session: SessionDep
 ):
-    """Get watchlist items with stock details"""
+    """Get watchlist items with stock details including market data"""
     # Verify watchlist belongs to user
     watchlist = session.exec(
         select(Watchlist).where(
@@ -579,11 +580,38 @@ def get_watchlist_items_with_details(
         ).where(WatchlistItem.watchlist_id == watchlist_id)
     ).all()
     
-    return [
-        {
+    # Get company IDs to fetch latest market data
+    company_ids = [stock.id for _, stock in items]
+    
+    # Get latest StockData for each company
+    latest_prices: Dict[UUID, StockData] = {}
+    if company_ids:
+        rows = session.exec(
+            select(StockData)
+            .where(StockData.company_id.in_(company_ids))
+            .order_by(StockData.company_id, StockData.timestamp.desc())
+        ).all() or []
+        # Keep first seen per company (sorted by timestamp desc per company)
+        seen = set()
+        for row in rows:
+            if row.company_id not in seen:
+                latest_prices[row.company_id] = row
+                seen.add(row.company_id)
+    
+    # Build response with market data
+    result = []
+    for item, stock in items:
+        stock_data = latest_prices.get(stock.id)
+        result.append({
             "id": item.id,
             "added_at": item.added_at,
             "notes": item.notes,
+            "symbol": stock.trading_code,
+            "stock_id": str(stock.id),
+            "last_trade_price": float(stock_data.last_trade_price) if stock_data else None,
+            "change": float(stock_data.change) if stock_data else None,
+            "change_percent": float(stock_data.change_percent) if stock_data else None,
+            "volume": stock_data.volume if stock_data else None,
             "stock": {
                 "id": stock.id,
                 "symbol": stock.trading_code,
@@ -591,6 +619,6 @@ def get_watchlist_items_with_details(
                 "sector": stock.sector,
                 "industry": stock.industry
             }
-        }
-        for item, stock in items
-    ] 
+        })
+    
+    return result 

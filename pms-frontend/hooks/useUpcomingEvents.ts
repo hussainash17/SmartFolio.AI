@@ -77,5 +77,7 @@ export function useUpcomingEvents(
 
 // Hook for fetching top N upcoming events (simplified)
 export function useTopUpcomingEvents(limit: number = 10) {
-  return useUpcomingEvents(1, limit, undefined, undefined, undefined, undefined, 'timestamp');
+  // Get current timestamp in seconds (Unix timestamp)
+  const currentTimestamp = Math.floor(Date.now() / 1000);
+  return useUpcomingEvents(1, limit, undefined, undefined, currentTimestamp, undefined, 'timestamp');
 }

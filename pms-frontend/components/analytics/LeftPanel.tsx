@@ -51,6 +51,7 @@ export function LeftPanel({ currentSymbol, onSymbolSelect }: LeftPanelProps) {
             last_trade_price: item.last_trade_price,
             change: item.change,
             change_percent: item.change_percent,
+            volume: item.volume,
             group: 'Watchlist',
         }));
     }, [watchlistItems]);

@@ -36,6 +36,18 @@ const STRATEGY_OPTIONS: { value: StrategyType; label: string; description: strin
     { value: 'rsi', label: 'RSI', description: 'Relative Strength Index signals' },
     { value: 'bbands', label: 'Bollinger Bands', description: 'Mean reversion strategy' },
     { value: 'macd', label: 'MACD', description: 'MACD/Signal line crossover' },
+    { value: 'stochastic', label: 'Stochastic Oscillator', description: 'Oversold/overbought signals' },
+    { value: 'atr_breakout', label: 'ATR Breakout', description: 'Average True Range breakout' },
+    { value: 'triple_ma', label: 'Triple MA', description: 'Triple moving average alignment' },
+    { value: 'zscore_reversion', label: 'Z-Score Reversion', description: 'Mean reversion with z-score' },
+    { value: 'adx_trend', label: 'ADX Trend', description: 'Average Directional Index trend following' },
+    { value: 'ichimoku', label: 'Ichimoku Cloud', description: 'Ichimoku Kinko Hyo cloud strategy' },
+    { value: 'williams_r', label: 'Williams %R', description: 'Williams %R oscillator' },
+    { value: 'cci', label: 'CCI', description: 'Commodity Channel Index' },
+    { value: 'vwma_crossover', label: 'VWMA Crossover', description: 'Volume Weighted MA crossover' },
+    { value: 'donchian', label: 'Donchian Channel', description: 'Donchian Channel breakout' },
+    { value: 'momentum', label: 'Momentum', description: 'Momentum-based strategy' },
+    { value: 'sr_reversion', label: 'Support/Resistance', description: 'Mean reversion at S/R levels' },
 ]
 
 export function BacktestControls({
@@ -189,6 +201,381 @@ export function BacktestControls({
                                 value={params.macd_signal}
                                 onChange={(e) => updateParam('macd_signal', parseInt(e.target.value) || 9)}
                                 min={1}
+                                className="h-8"
+                            />
+                        </div>
+                    </div>
+                )
+
+            case 'stochastic':
+                return (
+                    <div className="space-y-3">
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">%K Window</Label>
+                            <Input
+                                type="number"
+                                value={params.stoch_k_window}
+                                onChange={(e) => updateParam('stoch_k_window', parseInt(e.target.value) || 14)}
+                                min={1}
+                                className="h-8"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">%D Window</Label>
+                            <Input
+                                type="number"
+                                value={params.stoch_d_window}
+                                onChange={(e) => updateParam('stoch_d_window', parseInt(e.target.value) || 3)}
+                                min={1}
+                                className="h-8"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Buy Below (Oversold)</Label>
+                            <Input
+                                type="number"
+                                value={params.stoch_buy_below}
+                                onChange={(e) => updateParam('stoch_buy_below', parseFloat(e.target.value) || 20)}
+                                min={0}
+                                max={100}
+                                className="h-8"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Sell Above (Overbought)</Label>
+                            <Input
+                                type="number"
+                                value={params.stoch_sell_above}
+                                onChange={(e) => updateParam('stoch_sell_above', parseFloat(e.target.value) || 80)}
+                                min={0}
+                                max={100}
+                                className="h-8"
+                            />
+                        </div>
+                    </div>
+                )
+
+            case 'atr_breakout':
+                return (
+                    <div className="space-y-3">
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">ATR Window</Label>
+                            <Input
+                                type="number"
+                                value={params.atr_window}
+                                onChange={(e) => updateParam('atr_window', parseInt(e.target.value) || 14)}
+                                min={1}
+                                className="h-8"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Lookback Period</Label>
+                            <Input
+                                type="number"
+                                value={params.atr_lookback}
+                                onChange={(e) => updateParam('atr_lookback', parseInt(e.target.value) || 20)}
+                                min={1}
+                                className="h-8"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">ATR Multiplier</Label>
+                            <Input
+                                type="number"
+                                step="0.1"
+                                value={params.atr_multiplier}
+                                onChange={(e) => updateParam('atr_multiplier', parseFloat(e.target.value) || 1.5)}
+                                min={0.1}
+                                className="h-8"
+                            />
+                        </div>
+                    </div>
+                )
+
+            case 'triple_ma':
+                return (
+                    <div className="space-y-3">
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Short Period</Label>
+                            <Input
+                                type="number"
+                                value={params.ma_short}
+                                onChange={(e) => updateParam('ma_short', parseInt(e.target.value) || 10)}
+                                min={1}
+                                className="h-8"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Medium Period</Label>
+                            <Input
+                                type="number"
+                                value={params.ma_medium}
+                                onChange={(e) => updateParam('ma_medium', parseInt(e.target.value) || 30)}
+                                min={1}
+                                className="h-8"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Long Period</Label>
+                            <Input
+                                type="number"
+                                value={params.ma_long}
+                                onChange={(e) => updateParam('ma_long', parseInt(e.target.value) || 50)}
+                                min={1}
+                                className="h-8"
+                            />
+                        </div>
+                    </div>
+                )
+
+            case 'zscore_reversion':
+                return (
+                    <div className="space-y-3">
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Window Period</Label>
+                            <Input
+                                type="number"
+                                value={params.zscore_window}
+                                onChange={(e) => updateParam('zscore_window', parseInt(e.target.value) || 20)}
+                                min={1}
+                                className="h-8"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Z-Score Threshold</Label>
+                            <Input
+                                type="number"
+                                step="0.1"
+                                value={params.zscore_threshold}
+                                onChange={(e) => updateParam('zscore_threshold', parseFloat(e.target.value) || 2.0)}
+                                min={0.1}
+                                className="h-8"
+                            />
+                        </div>
+                    </div>
+                )
+
+            case 'adx_trend':
+                return (
+                    <div className="space-y-3">
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">ADX Window</Label>
+                            <Input
+                                type="number"
+                                value={params.adx_window}
+                                onChange={(e) => updateParam('adx_window', parseInt(e.target.value) || 14)}
+                                min={1}
+                                className="h-8"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">ADX Threshold</Label>
+                            <Input
+                                type="number"
+                                step="0.1"
+                                value={params.adx_threshold}
+                                onChange={(e) => updateParam('adx_threshold', parseFloat(e.target.value) || 25.0)}
+                                min={0}
+                                className="h-8"
+                            />
+                        </div>
+                    </div>
+                )
+
+            case 'ichimoku':
+                return (
+                    <div className="space-y-3">
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Conversion Period</Label>
+                            <Input
+                                type="number"
+                                value={params.ichimoku_conversion}
+                                onChange={(e) => updateParam('ichimoku_conversion', parseInt(e.target.value) || 9)}
+                                min={1}
+                                className="h-8"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Base Period</Label>
+                            <Input
+                                type="number"
+                                value={params.ichimoku_base}
+                                onChange={(e) => updateParam('ichimoku_base', parseInt(e.target.value) || 26)}
+                                min={1}
+                                className="h-8"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Span B Period</Label>
+                            <Input
+                                type="number"
+                                value={params.ichimoku_span_b}
+                                onChange={(e) => updateParam('ichimoku_span_b', parseInt(e.target.value) || 52)}
+                                min={1}
+                                className="h-8"
+                            />
+                        </div>
+                    </div>
+                )
+
+            case 'williams_r':
+                return (
+                    <div className="space-y-3">
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Period</Label>
+                            <Input
+                                type="number"
+                                value={params.williams_period}
+                                onChange={(e) => updateParam('williams_period', parseInt(e.target.value) || 14)}
+                                min={1}
+                                className="h-8"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Buy Below (Oversold)</Label>
+                            <Input
+                                type="number"
+                                value={params.williams_buy_below}
+                                onChange={(e) => updateParam('williams_buy_below', parseFloat(e.target.value) || -80)}
+                                min={-100}
+                                max={0}
+                                className="h-8"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Sell Above (Overbought)</Label>
+                            <Input
+                                type="number"
+                                value={params.williams_sell_above}
+                                onChange={(e) => updateParam('williams_sell_above', parseFloat(e.target.value) || -20)}
+                                min={-100}
+                                max={0}
+                                className="h-8"
+                            />
+                        </div>
+                    </div>
+                )
+
+            case 'cci':
+                return (
+                    <div className="space-y-3">
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">CCI Window</Label>
+                            <Input
+                                type="number"
+                                value={params.cci_window}
+                                onChange={(e) => updateParam('cci_window', parseInt(e.target.value) || 20)}
+                                min={1}
+                                className="h-8"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Buy Below (Oversold)</Label>
+                            <Input
+                                type="number"
+                                value={params.cci_buy_below}
+                                onChange={(e) => updateParam('cci_buy_below', parseFloat(e.target.value) || -100)}
+                                min={-200}
+                                max={0}
+                                className="h-8"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Sell Above (Overbought)</Label>
+                            <Input
+                                type="number"
+                                value={params.cci_sell_above}
+                                onChange={(e) => updateParam('cci_sell_above', parseFloat(e.target.value) || 100)}
+                                min={0}
+                                max={200}
+                                className="h-8"
+                            />
+                        </div>
+                    </div>
+                )
+
+            case 'vwma_crossover':
+                return (
+                    <div className="space-y-3">
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">VWMA Period</Label>
+                            <Input
+                                type="number"
+                                value={params.vwma_period}
+                                onChange={(e) => updateParam('vwma_period', parseInt(e.target.value) || 20)}
+                                min={1}
+                                className="h-8"
+                            />
+                        </div>
+                    </div>
+                )
+
+            case 'donchian':
+                return (
+                    <div className="space-y-3">
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Period</Label>
+                            <Input
+                                type="number"
+                                value={params.donchian_period}
+                                onChange={(e) => updateParam('donchian_period', parseInt(e.target.value) || 20)}
+                                min={1}
+                                className="h-8"
+                            />
+                        </div>
+                    </div>
+                )
+
+            case 'momentum':
+                return (
+                    <div className="space-y-3">
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Momentum Period</Label>
+                            <Input
+                                type="number"
+                                value={params.momentum_period}
+                                onChange={(e) => updateParam('momentum_period', parseInt(e.target.value) || 10)}
+                                min={1}
+                                className="h-8"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Momentum Threshold (%)</Label>
+                            <Input
+                                type="number"
+                                step="0.01"
+                                value={params.momentum_threshold * 100}
+                                onChange={(e) => updateParam('momentum_threshold', parseFloat(e.target.value) / 100 || 0.05)}
+                                min={0}
+                                max={100}
+                                className="h-8"
+                            />
+                        </div>
+                    </div>
+                )
+
+            case 'sr_reversion':
+                return (
+                    <div className="space-y-3">
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Lookback Period</Label>
+                            <Input
+                                type="number"
+                                value={params.sr_lookback}
+                                onChange={(e) => updateParam('sr_lookback', parseInt(e.target.value) || 20)}
+                                min={1}
+                                className="h-8"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Touch Threshold (%)</Label>
+                            <Input
+                                type="number"
+                                step="0.01"
+                                value={params.sr_touch_threshold * 100}
+                                onChange={(e) => updateParam('sr_touch_threshold', parseFloat(e.target.value) / 100 || 0.02)}
+                                min={0}
+                                max={10}
                                 className="h-8"
                             />
                         </div>
