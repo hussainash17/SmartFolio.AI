@@ -140,6 +140,15 @@ public class Company {
     @Column(name = "is_active")
     private Boolean isActive;
 
+    @Column(name = "is_dsex")
+    private Boolean isDsex;
+
+    @Column(name = "is_ds30")
+    private Boolean isDs30;
+
+    @Column(name = "is_dses")
+    private Boolean isDses;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

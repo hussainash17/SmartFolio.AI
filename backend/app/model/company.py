@@ -77,6 +77,9 @@ class Company(SQLModel, table=True):
     
     # Status and timestamps
     is_active: bool = Field(default=True)
+    is_dsex: Optional[bool] = Field(default=False, index=True)  # DSEX index flag
+    is_ds30: Optional[bool] = Field(default=False, index=True)  # DS30 index flag
+    is_dses: Optional[bool] = Field(default=False, index=True)  # DSES index flag
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     
@@ -118,6 +121,9 @@ class CompanyBase(SQLModel):
     nav: Optional[Decimal] = None
     dividend_yield: Optional[Decimal] = None
     is_active: bool = True
+    is_dsex: Optional[bool] = False
+    is_ds30: Optional[bool] = False
+    is_dses: Optional[bool] = False
 
 
 class CompanyCreate(CompanyBase):
@@ -149,6 +155,9 @@ class CompanyUpdate(SQLModel):
     nav: Optional[Decimal] = None
     dividend_yield: Optional[Decimal] = None
     is_active: Optional[bool] = None
+    is_dsex: Optional[bool] = None
+    is_ds30: Optional[bool] = None
+    is_dses: Optional[bool] = None
 
 
 class CompanyPublic(CompanyBase):
