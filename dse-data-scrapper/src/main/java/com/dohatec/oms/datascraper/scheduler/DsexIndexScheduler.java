@@ -31,9 +31,8 @@ public class DsexIndexScheduler {
      * - *: month
      * - SUN-THU: day of week (Sunday to Thursday)
      */
-//    @Scheduled(cron = "${scraper.schedule.dsex-index-cron:0 0 15 * * SUN-THU}",
-//            zone = "${scraper.schedule.timezone:Asia/Dhaka}")
-    @Bean
+    @Scheduled(cron = "${scraper.schedule.dsex-index-cron:0 0 15 * * SUN-THU}",
+            zone = "${scraper.schedule.timezone:Asia/Dhaka}")
     public void scrapeDsexIndexShares() {
         try {
             log.info("=== DSEX index shares scraping started ===");
