@@ -24,9 +24,8 @@ public class RealTimeMarketScheduler {
      * Scrape real-time market data every 1 minute during market hours
      * DSE trading hours: 10:00 AM - 2:30 PM (Monday to Thursday)
      */
-//    @Scheduled(cron = "${scraper.schedule.realtime-cron:0 */1 10-15 * * SUN-THU}",
-//            zone = "${scraper.schedule.timezone:Asia/Dhaka}")
-    @Bean
+    @Scheduled(cron = "${scraper.schedule.realtime-cron:0 */1 10-15 * * SUN-THU}",
+            zone = "${scraper.schedule.timezone:Asia/Dhaka}")
     public void scrapeRealTimeData() {
         try {
             log.info("=== Real-time market data scraping started ===");
