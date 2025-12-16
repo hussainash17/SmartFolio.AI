@@ -10,7 +10,11 @@ import { formatCurrency } from '../../../lib/utils';
 
 import { usePortfolioSparkline } from '../../../hooks/usePortfolioSparkline';
 
-const PortfolioSummary: React.FC = () => {
+interface PortfolioSummaryProps {
+    onNavigate?: (view: string) => void;
+}
+
+const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ onNavigate }) => {
     const { data: summary } = useDashboardSummary();
     const { data: historyData } = usePortfolioSparkline();
 
@@ -18,6 +22,20 @@ const PortfolioSummary: React.FC = () => {
     const dayChange = Number(summary?.day_change || 0);
     const dayChangePercent = Number(summary?.day_change_percent || 0);
     const isPositive = dayChange >= 0;
+
+    // New Metrics
+    const totalInvested = Number(summary?.total_investment || 0);
+    const cashBalance = Number(summary?.cash_balance || 0);
+    const realizedGain = Number(summary?.total_realized_gains || 0);
+
+    // Calculate Unrealized Gain
+    // If totalInvested is 0, we can't calculate it accurately from summary alone, 
+    // but typically Total Value = Invested + Unrealized + Cash (if total value includes cash)
+    // OR Total Value (Stocks) = Invested + Unrealized.
+    // Based on useDashboardSummary types: stock_value is likely what we compare against total_investment
+    const stockValue = Number(summary?.stock_value || 0);
+    const unrealizedGain = stockValue - totalInvested;
+    const unrealizedGainPercent = totalInvested > 0 ? (unrealizedGain / totalInvested) * 100 : 0;
 
     const chartData = React.useMemo(() => {
         if (!historyData) return [];
@@ -68,7 +86,12 @@ const PortfolioSummary: React.FC = () => {
                             {isPositive ? '+' : ''}{formatCurrency(dayChange)} Today
                         </p>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 bg-white/10 hover:bg-white/20 text-white rounded-lg">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 bg-white/10 hover:bg-white/20 text-white rounded-lg"
+                        onClick={() => onNavigate?.('portfolios')}
+                    >
                         <ArrowRight size={18} />
                     </Button>
                 </div>
@@ -101,6 +124,33 @@ const PortfolioSummary: React.FC = () => {
                             />
                         </LineChart>
                     </ResponsiveContainer>
+                </div>
+
+                {/* Detailed Stats Grid */}
+                <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-white/10">
+                    <div>
+                        <p className={`${textMutedClass} text-[10px] uppercase tracking-wider`}>Invested</p>
+                        <p className="text-sm font-semibold">{formatCurrency(totalInvested)}</p>
+                    </div>
+                    <div>
+                        <p className={`${textMutedClass} text-[10px] uppercase tracking-wider`}>Cash Balance</p>
+                        <p className="text-sm font-semibold">{formatCurrency(cashBalance)}</p>
+                    </div>
+                    <div>
+                        <p className={`${textMutedClass} text-[10px] uppercase tracking-wider`}>Unrealized P/L</p>
+                        <div className="flex items-center gap-1">
+                            <p className="text-sm font-semibold">{formatCurrency(unrealizedGain)}</p>
+                            <span className={`text-[10px] ${unrealizedGain >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>
+                                ({unrealizedGain >= 0 ? '+' : ''}{unrealizedGainPercent.toFixed(2)}%)
+                            </span>
+                        </div>
+                    </div>
+                    <div>
+                        <p className={`${textMutedClass} text-[10px] uppercase tracking-wider`}>Realized P/L</p>
+                        <p className={`text-sm font-semibold ${realizedGain >= 0 ? 'text-white' : 'text-rose-200'}`}>
+                            {realizedGain >= 0 ? '+' : ''}{formatCurrency(realizedGain)}
+                        </p>
+                    </div>
                 </div>
             </CardContent>
         </Card>

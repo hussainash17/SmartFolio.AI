@@ -16,11 +16,16 @@ import SectorAnalysis from './dashboard/overview/SectorAnalysis';
 import MarketDeepDive from './dashboard/overview/MarketDeepDive';
 import AnnouncementsList from './dashboard/overview/AnnouncementsList';
 
+
 interface ComprehensiveDashboardProps {
     recentTransactions?: any[];
+    onNavigate?: (view: string) => void;
 }
 
-export function ComprehensiveDashboard({ recentTransactions }: ComprehensiveDashboardProps) {
+export function ComprehensiveDashboard({
+    recentTransactions,
+    onNavigate
+}: ComprehensiveDashboardProps) {
     const { data: marketSummary } = useMarketSummary();
 
     // Calculate sentiment score
@@ -44,7 +49,7 @@ export function ComprehensiveDashboard({ recentTransactions }: ComprehensiveDash
                         <h2 className="text-xl font-bold">My Portfolio</h2>
                     </div> */}
 
-                    <PortfolioSummary />
+                    <PortfolioSummary onNavigate={onNavigate} />
                     <PortfolioImpact />
                     <PortfolioTabs
                         transactions={recentTransactions}
