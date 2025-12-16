@@ -33,30 +33,55 @@ const ImpactRow = ({ event, impact, exposure }: any) => (
     </div>
 );
 
-const SectorVisual = ({ name, weight, performance }: any) => (
-    <div className="flex items-center justify-between py-2">
-        <div className="flex items-center gap-2 w-1/3">
-            <div className="w-2 h-2 rounded-full bg-muted-foreground/30"></div>
-            <span className="text-xs font-medium text-muted-foreground uppercase">{name}</span>
-        </div>
+const SectorVisual = ({ name, weight, performance }: any) => {
+    // Calculate impact score
+    const impact = (weight * performance) / 100;
+    const isPositive = performance >= 0;
+    const isImpactPositive = impact >= 0;
 
-        {/* Composition Bar */}
-        <div className="flex-1 px-4 flex items-center gap-2">
-            <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                <div style={{ width: `${Math.min(weight, 100)}%` }} className="h-full bg-primary/80 rounded-full"></div>
+    return (
+        <div className="grid grid-cols-12 gap-2 items-center py-2 px-2 rounded-md hover:bg-muted/50 transition-colors border-b border-border/40 last:border-0">
+            {/* Sector Name */}
+            <div className="col-span-4 flex items-center gap-2 min-w-0">
+                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isPositive ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+                <span className="text-xs font-medium text-foreground truncate" title={name}>{name}</span>
             </div>
-            <span className="text-xs font-bold w-8 text-right">{weight}%</span>
-        </div>
 
-        {/* Performance */}
-        <div className="w-1/4 text-right flex justify-end items-center gap-1">
-            <span className={cn("text-xs font-bold", performance >= 0 ? "text-green-600" : "text-red-600")}>
-                {performance > 0 ? '+' : ''}{performance}%
-            </span>
-            {performance >= 0 ? <ArrowUpRight size={12} className="text-green-600" /> : <ArrowDownRight size={12} className="text-red-600" />}
+            {/* Weight (Progress Bar) */}
+            <div className="col-span-3 flex flex-col justify-center">
+                <div className="flex justify-between items-end mb-0.5">
+                    <span className="text-[10px] text-muted-foreground">Weight</span>
+                    <span className="text-[10px] font-medium">{weight}%</span>
+                </div>
+                <div className="h-1 bg-muted rounded-full overflow-hidden w-full">
+                    <div
+                        style={{ width: `${Math.min(weight, 100)}%` }}
+                        className="h-full bg-primary/60 rounded-full"
+                    ></div>
+                </div>
+            </div>
+
+            {/* Return (Raw %) */}
+            <div className="col-span-2 text-right">
+                <span className={cn("text-[10px] font-medium", isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                    {isPositive ? '+' : ''}{performance}%
+                </span>
+            </div>
+
+            {/* Impact (Highlighted) */}
+            <div className="col-span-3 text-right">
+                <div className={cn(
+                    "inline-flex items-center justify-end gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold min-w-[3.5rem]",
+                    isImpactPositive
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                        : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                )}>
+                    {isImpactPositive ? '+' : ''}{impact.toFixed(2)}%
+                </div>
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 const PortfolioImpact: React.FC = () => {
     const { data, isLoading } = usePortfolioImpact();
@@ -81,10 +106,10 @@ const PortfolioImpact: React.FC = () => {
                         {/* Impact Table */}
                         {data.events && data.events.length > 0 && (
                             <div className="mb-6">
-                                <div className="grid grid-cols-12 gap-4 pb-2 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                                    <div className="col-span-4">Market Event</div>
-                                    <div className="col-span-4">Impact on You</div>
-                                    <div className="col-span-4">Your Exposure</div>
+                                <div className="grid grid-cols-12 gap-2 pb-1.5 border-b border-border text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                    <div className="col-span-4">Event</div>
+                                    <div className="col-span-4">Impact</div>
+                                    <div className="col-span-4">Exposure</div>
                                 </div>
 
                                 {data.events.map((item: any, index: number) => (
@@ -93,13 +118,18 @@ const PortfolioImpact: React.FC = () => {
                             </div>
                         )}
 
-                        {/* Composition vs Performance */}
+                        {/* Sector Performance Attribution */}
                         {data.sector_composition && data.sector_composition.length > 0 && (
-                            <div className="bg-muted/50 rounded-lg p-4">
-                                <div className="flex justify-between items-center mb-3">
-                                    <h4 className="text-xs font-bold text-muted-foreground uppercase">Composition vs Performance</h4>
+                            <div className="border border-border/50 rounded-lg overflow-hidden">
+                                {/* Explicit Headers */}
+                                <div className="grid grid-cols-12 gap-2 px-2 py-2 bg-muted/30 border-b border-border/50 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                    <div className="col-span-4">Sector</div>
+                                    <div className="col-span-3">PF Weight</div>
+                                    <div className="col-span-2 text-right">Sector (%)</div>
+                                    <div className="col-span-3 text-right">PF Impact (%)</div>
                                 </div>
-                                <div className="space-y-1">
+
+                                <div className="bg-card">
                                     {data.sector_composition.slice(0, 5).map((sector: any, index: number) => (
                                         <SectorVisual key={index} {...sector} />
                                     ))}

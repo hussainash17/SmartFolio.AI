@@ -1,6 +1,6 @@
 import React from 'react';
-import { ArrowUpRight, ArrowRight, ArrowDownRight } from 'lucide-react';
-import { LineChart, Line, ResponsiveContainer, Tooltip, YAxis, XAxis } from 'recharts';
+import { ArrowUpRight, ArrowRight, ArrowDownRight, Wallet, PiggyBank, TrendingUp, TrendingDown, DollarSign, PieChart } from 'lucide-react';
+import { LineChart, Line, ResponsiveContainer, Tooltip, YAxis, XAxis, AreaChart, Area } from 'recharts';
 import { Card, CardContent } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { useDashboardSummary } from '../../../hooks/useDashboardSummary';
@@ -62,92 +62,140 @@ const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ onNavigate }) => {
         return mappedData.slice(-10);
     }, [historyData, summary]);
 
+    // Refined Gradients
     const gradientClass = isPositive
-        ? "from-emerald-600 to-teal-700 dark:from-emerald-800 dark:to-teal-900"
-        : "from-rose-600 to-red-700 dark:from-rose-800 dark:to-red-900";
+        ? "bg-gradient-to-br from-[#059669] via-[#047857] to-[#064e3b] dark:from-[#059669] dark:via-[#047857] dark:to-[#022c22]"
+        : "bg-gradient-to-br from-[#e11d48] via-[#be123c] to-[#881337] dark:from-[#e11d48] dark:via-[#be123c] dark:to-[#4c0519]";
 
-    const textMutedClass = isPositive ? "text-emerald-100" : "text-rose-100";
-    const tooltipColor = isPositive ? "#059669" : "#e11d48";
+    const chartColor = "#ffffff";
+    const chartFill = isPositive ? "rgba(255, 255, 255, 0.1)" : "rgba(255, 255, 255, 0.1)";
 
     return (
-        <Card className={`bg-gradient-to-br ${gradientClass} text-white border-none overflow-hidden`}>
-            <CardContent className="p-5">
-                <div className="flex justify-between items-start">
-                    <div>
-                        <p className={`${textMutedClass} text-xs font-medium uppercase tracking-wider`}>Total Portfolio Value</p>
-                        <div className="flex items-baseline gap-3 mt-1">
-                            <h2 className="text-3xl font-bold">{formatCurrency(totalValue)}</h2>
-                            <span className="bg-white/20 px-1.5 py-0.5 rounded text-xs font-medium flex items-center gap-1">
-                                {isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                                {isPositive ? '+' : ''}{dayChangePercent.toFixed(2)}%
-                            </span>
+        <Card className={`relative overflow-hidden border-none shadow-lg ${gradientClass} text-white transition-all duration-300 hover:shadow-xl`}>
+            {/* Background Pattern Overlay */}
+            <div className="absolute inset-0 opacity-10 pointer-events-none">
+                <svg width="100%" height="100%">
+                    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="1" />
+                    </pattern>
+                    <rect width="100%" height="100%" fill="url(#grid)" />
+                </svg>
+            </div>
+
+            <CardContent className="p-0 relative z-10">
+                {/* Main Header Section */}
+                <div className="p-6 pb-2">
+                    <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-2 opacity-90">
+                            <div className="p-1.5 bg-white/20 rounded-lg backdrop-blur-sm">
+                                <Wallet size={16} className="text-white" />
+                            </div>
+                            <span className="text-sm font-medium tracking-wide">Total Portfolio Value</span>
                         </div>
-                        <p className={`${textMutedClass} text-xs mt-1`}>
-                            {isPositive ? '+' : ''}{formatCurrency(dayChange)} Today
-                        </p>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors"
+                            onClick={() => onNavigate?.('portfolios')}
+                        >
+                            <ArrowRight size={16} />
+                        </Button>
                     </div>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 bg-white/10 hover:bg-white/20 text-white rounded-lg"
-                        onClick={() => onNavigate?.('portfolios')}
-                    >
-                        <ArrowRight size={18} />
-                    </Button>
+
+                    <div className="flex items-end gap-3 mb-1">
+                        <h2 className="text-4xl font-bold tracking-tight">{formatCurrency(totalValue)}</h2>
+                    </div>
+
+                    <div className="flex items-center gap-2 mb-6">
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold ${isPositive ? 'bg-emerald-400/20 text-emerald-100' : 'bg-rose-400/20 text-rose-100'} backdrop-blur-sm`}>
+                            {isPositive ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                            <span>{dayChangePercent.toFixed(2)}%</span>
+                        </div>
+                        <span className="text-sm opacity-80 font-medium">
+                            {isPositive ? '+' : ''}{formatCurrency(dayChange)} Today
+                        </span>
+                    </div>
                 </div>
 
-                <div className="h-16 mt-4 -mx-2">
+                {/* Chart Section */}
+                <div className="h-24 w-full -mt-4">
                     <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={chartData}>
+                        <AreaChart data={chartData}>
+                            <defs>
+                                <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="white" stopOpacity={0.3} />
+                                    <stop offset="100%" stopColor="white" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
                             <XAxis dataKey="date" hide={true} />
                             <YAxis domain={['dataMin', 'dataMax']} hide={true} />
                             <Tooltip
                                 contentStyle={{
-                                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                                    borderRadius: '8px',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                    borderRadius: '12px',
                                     border: 'none',
-                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                    padding: '8px 12px'
                                 }}
-                                itemStyle={{ color: tooltipColor, fontWeight: 'bold' }}
-                                labelStyle={{ color: '#6b7280', fontSize: '12px' }}
+                                itemStyle={{ color: isPositive ? '#059669' : '#e11d48', fontWeight: 'bold', fontSize: '14px' }}
+                                labelStyle={{ color: '#64748b', fontSize: '11px', marginBottom: '2px' }}
                                 formatter={(value: number) => [formatCurrency(value), 'Value']}
-                                labelFormatter={(label) => new Date(label).toLocaleDateString()}
+                                labelFormatter={(label) => new Date(label).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                cursor={{ stroke: 'rgba(255,255,255,0.5)', strokeWidth: 1, strokeDasharray: '4 4' }}
                             />
-                            <Line
+                            <Area
                                 type="monotone"
                                 dataKey="value"
-                                stroke="#ffffff"
-                                strokeWidth={2}
-                                dot={false}
-                                strokeOpacity={0.8}
-                                activeDot={{ r: 4, strokeWidth: 0, fill: '#ffffff' }}
+                                stroke={chartColor}
+                                strokeWidth={3}
+                                fill="url(#chartGradient)"
+                                activeDot={{ r: 6, strokeWidth: 0, fill: 'white' }}
                             />
-                        </LineChart>
+                        </AreaChart>
                     </ResponsiveContainer>
                 </div>
 
-                {/* Detailed Stats Grid */}
-                <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-white/10">
-                    <div>
-                        <p className={`${textMutedClass} text-[10px] uppercase tracking-wider`}>Invested</p>
-                        <p className="text-sm font-semibold">{formatCurrency(totalInvested)}</p>
+                {/* Glassmorphism Stats Grid */}
+                <div className="grid grid-cols-2 gap-px bg-white/10 backdrop-blur-md border-t border-white/10">
+                    {/* Invested */}
+                    <div className="p-4 hover:bg-white/5 transition-colors group">
+                        <div className="flex items-center gap-2 mb-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                            <PiggyBank size={14} />
+                            <span className="text-xs font-medium uppercase tracking-wider">Invested</span>
+                        </div>
+                        <p className="text-base font-bold">{formatCurrency(totalInvested)}</p>
                     </div>
-                    <div>
-                        <p className={`${textMutedClass} text-[10px] uppercase tracking-wider`}>Cash Balance</p>
-                        <p className="text-sm font-semibold">{formatCurrency(cashBalance)}</p>
+
+                    {/* Cash */}
+                    <div className="p-4 hover:bg-white/5 transition-colors group border-l border-white/10">
+                        <div className="flex items-center gap-2 mb-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                            <DollarSign size={14} />
+                            <span className="text-xs font-medium uppercase tracking-wider">Cash</span>
+                        </div>
+                        <p className="text-base font-bold">{formatCurrency(cashBalance)}</p>
                     </div>
-                    <div>
-                        <p className={`${textMutedClass} text-[10px] uppercase tracking-wider`}>Unrealized P/L</p>
-                        <div className="flex items-center gap-1">
-                            <p className="text-sm font-semibold">{formatCurrency(unrealizedGain)}</p>
-                            <span className={`text-[10px] ${unrealizedGain >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>
-                                ({unrealizedGain >= 0 ? '+' : ''}{unrealizedGainPercent.toFixed(2)}%)
+
+                    {/* Unrealized P/L */}
+                    <div className="p-4 hover:bg-white/5 transition-colors group border-t border-white/10">
+                        <div className="flex items-center gap-2 mb-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                            <PieChart size={14} />
+                            <span className="text-xs font-medium uppercase tracking-wider">Unrealized</span>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                            <p className="text-base font-bold">{formatCurrency(unrealizedGain)}</p>
+                            <span className={`text-xs font-bold ${unrealizedGain >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>
+                                {unrealizedGain >= 0 ? '+' : ''}{unrealizedGainPercent.toFixed(1)}%
                             </span>
                         </div>
                     </div>
-                    <div>
-                        <p className={`${textMutedClass} text-[10px] uppercase tracking-wider`}>Realized P/L</p>
-                        <p className={`text-sm font-semibold ${realizedGain >= 0 ? 'text-white' : 'text-rose-200'}`}>
+
+                    {/* Realized P/L */}
+                    <div className="p-4 hover:bg-white/5 transition-colors group border-t border-l border-white/10">
+                        <div className="flex items-center gap-2 mb-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                            {realizedGain >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                            <span className="text-xs font-medium uppercase tracking-wider">Realized</span>
+                        </div>
+                        <p className={`text-base font-bold ${realizedGain >= 0 ? 'text-white' : 'text-rose-200'}`}>
                             {realizedGain >= 0 ? '+' : ''}{formatCurrency(realizedGain)}
                         </p>
                     </div>
