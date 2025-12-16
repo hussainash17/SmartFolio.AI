@@ -36,6 +36,13 @@ export function AnalyticsToolLayout({
     const [currentSymbol, setCurrentSymbol] = useState(initialSymbol);
     const [theme, setTheme] = useState<'light' | 'dark'>('dark');
 
+    // Sync currentSymbol when initialSymbol prop changes (e.g., navigation from search or portfolio)
+    useEffect(() => {
+        if (initialSymbol && initialSymbol !== currentSymbol) {
+            setCurrentSymbol(initialSymbol);
+        }
+    }, [initialSymbol]);
+
     // Panel width constants
     const MIN_PANEL_WIDTH = 200;
     const MAX_PANEL_WIDTH = 600;

@@ -19,31 +19,36 @@ router = APIRouter(prefix="/market", tags=["market"])
 
 
 @router.get("/benchmark/{benchmark_id}/last-5-days")
-def get_benchmark_last_5_days(benchmark_id: str, session: SessionDep) -> Dict[str, Any]:
-    """Get the last 5 trading days of benchmark data.
+def get_benchmark_last_5_days(
+    benchmark_id: str, 
+    session: SessionDep,
+    days: int = Query(5, ge=1, le=30, description="Number of trading days to fetch")
+) -> Dict[str, Any]:
+    """Get the last N trading days of benchmark data.
     
-    Returns the last 5 trading days of benchmark data with date and value in crore.
+    Returns the last N trading days of benchmark data with date and value in crore.
     Values are converted from million (stored in DB) to crore.
     
     Args:
         benchmark_id: The benchmark identifier (e.g., 'DSEX')
         session: Database session
+        days: Number of trading days to fetch (default 5, max 30)
     
     Returns:
         Dict containing benchmark_id, data array with date and value_in_crore
     """
     from sqlalchemy import text
     
-    # Fetch last 5 trading days in a single query
+    # Fetch last N trading days in a single query
     query = text("""
         SELECT date, total_value
         FROM benchmark_data
         WHERE benchmark_id = :benchmark_id
         ORDER BY date DESC
-        LIMIT 5
+        LIMIT :days
     """)
     
-    result = session.execute(query, {"benchmark_id": benchmark_id}).fetchall()
+    result = session.execute(query, {"benchmark_id": benchmark_id, "days": days}).fetchall()
     
     if not result:
         raise HTTPException(
@@ -389,6 +394,87 @@ def get_market_summary(session: SessionDep) -> Dict[str, Any]:
         "turnover_change_percent": turnover_change_percent,
         "volume_change_percent": volume_change_percent,
         "trades_change_percent": trades_change_percent,
+    }
+
+
+@router.get("/stock-distribution")
+def get_stock_distribution(session: SessionDep) -> Dict[str, Any]:
+    """Get distribution of stocks grouped by percentage change.
+    
+    Returns a histogram of stocks grouped into predefined percentage change bins.
+    Useful for visualizing market breadth distribution.
+    
+    Bins:
+    - 0%: Exactly 0
+    - 0 to 2%: (0, 2]
+    - 0 to -2%: [-2, 0)
+    - 2 to 5%: (2, 5]
+    - -2 to -5%: [-5, -2)
+    - 5 to 10%: (5, 10]
+    - -5 to -10%: [-10, -5)
+    
+    Returns:
+        Dict containing distribution with bin labels and counts
+    """
+    from sqlalchemy import text
+    
+    # Get the latest timestamp from StockData
+    latest_timestamp = session.exec(
+        select(func.max(StockData.timestamp))
+    ).first()
+    
+    if not latest_timestamp:
+        return {
+            "distribution": {
+                "0%": 0,
+                "0 to 2%": 0,
+                "0 to -2%": 0,
+                "2 to 5%": 0,
+                "-2 to -5%": 0,
+                "5 to 10%": 0,
+                "-5 to -10%": 0,
+            }
+        }
+    
+    # Query to categorize stocks by change_percent into bins
+    distribution_query = text("""
+        SELECT 
+            COALESCE(SUM(CASE WHEN change_percent = 0 THEN 1 ELSE 0 END), 0) as zero_pct,
+            COALESCE(SUM(CASE WHEN change_percent > 0 AND change_percent <= 2 THEN 1 ELSE 0 END), 0) as zero_to_2_pct,
+            COALESCE(SUM(CASE WHEN change_percent >= -2 AND change_percent < 0 THEN 1 ELSE 0 END), 0) as zero_to_neg2_pct,
+            COALESCE(SUM(CASE WHEN change_percent > 2 AND change_percent <= 5 THEN 1 ELSE 0 END), 0) as two_to_5_pct,
+            COALESCE(SUM(CASE WHEN change_percent >= -5 AND change_percent < -2 THEN 1 ELSE 0 END), 0) as neg2_to_neg5_pct,
+            COALESCE(SUM(CASE WHEN change_percent > 5 AND change_percent <= 10 THEN 1 ELSE 0 END), 0) as five_to_10_pct,
+            COALESCE(SUM(CASE WHEN change_percent >= -10 AND change_percent < -5 THEN 1 ELSE 0 END), 0) as neg5_to_neg10_pct
+        FROM stockdata
+        WHERE timestamp = :latest_timestamp
+    """)
+    
+    result = session.execute(distribution_query, {"latest_timestamp": latest_timestamp}).fetchone()
+    
+    if not result:
+        return {
+            "distribution": {
+                "0%": 0,
+                "0 to 2%": 0,
+                "0 to -2%": 0,
+                "2 to 5%": 0,
+                "-2 to -5%": 0,
+                "5 to 10%": 0,
+                "-5 to -10%": 0,
+            }
+        }
+    
+    return {
+        "distribution": {
+            "0%": int(result.zero_pct),
+            "0 to 2%": int(result.zero_to_2_pct),
+            "0 to -2%": int(result.zero_to_neg2_pct),
+            "2 to 5%": int(result.two_to_5_pct),
+            "-2 to -5%": int(result.neg2_to_neg5_pct),
+            "5 to 10%": int(result.five_to_10_pct),
+            "-5 to -10%": int(result.neg5_to_neg10_pct),
+        }
     }
 
 

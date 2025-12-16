@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart, Bar, ResponsiveContainer, Cell, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { BarChart, Bar, ResponsiveContainer, Cell, Tooltip, XAxis, YAxis, CartesianGrid, Line, ComposedChart } from 'recharts';
 import { Card, CardHeader, CardTitle, CardContent } from '../../ui/card';
 import { TrendingUp, Activity, Layers, ArrowUp, ArrowDown } from 'lucide-react';
 import { useMarketSummary, useBenchmarkLast5Days } from '../../../hooks/useDashboardMarket';
@@ -8,7 +8,7 @@ import { cn } from '../../../lib/utils';
 const MetricItem = ({ label, value, change, icon: Icon, color }: any) => {
     const isPositive = change && parseFloat(change) >= 0;
     const changeColor = isPositive ? 'text-green-600' : 'text-red-600';
-    
+
     return (
         <div className="flex-1">
             <div className="flex items-center gap-1.5 mb-0.5">
@@ -27,7 +27,8 @@ const MetricItem = ({ label, value, change, icon: Icon, color }: any) => {
 
 const MarketTurnover: React.FC = () => {
     const { data: marketSummary } = useMarketSummary();
-    const { data: benchmarkLast5Days } = useBenchmarkLast5Days('DSEX');
+    // Fetch last 10 days instead of 5
+    const { data: benchmarkLast10Days } = useBenchmarkLast5Days('DSEX', 10);
 
     const formatTurnover = (val: number) => {
         if (!val) return "0.0 Cr";
@@ -47,10 +48,11 @@ const MarketTurnover: React.FC = () => {
         return `${val.toFixed(1)} K`;
     };
 
-    const chartData = benchmarkLast5Days?.data?.map((item, index, arr) => {
+    const chartData = benchmarkLast10Days?.data?.map((item, index, arr) => {
         const date = new Date(item.date);
         const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-        
+        const monthDay = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).replace(' ', '');
+
         let change = 0;
         let changePercent = 0;
         if (index > 0) {
@@ -58,9 +60,10 @@ const MarketTurnover: React.FC = () => {
             change = item.value_in_crore - prevValue;
             changePercent = prevValue > 0 ? (change / prevValue) * 100 : 0;
         }
-        
+
         return {
-            day: dayName,
+            day: monthDay,
+            dayName,
             value: item.value_in_crore,
             change,
             changePercent,
@@ -71,12 +74,12 @@ const MarketTurnover: React.FC = () => {
 
     const getIntensityColor = (value: number, isLatest: boolean) => {
         if (isLatest) return '#3b82f6';
-        
+
         const maxValue = Math.max(...chartData.map(d => d.value), 1);
         const minValue = Math.min(...chartData.map(d => d.value), 0);
         const range = maxValue - minValue || 1;
         const normalized = (value - minValue) / range;
-        
+
         if (normalized >= 0.7) return '#10b981';
         if (normalized >= 0.4) return '#f59e0b';
         return '#ef4444';
@@ -87,10 +90,10 @@ const MarketTurnover: React.FC = () => {
             const data = payload[0].payload;
             const changeIcon = data.change >= 0 ? <ArrowUp size={12} className="text-green-600" /> : <ArrowDown size={12} className="text-red-600" />;
             const changeColor = data.change >= 0 ? 'text-green-600' : 'text-red-600';
-            
+
             return (
                 <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
-                    <p className="font-semibold text-xs">{data.day}</p>
+                    <p className="font-semibold text-xs">{data.dayName} ({data.day})</p>
                     <p className="text-xs font-bold text-blue-600">{data.value.toFixed(2)} Cr</p>
                     {data.change !== 0 && (
                         <div className={cn("text-[10px] flex items-center gap-1 mt-0.5", changeColor)}>
@@ -108,29 +111,26 @@ const MarketTurnover: React.FC = () => {
     const turnoverValue = marketSummary?.total_turnover ? Number(marketSummary.total_turnover) : 0;
     const volumeValue = marketSummary?.total_volume || 0;
     const tradesValue = marketSummary?.total_trades || 0;
-    
+
     const turnover = formatTurnover(turnoverValue);
     const volume = formatVolume(volumeValue);
     const trades = formatTrades(tradesValue);
-    
+
     // Format change percentages
     const formatChangePercent = (percent: number | undefined) => {
         if (percent === undefined || percent === null) return null;
         const sign = percent >= 0 ? '+' : '';
         return `${sign}${percent.toFixed(1)}%`;
     };
-    
+
     const turnoverChange = formatChangePercent(marketSummary?.turnover_change_percent);
     const volumeChange = formatChangePercent(marketSummary?.volume_change_percent);
     const tradesChange = formatChangePercent(marketSummary?.trades_change_percent);
 
     return (
         <Card className="h-full border-none shadow-sm">
-            <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Market Activity</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-                <div className="flex justify-between gap-3">
+            <CardContent className="space-y-2">
+                <div className="flex justify-between gap-5">
                     <MetricItem
                         label="Turnover"
                         value={turnover}
@@ -161,28 +161,31 @@ const MarketTurnover: React.FC = () => {
                             Crores
                         </span>
                     </div>
-                    
-                    <div className="h-28 pl-2">
+
+                    <div className="h-32 pl-2">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
+                            <ComposedChart
                                 data={chartData}
-                                margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
-                                barCategoryGap="35%"
+                                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                                barCategoryGap="20%"
                             >
-                                <CartesianGrid 
-                                    strokeDasharray="2 2" 
-                                    stroke="var(--border)" 
+                                <CartesianGrid
+                                    strokeDasharray="2 2"
+                                    stroke="var(--border)"
                                     vertical={false}
                                     opacity={0.3}
                                 />
-                                <XAxis 
-                                    dataKey="day" 
-                                    tick={{ fontSize: 9, fill: 'var(--muted-foreground)' }}
+                                <XAxis
+                                    dataKey="day"
+                                    tick={{ fontSize: 7, fill: 'var(--muted-foreground)' }}
                                     axisLine={false}
                                     tickLine={false}
-                                    dy={2}
+                                    interval={0}
+                                    angle={0}
+                                    textAnchor="middle"
+                                    height={20}
                                 />
-                                <YAxis 
+                                <YAxis
                                     tick={{ fontSize: 8, fill: 'var(--muted-foreground)' }}
                                     axisLine={false}
                                     tickLine={false}
@@ -190,21 +193,31 @@ const MarketTurnover: React.FC = () => {
                                     tickFormatter={(value) => value.toFixed(0)}
                                 />
                                 <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(59, 130, 246, 0.08)' }} />
-                                <Bar 
-                                    dataKey="value" 
+                                <Bar
+                                    dataKey="value"
                                     radius={[3, 3, 0, 0]}
                                     animationDuration={400}
-                                    maxBarSize={18}
+                                    maxBarSize={16}
                                 >
                                     {chartData.map((entry, index) => (
-                                        <Cell 
-                                            key={`cell-${index}`} 
+                                        <Cell
+                                            key={`cell-${index}`}
                                             fill={getIntensityColor(entry.value, entry.isLatest)}
                                             opacity={entry.isLatest ? 1 : 0.85}
                                         />
                                     ))}
                                 </Bar>
-                            </BarChart>
+                                {/* Smooth trend line connecting bar tops */}
+                                <Line
+                                    type="monotone"
+                                    dataKey="value"
+                                    stroke="#8b5cf6"
+                                    strokeWidth={2}
+                                    dot={false}
+                                    activeDot={{ r: 4, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }}
+                                    animationDuration={600}
+                                />
+                            </ComposedChart>
                         </ResponsiveContainer>
                     </div>
                 </div>

@@ -1,9 +1,9 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../ui/tabs';
-import { ArrowUp, ArrowDown, Zap, Globe, AlertTriangle, Layers } from 'lucide-react';
+import { ArrowUp, ArrowDown, Zap, AlertTriangle } from 'lucide-react';
 import { useMarketTopMovers, useMarketMostActive, useMarketMostVolatile } from '../../../hooks/useDashboardMarket';
-import { cn } from '../../../lib/utils';
+import { useBlockTransactions } from '../../../hooks/useBlockTransactions';
 
 // --- Sub-components ---
 
@@ -86,26 +86,76 @@ const MarketMovers = () => {
     );
 };
 
-const BlockTrades = () => (
-    <div className="space-y-3">
-        {[
-            { ticker: 'SQURPHARMA', qty: '50,000', price: '215.5', value: '1.07 Cr', time: '11:30 AM' },
-            { ticker: 'GP', qty: '25,000', price: '286.2', value: '71.5 L', time: '12:15 PM' },
-            { ticker: 'BEXIMCO', qty: '100,000', price: '115.0', value: '1.15 Cr', time: '10:45 AM' },
-        ].map((trade, i) => (
-            <div key={i} className="flex justify-between items-center p-3 border rounded-lg bg-card">
-                <div>
-                    <p className="font-bold text-sm">{trade.ticker}</p>
-                    <p className="text-xs text-muted-foreground">{trade.time}</p>
-                </div>
-                <div className="text-right">
-                    <p className="font-medium text-sm">৳ {trade.value}</p>
-                    <p className="text-xs text-muted-foreground">@ {trade.price} ({trade.qty})</p>
-                </div>
+const BlockTrades = () => {
+    const { data: blockTransactions, isLoading } = useBlockTransactions();
+
+    // Format volume with commas
+    const formatVolume = (volume: number) => {
+        return volume.toLocaleString('en-IN');
+    };
+
+    // Format value in Crore/Lakh
+    const formatValue = (value: number) => {
+        if (value >= 1) {
+            return `${value.toFixed(2)} Cr`;
+        }
+        return `${(value * 100).toFixed(2)} L`;
+    };
+
+    // Format price range
+    const formatPrice = (minPrice: number, maxPrice: number) => {
+        if (minPrice === maxPrice) {
+            return minPrice.toFixed(2);
+        }
+        return `${minPrice.toFixed(2)} - ${maxPrice.toFixed(2)}`;
+    };
+
+    if (isLoading) {
+        return (
+            <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex justify-between items-center p-3 border rounded-lg bg-card animate-pulse">
+                        <div className="space-y-2">
+                            <div className="h-4 w-20 bg-muted rounded"></div>
+                            <div className="h-3 w-16 bg-muted rounded"></div>
+                        </div>
+                        <div className="space-y-2 text-right">
+                            <div className="h-4 w-16 bg-muted rounded ml-auto"></div>
+                            <div className="h-3 w-24 bg-muted rounded ml-auto"></div>
+                        </div>
+                    </div>
+                ))}
             </div>
-        ))}
-    </div>
-);
+        );
+    }
+
+    const trades = blockTransactions || [];
+
+    if (trades.length === 0) {
+        return (
+            <div className="text-center py-6 text-muted-foreground">
+                No block transactions available
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-3">
+            {trades.slice(0, 10).map((trade) => (
+                <div key={trade.id} className="flex justify-between items-center p-3 border rounded-lg bg-card">
+                    <div>
+                        <p className="font-bold text-sm">{trade.code}</p>
+                        <p className="text-xs text-muted-foreground">{trade.trades} trade{trade.trades > 1 ? 's' : ''}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="font-medium text-sm">৳ {formatValue(trade.value)}</p>
+                        <p className="text-xs text-muted-foreground">@ {formatPrice(trade.minPrice, trade.maxPrice)} ({formatVolume(trade.volume)})</p>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
 
 const CircuitBreakers = () => (
     <div className="space-y-3">

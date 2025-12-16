@@ -225,12 +225,35 @@ export interface BenchmarkLast5Days {
   }>;
 }
 
-// Hook for last 5 days of benchmark data
-export function useBenchmarkLast5Days(benchmarkId: string = 'DSEX') {
+// Hook for last N days of benchmark data
+export function useBenchmarkLast5Days(benchmarkId: string = 'DSEX', days: number = 5) {
   return useQuery({
-    queryKey: ['market', 'benchmark', benchmarkId, 'last-5-days'],
+    queryKey: ['market', 'benchmark', benchmarkId, 'last-5-days', days],
     enabled: !!(OpenAPI as any).TOKEN,
     staleTime: 30 * 1000,
-    queryFn: () => fetchMarketAPI<BenchmarkLast5Days>(`/api/v1/market/benchmark/${benchmarkId}/last-5-days`),
+    queryFn: () => fetchMarketAPI<BenchmarkLast5Days>(`/api/v1/market/benchmark/${benchmarkId}/last-5-days?days=${days}`),
+  });
+}
+
+// Types for stock distribution by percentage change
+export interface StockDistribution {
+  distribution: {
+    "0%": number;
+    "0 to 2%": number;
+    "0 to -2%": number;
+    "2 to 5%": number;
+    "-2 to -5%": number;
+    "5 to 10%": number;
+    "-5 to -10%": number;
+  };
+}
+
+// Hook for stock distribution histogram
+export function useStockDistribution() {
+  return useQuery({
+    queryKey: ['market', 'stock-distribution'],
+    enabled: !!(OpenAPI as any).TOKEN,
+    staleTime: 30 * 1000,
+    queryFn: () => fetchMarketAPI<StockDistribution>('/api/v1/market/stock-distribution'),
   });
 }

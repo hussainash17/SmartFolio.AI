@@ -92,7 +92,7 @@ export function ResearchWorkspace({ defaultSymbol, marketData, onQuickTrade }: R
           <TabsTrigger value="backtesting">Backtesting</TabsTrigger>
         </TabsList>
         <TabsContent value="trade-decision" className="flex-1 min-h-0">
-          <AnalyticsToolLayout />
+          <AnalyticsToolLayout initialSymbol={initialDefault} />
         </TabsContent>
         <TabsContent value="multi" className="flex-1 min-h-0">
           <MultiChartGrid />
