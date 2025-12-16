@@ -1,11 +1,9 @@
 package com.dohatec.oms.datascraper.scheduler;
 
-import com.dohatec.oms.datascraper.service.scraper.DseNewsScraper;
 import com.dohatec.oms.datascraper.service.scraper.OpenPriceScraper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -24,8 +22,7 @@ public class OpenPriceUpdateScheduler {
     /**
      * Scrape open price from market depth url every 60 seconds
      */
-    // @Scheduled(cron = "${scraper.schedule.open-price-cron:0 */5 10-13 * * SUN-THU}", zone = "${scraper.schedule.timezone:Asia/Dhaka}")
-    @Bean
+    @Scheduled(cron = "${scraper.schedule.open-price-cron:0 */5 10-13 * * SUN-THU}", zone = "${scraper.schedule.timezone:Asia/Dhaka}")
     public void setOpenPriceScraper() {
         try {
             log.info("=== Open Price Scheduler started ===");
