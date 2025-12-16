@@ -49,6 +49,9 @@ public class StockData {
     @Column(name = "previous_close", nullable = false)
     private BigDecimal previousClose;
 
+    @Column(name = "closed_price", nullable = false)
+    private BigDecimal closedPrice;
+
     @Column(name = "volume")
     private Long volume;
 

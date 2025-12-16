@@ -122,11 +122,11 @@ public class DailyOHLCAggregator {
                 .openPrice(stockData.getOpenPrice() != null ? stockData.getOpenPrice() : BigDecimal.ZERO)
                 .high(stockData.getHigh() != null ? stockData.getHigh() : BigDecimal.ZERO)
                 .low(stockData.getLow() != null ? stockData.getLow() : BigDecimal.ZERO)
-                .closePrice(stockData.getLastTradePrice() != null ? stockData.getLastTradePrice() : BigDecimal.ZERO) // Close
-                                                                                                                     // is
-                                                                                                                     // last
-                                                                                                                     // trade
-                                                                                                                     // price
+                .closePrice(stockData.getClosedPrice() != null ? stockData.getClosedPrice() : BigDecimal.ZERO) // Close
+                                                                                                               // is
+                                                                                                               // last
+                                                                                                               // trade
+                                                                                                               // price
                 .volume(stockData.getVolume() != null ? stockData.getVolume() : 0L)
                 .turnover(
                         stockData.getTurnover() != null ? stockData.getTurnover().multiply(BigDecimal.valueOf(1000000))

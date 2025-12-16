@@ -76,11 +76,7 @@ public class DsexIndexScraper {
      *
      * @return HTML content as string
      */
-    @Retryable(
-            retryFor = {Exception.class},
-            maxAttempts = 3,
-            backoff = @Backoff(delay = 1000, multiplier = 2.0)
-    )
+    @Retryable(retryFor = { Exception.class }, maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2.0))
     private String fetchHtml() {
         try {
             log.debug("Fetching HTML from: {}", DSEX_INDEX_URL);
@@ -114,56 +110,21 @@ public class DsexIndexScraper {
 
             // Find all links that contain trading codes
             // Pattern: <a href="displayCompany.php?name=TRADINGCODE">
-            Elements links = doc.select("a[href*='displayCompany.php']");
+            // We only look inside div.table-responsive to avoid picking up ticker/header
+            // links
+            Elements links = doc.select("div.table-responsive a[href*='displayCompany.php']");
 
             for (Element link : links) {
-                String href = link.attr("href");
-                // Extract trading code from href like "displayCompany.php?name=TRADINGCODE"
-                if (href.contains("name=")) {
-                    String tradingCode = href.substring(href.indexOf("name=") + 5);
-                    // Remove any query parameters or fragments
-                    if (tradingCode.contains("&")) {
-                        tradingCode = tradingCode.substring(0, tradingCode.indexOf("&"));
-                    }
-                    if (tradingCode.contains("#")) {
-                        tradingCode = tradingCode.substring(0, tradingCode.indexOf("#"));
-                    }
-                    // Remove parentheses and their contents (e.g., "AMCL(PRAN)" -> "AMCL")
-                    if (tradingCode.contains("(")) {
-                        tradingCode = tradingCode.substring(0, tradingCode.indexOf("("));
-                    }
+                // Use text() instead of href to avoid URL parsing issues with special
+                // characters like '&'
+                // Example: <a href="...?name=KAY&QUE">KAY&QUE</a> -> text is "KAY&QUE"
+                String tradingCode = link.text();
+
+                // Clean up the code
+                if (tradingCode != null) {
                     tradingCode = tradingCode.trim().toUpperCase();
                     if (!tradingCode.isEmpty()) {
                         tradingCodes.add(tradingCode);
-                    }
-                }
-            }
-
-            // Also check table cells directly for additional patterns
-            Elements tableRows = doc.select("table tr");
-            for (Element row : tableRows) {
-                Elements cells = row.select("td");
-                for (Element cell : cells) {
-                    Elements cellLinks = cell.select("a[href*='displayCompany.php']");
-                    for (Element cellLink : cellLinks) {
-                        String href = cellLink.attr("href");
-                        if (href.contains("name=")) {
-                            String tradingCode = href.substring(href.indexOf("name=") + 5);
-                            if (tradingCode.contains("&")) {
-                                tradingCode = tradingCode.substring(0, tradingCode.indexOf("&"));
-                            }
-                            if (tradingCode.contains("#")) {
-                                tradingCode = tradingCode.substring(0, tradingCode.indexOf("#"));
-                            }
-                            // Remove parentheses and their contents (e.g., "AMCL(PRAN)" -> "AMCL")
-                            if (tradingCode.contains("(")) {
-                                tradingCode = tradingCode.substring(0, tradingCode.indexOf("("));
-                            }
-                            tradingCode = tradingCode.trim().toUpperCase();
-                            if (!tradingCode.isEmpty()) {
-                                tradingCodes.add(tradingCode);
-                            }
-                        }
                     }
                 }
             }
@@ -288,4 +249,3 @@ public class DsexIndexScraper {
         }
     }
 }
-
