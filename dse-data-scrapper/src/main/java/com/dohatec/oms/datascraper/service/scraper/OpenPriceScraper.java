@@ -1,6 +1,7 @@
 package com.dohatec.oms.datascraper.service.scraper;
 
 import com.dohatec.oms.datascraper.config.ScraperProperties;
+import com.dohatec.oms.datascraper.dto.StockPriceDTO;
 import com.dohatec.oms.datascraper.model.Company;
 import com.dohatec.oms.datascraper.model.StockData;
 import com.dohatec.oms.datascraper.repository.CompanyRepository;
@@ -13,7 +14,6 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.*;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
@@ -47,7 +47,6 @@ public class OpenPriceScraper {
      * Scheduled task to scrape open prices during market hours
      * Runs every 5 minutes, Sunday to Thursday, 10:00 AM to 1:59 PM Dhaka timezone
      */
-    @Scheduled(cron = "${scraper.schedule.open-price-cron:0 */5 10-13 * * SUN-THU}", zone = "${scraper.schedule.timezone:Asia/Dhaka}")
     @Transactional
     public void scrapeOpenPrices() {
         try {
@@ -64,7 +63,7 @@ public class OpenPriceScraper {
 
             int successCount = 0;
             int failureCount = 0;
-
+            List<StockData> stockDataListToSave = new java.util.ArrayList<>(List.of());
             for (StockData stockData : stocksWithNullOpen) {
                 try {
                     // Get company trading code
@@ -80,7 +79,7 @@ public class OpenPriceScraper {
 
                     if (openPrice != null) {
                         stockData.setOpenPrice(openPrice);
-                        stockDataRepository.save(stockData);
+                        stockDataListToSave.add(stockData);
                         successCount++;
                         log.debug("Updated open price for {}: {}", tradingCode, openPrice);
                     } else {
@@ -96,7 +95,7 @@ public class OpenPriceScraper {
                     log.error("Error processing stock data: {}", stockData.getCompanyId(), e);
                 }
             }
-
+            stockDataRepository.saveAll(stockDataListToSave);
             log.info("=== Open Price Scraper completed. Success: {}, Failed: {} ===",
                     successCount, failureCount);
 
@@ -107,7 +106,7 @@ public class OpenPriceScraper {
 
     /**
      * Fetch open price for a symbol from DSE AJAX API
-     * 
+     *
      * @param symbol the trading code
      * @return the open price or null if not found
      */
@@ -157,7 +156,7 @@ public class OpenPriceScraper {
 
     /**
      * Parse open price from HTML response
-     * 
+     *
      * @param html   the HTML content
      * @param symbol the trading code (for logging)
      * @return the open price or null if not found
@@ -165,43 +164,10 @@ public class OpenPriceScraper {
     private BigDecimal parseOpenPrice(String html, String symbol) {
         try {
             Document doc = Jsoup.parse(html);
-
-            // Look for the price statistics table containing "Open"
-            Elements tables = doc.select("table");
-
-            for (Element table : tables) {
-                Elements rows = table.select("tr");
-                for (Element row : rows) {
-                    Elements cells = row.select("td, th");
-                    for (int i = 0; i < cells.size() - 1; i++) {
-                        String cellText = cells.get(i).text().trim();
-                        if ("Open".equalsIgnoreCase(cellText) || "Open:".equalsIgnoreCase(cellText)) {
-                            String valueText = cells.get(i + 1).text().trim();
-                            return parsePrice(valueText);
-                        }
-                    }
-                }
-            }
-
-            // Alternative: look for specific structure with labels
-            Elements allElements = doc.getAllElements();
-            for (Element el : allElements) {
-                if (el.text().contains("Open")) {
-                    Element sibling = el.nextElementSibling();
-                    if (sibling != null) {
-                        String value = sibling.text().trim();
-                        if (!value.isEmpty()) {
-                            BigDecimal price = parsePrice(value);
-                            if (price != null) {
-                                return price;
-                            }
-                        }
-                    }
-                }
-            }
-
-            log.debug("Could not find Open price in HTML for: {}", symbol);
-            return null;
+            String openPrice = doc.select("td:containsOwn(Open Price) + td")
+                    .text()
+                    .replace(": ", "");
+            return new BigDecimal(openPrice);
 
         } catch (Exception e) {
             log.error("Error parsing HTML for {}: {}", symbol, e.getMessage());
@@ -212,7 +178,7 @@ public class OpenPriceScraper {
     /**
      * Parse price string to BigDecimal
      * Handles comma-separated numbers and removes BDT/currency symbols
-     * 
+     *
      * @param priceText the price text
      * @return the parsed BigDecimal or null
      */

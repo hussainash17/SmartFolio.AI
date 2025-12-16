@@ -224,13 +224,6 @@ public class RealTimeMarketScraper {
                 changePercent = change.divide(ycp, 4, RoundingMode.HALF_UP)
                         .multiply(BigDecimal.valueOf(100));
             }
-
-            // Determine opening price - use LTP if close is 0, otherwise use YCP
-            BigDecimal openPrice = ycp;
-            if (closingPrice != null && closingPrice.compareTo(BigDecimal.ZERO) == 0) {
-                openPrice = ycp;
-            }
-
             log.debug("Parsed stock: {} - LTP: {}, High: {}, Low: {}, Change: {}, Volume: {}",
                     tradingCode, ltp, high, low, change, volume);
 
@@ -246,7 +239,6 @@ public class RealTimeMarketScraper {
                     .trade(trade)
                     .value(value)
                     .volume(volume)
-                    .openPrice(openPrice)
                     .build();
 
         } catch (Exception e) {
@@ -324,7 +316,6 @@ public class RealTimeMarketScraper {
         stockData.setChangePercent(priceDTO.getChangePercent() != null ? priceDTO.getChangePercent() : BigDecimal.ZERO);
         stockData.setHigh(priceDTO.getHigh() != null ? priceDTO.getHigh() : BigDecimal.ZERO);
         stockData.setLow(priceDTO.getLow() != null ? priceDTO.getLow() : BigDecimal.ZERO);
-        stockData.setOpenPrice(priceDTO.getOpenPrice() != null ? priceDTO.getOpenPrice() : BigDecimal.ZERO);
         stockData.setPreviousClose(priceDTO.getYcp() != null ? priceDTO.getYcp() : BigDecimal.ZERO);
         stockData.setVolume(priceDTO.getVolume());
         stockData.setTurnover(priceDTO.getValue() != null ? priceDTO.getValue() : BigDecimal.ZERO);
