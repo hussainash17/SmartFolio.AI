@@ -86,10 +86,6 @@ public class OpenPriceScraper {
                         failureCount++;
                         log.warn("Could not fetch open price for: {}", tradingCode);
                     }
-
-                    // Small delay to avoid overwhelming the server
-                    Thread.sleep(200);
-
                 } catch (Exception e) {
                     failureCount++;
                     log.error("Error processing stock data: {}", stockData.getCompanyId(), e);
