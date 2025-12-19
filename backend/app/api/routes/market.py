@@ -559,8 +559,11 @@ def list_fundamentals(
     from app.model.technical_indicators import DonchianChannelCache
     from sqlalchemy import func, desc, asc
 
-    # Subquery to get the latest calculation date
-    latest_date_subquery = select(func.max(DonchianChannelCache.calculation_date))
+    # Subquery to get the latest calculation date that has fundamental_score populated
+    latest_date_subquery = (
+        select(func.max(DonchianChannelCache.calculation_date))
+        .where(DonchianChannelCache.fundamental_score.isnot(None))
+    )
     latest_date = session.exec(latest_date_subquery).first()
 
     if not latest_date:
