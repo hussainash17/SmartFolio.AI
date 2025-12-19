@@ -917,11 +917,20 @@ public class FundamentalDataProcessor {
     private void processShareholdingPattern(Company company, Map<String, String> dataMap) {
         try {
             // Extract shareholding data
-            String yearStr = dataMap.get("Shareholding_Pattern_Year");
-            Integer year = htmlParserUtil.parseInteger(yearStr);
+            String dateStr = dataMap.get("Shareholding_Pattern_Date");
+            LocalDate date = dateFormatterUtil.parseDate(dateStr);
 
-            if (year == null) {
-                log.debug("No shareholding pattern year found for: {}", company.getTradingCode());
+            // Fallback for backward compatibility or if parsing fails
+            if (date == null) {
+                String yearStr = dataMap.get("Shareholding_Pattern_Year");
+                Integer year = htmlParserUtil.parseInteger(yearStr != null ? yearStr : dateStr);
+                if (year != null) {
+                    date = LocalDate.of(year, 12, 31);
+                }
+            }
+
+            if (date == null) {
+                log.debug("No valid shareholding pattern date found for: {}", company.getTradingCode());
                 return;
             }
 
@@ -938,9 +947,6 @@ public class FundamentalDataProcessor {
                 log.debug("No shareholding percentages found for: {}", company.getTradingCode());
                 return;
             }
-
-            // Convert year to LocalDate (use Dec 31 of that year as default)
-            LocalDate date = LocalDate.of(year, 12, 31);
 
             // Fetch existing or create new
             ShareholdingPattern shareholding = shareholdingPatternRepository
