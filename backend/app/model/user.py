@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from .funds import AccountTransaction
     from .risk_management import UserRiskProfile, RiskAlert, StockScreener
     from .funds import AccountTransaction
+    from .trading_idea import TradingIdea, IdeaComment, IdeaLike, UserFollow, SymbolFollow
 
 
 class AccountType(str, Enum):
@@ -296,6 +297,20 @@ class User(UserBase, table=True):
                                                                                sa_relationship_kwargs={"cascade": "all, delete"})
     accounts: list["UserAccount"] = Relationship(back_populates="user",
                                                  sa_relationship_kwargs={"cascade": "all, delete"})
+
+    # Trading Ideas relationships
+    trading_ideas: list["TradingIdea"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
+    idea_comments: list["IdeaComment"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
+    idea_likes: list["IdeaLike"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
+    followers: list["UserFollow"] = Relationship(
+        sa_relationship_kwargs={"primaryjoin": "UserFollow.followed_id == User.id", "cascade": "all, delete"},
+        back_populates="followed"
+    )
+    following: list["UserFollow"] = Relationship(
+        sa_relationship_kwargs={"primaryjoin": "UserFollow.follower_id == User.id", "cascade": "all, delete"},
+        back_populates="follower"
+    )
+    symbol_follows: list["SymbolFollow"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
 
 
 # KYC Pydantic models for API

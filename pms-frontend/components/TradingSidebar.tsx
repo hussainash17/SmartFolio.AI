@@ -3,10 +3,10 @@ import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Separator } from "./ui/separator";
-import { 
-  LayoutDashboard, 
-  PieChart, 
-  TrendingUp, 
+import {
+  LayoutDashboard,
+  PieChart,
+  TrendingUp,
   Search,
   ShieldCheck,
   FileText,
@@ -25,7 +25,8 @@ import {
   Shield,
   ChevronRight,
   Menu,
-  X
+  X,
+  Lightbulb
 } from "lucide-react";
 import { AuthUser } from "../hooks/useAuth";
 
@@ -84,6 +85,7 @@ export function TradingSidebar({ currentView, onViewChange, user, onLogout }: Tr
         { id: 'research', label: 'Analysis Tools', icon: <LineChart className="h-5 w-5" /> },
         { id: 'fundamentals', label: 'Fundamentals', icon: <Calculator className="h-5 w-5" /> },
         { id: 'news', label: 'News & Insights', icon: <Bell className="h-5 w-5" />, badge: '3' },
+        { id: 'ideas', label: 'Trading Ideas', icon: <Lightbulb className="h-5 w-5" />, isNew: true },
       ]
     },
     {
@@ -112,11 +114,10 @@ export function TradingSidebar({ currentView, onViewChange, user, onLogout }: Tr
         <Button
           variant={isActive ? "default" : "ghost"}
           onClick={() => onViewChange(item.id)}
-          className={`w-full justify-start h-12 px-4 mb-1 ${
-            isActive
+          className={`w-full justify-start h-12 px-4 mb-1 ${isActive
               ? 'bg-primary text-primary-foreground shadow-sm'
               : 'hover:bg-accent hover:text-accent-foreground text-muted-foreground hover:text-foreground'
-          } ${isCollapsed ? 'px-2' : ''}`}
+            } ${isCollapsed ? 'px-2' : ''}`}
         >
           <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} w-full`}>
             <div className="shrink-0">{item.icon}</div>
@@ -139,7 +140,7 @@ export function TradingSidebar({ currentView, onViewChange, user, onLogout }: Tr
             )}
           </div>
         </Button>
-        
+
         {/* Tooltip for collapsed state */}
         {isCollapsed && (
           <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 bg-popover text-popover-foreground text-sm rounded-md border shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
@@ -212,16 +213,15 @@ export function TradingSidebar({ currentView, onViewChange, user, onLogout }: Tr
           <Button
             variant="ghost"
             onClick={handleSignOut}
-            className={`w-full justify-start h-12 px-4 text-red-600 hover:text-red-700 hover:bg-red-50 ${
-              isCollapsed ? 'px-2' : ''
-            }`}
+            className={`w-full justify-start h-12 px-4 text-red-600 hover:text-red-700 hover:bg-red-50 ${isCollapsed ? 'px-2' : ''
+              }`}
           >
             <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} w-full`}>
               <LogOut className="h-5 w-5 shrink-0" />
               {!isCollapsed && <span className="text-sm font-medium">Sign Out</span>}
             </div>
           </Button>
-          
+
           {/* Tooltip for collapsed sign out */}
           {isCollapsed && (
             <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 bg-popover text-popover-foreground text-sm rounded-md border shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">

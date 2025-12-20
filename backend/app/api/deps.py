@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Optional
 
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -40,6 +40,28 @@ def get_current_user(session: SessionDep, token: TokenDep) -> User:
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def get_current_user_optional(
+    session: SessionDep, 
+    token: Annotated[Optional[str], Depends(reusable_oauth2)] = None
+) -> Optional[User]:
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[security.ALGORITHM]
+        )
+        token_data = TokenPayload(**payload)
+    except (InvalidTokenError, ValidationError):
+        return None
+    user = session.get(User, token_data.sub)
+    if not user or not user.is_active:
+        return None
+    return user
+
+
+CurrentUserOptional = Annotated[Optional[User], Depends(get_current_user_optional)]
 
 
 def get_current_active_superuser(current_user: CurrentUser) -> User:

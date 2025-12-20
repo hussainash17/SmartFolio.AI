@@ -1,4 +1,4 @@
-import { useEffect, useRef, memo, useState, useCallback } from 'react';
+import { useEffect, useRef, memo, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { useTradingViewQuote } from '../hooks/useTradingViewQuote';
 import { useTradingViewPositions, TradingViewPosition } from '../hooks/useTradingViewPositions';
 
@@ -11,6 +11,16 @@ interface TradingViewChartProps {
   onPlaceOrder?: (symbol: string, side: 'buy' | 'sell') => void;
   onClosePosition?: (portfolioId: string, positionId: string) => Promise<void>;
   onPositionUpdate?: () => void; // Callback when positions are updated
+  initialChartState?: any; // Chart state to load on mount (from widget.save())
+  onChartStateChange?: (chartState: any) => void; // Callback when chart state changes
+  enableSaveLoad?: boolean; // Whether to enable chart state saving/loading
+}
+
+// Expose ref methods for external access
+export interface TradingViewChartRef {
+  saveChartState: () => Promise<any>;
+  loadChartState: (state: any) => Promise<void>;
+  getWidget: () => any;
 }
 
 declare global {
@@ -20,16 +30,22 @@ declare global {
   }
 }
 
-export const TradingViewChart = memo(({
-  symbol = '',
-  interval = '1D',
-  theme = 'light',
-  autosize = true,
-  height = 600,
-  onPlaceOrder,
-  onClosePosition,
-  onPositionUpdate,
-}: TradingViewChartProps) => {
+export const TradingViewChart = memo(forwardRef<TradingViewChartRef, TradingViewChartProps>((
+  {
+    symbol = '',
+    interval = '1D',
+    theme = 'light',
+    autosize = true,
+    height = 600,
+    onPlaceOrder,
+    onClosePosition,
+    onPositionUpdate,
+    initialChartState,
+    onChartStateChange,
+    enableSaveLoad = false,
+  },
+  ref
+) => {
   void onClosePosition;
   void onPositionUpdate;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -45,6 +61,39 @@ export const TradingViewChart = memo(({
   const datafeedRef = useRef<any>(null);
   const lastPriceRef = useRef<number | null>(null);
   const symbolChangedHandlerRef = useRef<((info: any) => void) | null>(null);
+  const chartStateLoadedRef = useRef<boolean>(false);
+
+  // Expose methods via ref
+  useImperativeHandle(ref, () => ({
+    saveChartState: async () => {
+      if (!widgetRef.current) {
+        throw new Error('Widget not initialized');
+      }
+      return new Promise((resolve, reject) => {
+        try {
+          widgetRef.current.save((state: any) => {
+            resolve(state);
+          });
+        } catch (error) {
+          reject(error);
+        }
+      });
+    },
+    loadChartState: async (state: any) => {
+      if (!widgetRef.current) {
+        throw new Error('Widget not initialized');
+      }
+      return new Promise((resolve, reject) => {
+        try {
+          widgetRef.current.load(state);
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      });
+    },
+    getWidget: () => widgetRef.current,
+  }), []);
 
   // Use custom hooks for data fetching
   const { data: quoteData } = useTradingViewQuote({
@@ -320,6 +369,16 @@ export const TradingViewChart = memo(({
           const chart = widget.chart();
           chartRef.current = chart;
 
+          // Load initial chart state if provided
+          if (initialChartState && !chartStateLoadedRef.current) {
+            try {
+              widget.load(initialChartState);
+              chartStateLoadedRef.current = true;
+            } catch (error) {
+              console.error('Error loading initial chart state:', error);
+            }
+          }
+
           // Quote updates are now handled by useTradingViewQuote hook
           // Position updates are handled by useTradingViewPositions hook
 
@@ -494,7 +553,7 @@ export const TradingViewChart = memo(({
       />
     </div>
   );
-});
+}));
 
 TradingViewChart.displayName = 'TradingViewChart';
 

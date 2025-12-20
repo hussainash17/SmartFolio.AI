@@ -163,9 +163,8 @@ function GoalCard({ goal, onSelect, onDelete, isSelected }: any) {
 
   return (
     <Card
-      className={`cursor-pointer transition-all hover:shadow-lg ${
-        isSelected ? "ring-2 ring-primary shadow-lg" : ""
-      }`}
+      className={`cursor-pointer transition-all hover:shadow-lg ${isSelected ? "ring-2 ring-primary shadow-lg" : ""
+        }`}
       onClick={onSelect}
     >
       <CardHeader className="pb-3">
@@ -374,9 +373,8 @@ function GoalOverview({ goal, onUpdate }: any) {
                     {progress.milestones.map((milestone, idx) => (
                       <div
                         key={idx}
-                        className={`p-3 rounded-lg border ${
-                          milestone.achieved ? "bg-green-50 border-green-200" : "bg-gray-50"
-                        }`}
+                        className={`p-3 rounded-lg border ${milestone.achieved ? "bg-green-50 border-green-200" : "bg-gray-50"
+                          }`}
                       >
                         <div className="flex items-center gap-2 mb-1">
                           {milestone.achieved ? (
@@ -550,7 +548,7 @@ function GoalSIPCalculator({ goalId }: { goalId: string }) {
             <div className="space-y-4">
               <h4 className="font-semibold">Required Investment</h4>
               <div className="space-y-2">
-                    <div className="flex justify-between items-center p-4 bg-primary/10 rounded-lg">
+                <div className="flex justify-between items-center p-4 bg-primary/10 rounded-lg">
                   <span className="font-semibold">Monthly SIP Required</span>
                   <span className="text-2xl font-bold">{(sipCalc.required_monthly_sip ?? 0).toLocaleString()}</span>
                 </div>
@@ -671,8 +669,8 @@ function GoalWhatIfScenarios({ goalId }: { goalId: string }) {
                   scenarioType.includes("sip")
                     ? "e.g., 5000"
                     : scenarioType.includes("return")
-                    ? "e.g., 12"
-                    : ""
+                      ? "e.g., 12"
+                      : ""
                 }
               />
             </div>
@@ -696,7 +694,7 @@ function GoalWhatIfScenarios({ goalId }: { goalId: string }) {
                     <div className="flex justify-between">
                       <span>Monthly SIP</span>
                       <span className="font-semibold">
-                    {(whatIfMutation.data.original_scenario?.monthly_sip ?? 0).toLocaleString()}
+                        {(whatIfMutation.data.original_scenario?.monthly_sip ?? 0).toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -1103,7 +1101,7 @@ function GoalCreateForm({ onSuccess, onCreate }: any) {
 
         <div className="grid md:grid-cols-2 gap-4">
           <div>
-          <Label>Target Amount*</Label>
+            <Label>Target Amount*</Label>
             <Input
               type="number"
               required
@@ -1127,7 +1125,7 @@ function GoalCreateForm({ onSuccess, onCreate }: any) {
 
         <div className="grid md:grid-cols-2 gap-4">
           <div>
-          <Label>Current Amount</Label>
+            <Label>Current Amount</Label>
             <Input
               type="number"
               placeholder="e.g., 100000"
@@ -1139,7 +1137,7 @@ function GoalCreateForm({ onSuccess, onCreate }: any) {
           </div>
 
           <div>
-          <Label>Monthly Contribution</Label>
+            <Label>Monthly Contribution</Label>
             <Input
               type="number"
               placeholder="e.g., 10000"

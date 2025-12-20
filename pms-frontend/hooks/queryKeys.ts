@@ -111,4 +111,10 @@ export const queryKeys = {
   symbolEvents: (symbol: string, limit?: number) => ['events', 'symbol', symbol, limit ?? 10] as const,
   tradeHistory: (limit?: number) => ['trades', 'history', limit ?? 50] as const,
   aggregatedPortfolioHistory: (limit?: number) => ['portfolio', 'history', 'aggregated', limit ?? 30] as const,
+
+  // Trading Ideas
+  tradingIdeas: (params: any) => ['ideas', 'list', params] as const,
+  tradingIdea: (id: string) => ['ideas', 'detail', id] as const,
+  ideaComments: (id: string) => ['ideas', 'comments', id] as const,
+  userSocialProfile: (userId: string) => ['users', 'social-profile', userId] as const,
 };
