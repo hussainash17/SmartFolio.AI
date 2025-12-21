@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -67,6 +68,12 @@ public class StockData {
     @Column(name = "timestamp", nullable = false)
     private LocalDateTime timestamp;
 
+    @Column(name = "trading_date")
+    private LocalDate tradingDate;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
     @PrePersist
     protected void onCreate() {
         if (id == null) {
@@ -74,6 +81,12 @@ public class StockData {
         }
         if (timestamp == null) {
             timestamp = LocalDateTime.now();
+        }
+        if (tradingDate == null) {
+            tradingDate = LocalDate.now();
+        }
+        if (updatedAt == null) {
+            updatedAt = LocalDateTime.now();
         }
     }
 

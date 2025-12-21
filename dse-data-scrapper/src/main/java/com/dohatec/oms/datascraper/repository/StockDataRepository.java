@@ -112,4 +112,31 @@ public interface StockDataRepository extends JpaRepository<StockData, UUID> {
      */
     @Query("SELECT s FROM StockData s WHERE s.openPrice IS NULL")
     List<StockData> findByOpenPriceIsNull();
+
+    /**
+     * Find stock data by trading date
+     *
+     * @param tradingDate the trading date
+     * @return list of stock data
+     */
+    List<StockData> findByTradingDate(java.time.LocalDate tradingDate);
+
+    /**
+     * Find stock data by trading date where open price is null
+     *
+     * @param tradingDate the trading date
+     * @return list of stock data
+     */
+    List<StockData> findByTradingDateAndOpenPriceIsNull(java.time.LocalDate tradingDate);
+
+    /**
+     * Find stock data by trading date and updated before a specific time
+     *
+     * @param tradingDate   the trading date
+     * @param updatedBefore timestamp to compare against
+     * @return list of stock data
+     */
+    @Query("SELECT sd FROM StockData sd WHERE sd.tradingDate = :tradingDate AND sd.updatedAt < :updatedBefore")
+    List<StockData> findByTradingDateAndUpdatedAtBefore(@Param("tradingDate") java.time.LocalDate tradingDate,
+            @Param("updatedBefore") LocalDateTime updatedBefore);
 }

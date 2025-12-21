@@ -21,8 +21,14 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Service for scraping open prices from DSE AJAX API
@@ -47,56 +53,112 @@ public class OpenPriceScraper {
      * Scheduled task to scrape open prices during market hours
      * Runs every 5 minutes, Sunday to Thursday, 10:00 AM to 1:59 PM Dhaka timezone
      */
+    private static final int AGGRESSIVE_UPDATE_MINUTES = 30; // First 30 mins
+    private static final int MODERATE_UPDATE_MINUTES = 60; // Up to 60 mins
+
+    /**
+     * Scheduled task to scrape open prices during market hours
+     * Runs every 5 minutes, Sunday to Thursday, 10:00 AM to 1:59 PM Dhaka timezone
+     */
     @Transactional
     public void scrapeOpenPrices() {
         try {
-            log.info("=== Open Price Scraper started ===");
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime marketOpen = now.withHour(10).withMinute(0).withSecond(0);
+            long minutesSinceOpen = ChronoUnit.MINUTES.between(marketOpen, now);
 
-            // Find all stock data records with null open price
-            List<StockData> stocksWithNullOpen = stockDataRepository.findByOpenPriceIsNull();
-            log.info("Found {} stocks with null open price", stocksWithNullOpen.size());
+            log.info("=== Open Price Scraper started. Minutes since market open: {} ===", minutesSinceOpen);
 
-            if (stocksWithNullOpen.isEmpty()) {
-                log.info("No stocks need open price update");
+            // Determine which stocks need updates based on time windows
+            List<StockData> stocksToUpdate = getStocksNeedingUpdate(minutesSinceOpen);
+
+            if (stocksToUpdate.isEmpty()) {
+                log.info("No stocks need open price update at this time");
                 return;
             }
 
-            int successCount = 0;
-            int failureCount = 0;
-            List<StockData> stockDataListToSave = new java.util.ArrayList<>(List.of());
-            for (StockData stockData : stocksWithNullOpen) {
-                try {
-                    // Get company trading code
-                    Optional<Company> companyOpt = companyRepository.findById(stockData.getCompanyId());
-                    if (companyOpt.isEmpty()) {
-                        log.warn("Company not found for StockData: {}", stockData.getCompanyId());
-                        failureCount++;
-                        continue;
-                    }
+            log.info("Found {} stocks to update", stocksToUpdate.size());
 
-                    String tradingCode = companyOpt.get().getTradingCode();
-                    BigDecimal openPrice = fetchOpenPrice(tradingCode);
+            // Parallel processing with company data pre-fetched
+            Map<UUID, Company> companyMap = companyRepository.findAllById(
+                    stocksToUpdate.stream().map(StockData::getCompanyId).collect(Collectors.toList()))
+                    .stream().collect(Collectors.toMap(Company::getId, c -> c));
 
-                    if (openPrice != null) {
-                        stockData.setOpenPrice(openPrice);
-                        stockDataListToSave.add(stockData);
-                        successCount++;
-                        log.debug("Updated open price for {}: {}", tradingCode, openPrice);
-                    } else {
-                        failureCount++;
-                        log.warn("Could not fetch open price for: {}", tradingCode);
-                    }
-                } catch (Exception e) {
-                    failureCount++;
-                    log.error("Error processing stock data: {}", stockData.getCompanyId(), e);
-                }
+            List<StockData> updatedStocks = stocksToUpdate.parallelStream()
+                    .map(stockData -> processStockData(stockData, companyMap))
+                    .filter(Optional::isPresent)
+                    .map(Optional::get)
+                    .collect(Collectors.toList());
+
+            if (!updatedStocks.isEmpty()) {
+                stockDataRepository.saveAll(updatedStocks);
+                log.info("Successfully updated {} stocks", updatedStocks.size());
             }
-            stockDataRepository.saveAll(stockDataListToSave);
-            log.info("=== Open Price Scraper completed. Success: {}, Failed: {} ===",
-                    successCount, failureCount);
+
+            log.info("=== Open Price Scraper completed ===");
 
         } catch (Exception e) {
             log.error("Open Price Scraper failed", e);
+        }
+    }
+
+    /**
+     * Smart selection: Which stocks need updates based on time since market open
+     */
+    private List<StockData> getStocksNeedingUpdate(long minutesSinceOpen) {
+        LocalDate today = LocalDate.now();
+
+        if (minutesSinceOpen < 0) {
+            // Before market open - update stocks from today if any exist
+            return stockDataRepository.findByTradingDate(today);
+        } else if (minutesSinceOpen <= AGGRESSIVE_UPDATE_MINUTES) {
+            // First 30 mins: Update ALL stocks (aggressive correction window)
+            return stockDataRepository.findByTradingDate(today);
+        } else if (minutesSinceOpen <= MODERATE_UPDATE_MINUTES) {
+            // 30-60 mins: Update only stocks updated in last 15 mins (moderate window)
+            LocalDateTime fifteenMinutesAgo = LocalDateTime.now().minusMinutes(15);
+            return stockDataRepository.findByTradingDateAndUpdatedAtBefore(today, fifteenMinutesAgo);
+        } else {
+            // After 60 mins: Prices are stable, only update null prices
+            return stockDataRepository.findByTradingDateAndOpenPriceIsNull(today);
+        }
+    }
+
+    private Optional<StockData> processStockData(StockData stockData,
+            java.util.Map<java.util.UUID, Company> companyMap) {
+        try {
+            Company company = companyMap.get(stockData.getCompanyId());
+            if (company == null) {
+                log.warn("Company not found for StockData: {}", stockData.getCompanyId());
+                return Optional.empty();
+            }
+
+            String tradingCode = company.getTradingCode();
+            BigDecimal newOpenPrice = fetchOpenPrice(tradingCode);
+
+            if (newOpenPrice != null) {
+                BigDecimal oldOpenPrice = stockData.getOpenPrice();
+
+                // Only update if price changed or was null
+                if (oldOpenPrice == null || !oldOpenPrice.equals(newOpenPrice)) {
+                    stockData.setOpenPrice(newOpenPrice);
+                    stockData.setUpdatedAt(java.time.LocalDateTime.now()); // Track update time
+
+                    if (oldOpenPrice != null) {
+                        log.info("CORRECTED open price for {}: {} -> {}",
+                                tradingCode, oldOpenPrice, newOpenPrice);
+                    } else {
+                        log.debug("Set open price for {}: {}", tradingCode, newOpenPrice);
+                    }
+
+                    return Optional.of(stockData);
+                }
+            }
+
+            return Optional.empty();
+        } catch (Exception e) {
+            log.error("Error processing stock data: {}", stockData.getCompanyId(), e);
+            return Optional.empty();
         }
     }
 
