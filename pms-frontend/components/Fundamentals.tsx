@@ -26,7 +26,8 @@ import {
     MetricCard,
     calculateFundamentalScore,
     generateInsights,
-    exportToCSV
+    exportToCSV,
+    StockDetails
 } from "./fundamentals/index";
 import { QuickTradeDialog } from "./QuickTradeDialog";
 import { ShareholdingChart } from "./charts/ShareholdingChart";
@@ -342,64 +343,66 @@ export function Fundamentals({ defaultSymbol }: FundamentalsProps) {
 
     return (
         <div className="space-y-6">
-            {/* Top Control Bar */}
-            <Card>
-                <CardContent className="pt-6">
-                    <div className="flex flex-col lg:flex-row gap-4">
-                        {/* Search */}
-                        <div className="flex-1 relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search stocks by symbol or company name..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10"
-                            />
-                        </div>
+            {/* Top Control Bar - Hidden in Detail View */}
+            {viewMode !== 'detail' && (
+                <Card>
+                    <CardContent className="pt-6">
+                        <div className="flex flex-col lg:flex-row gap-4">
+                            {/* Search */}
+                            <div className="flex-1 relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search stocks by symbol or company name..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="pl-10"
+                                />
+                            </div>
 
-                        {/* View Toggle */}
-                        <div className="flex gap-2">
-                            <Button
-                                variant={viewMode === 'grid' ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => setViewMode('grid')}
-                            >
-                                <Grid3x3 className="h-4 w-4 mr-2" />
-                                Grid
-                            </Button>
-                            <Button
-                                variant={viewMode === 'detail' ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => selectedSymbol && setViewMode('detail')}
-                                disabled={!selectedSymbol}
-                            >
-                                <List className="h-4 w-4 mr-2" />
-                                Detail
-                            </Button>
-                            {comparisonBasket.length > 0 && (
+                            {/* View Toggle */}
+                            <div className="flex gap-2">
                                 <Button
-                                    variant={viewMode === 'comparison' ? 'default' : 'outline'}
+                                    variant={viewMode === 'grid' ? 'default' : 'outline'}
                                     size="sm"
-                                    onClick={() => setViewMode('comparison')}
+                                    onClick={() => setViewMode('grid')}
                                 >
-                                    <BarChart3 className="h-4 w-4 mr-2" />
-                                    Compare ({comparisonBasket.length})
+                                    <Grid3x3 className="h-4 w-4 mr-2" />
+                                    Grid
                                 </Button>
-                            )}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => selectedSymbol && setViewMode('detail')}
+                                    disabled={!selectedSymbol}
+                                >
+                                    <List className="h-4 w-4 mr-2" />
+                                    Detail
+                                </Button>
+                                {comparisonBasket.length > 0 && (
+                                    <Button
+                                        variant={viewMode === 'comparison' ? 'default' : 'outline'}
+                                        size="sm"
+                                        onClick={() => setViewMode('comparison')}
+                                    >
+                                        <BarChart3 className="h-4 w-4 mr-2" />
+                                        Compare ({comparisonBasket.length})
+                                    </Button>
+                                )}
+                            </div>
                         </div>
-                    </div>
 
-                    {viewMode === 'grid' && (
-                        <div className="mt-4">
-                            <FilterPanel
-                                filters={filters}
-                                onFiltersChange={setFilters}
-                                sectors={sectors}
-                            />
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                        {viewMode === 'grid' && (
+                            <div className="mt-4">
+                                <FilterPanel
+                                    filters={filters}
+                                    onFiltersChange={setFilters}
+                                    sectors={sectors}
+                                />
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Grid View */}
             {viewMode === 'grid' && (
@@ -583,381 +586,13 @@ export function Fundamentals({ defaultSymbol }: FundamentalsProps) {
                 </div>
             )}
 
-            {/* Detail View - Original Detailed Analysis */}
+            {/* Detail View - New Redesigned View */}
             {viewMode === 'detail' && selectedSymbol && (
-                <div className="space-y-6">
-                    {/* Back Button */}
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setViewMode('grid')}
-                    >
-                        ← Back to Grid
-                    </Button>
-
-                    {/* Hero Section */}
-                    <Card>
-                        <CardHeader className="pb-4">
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                                <div>
-                                    <CardTitle className="text-2xl font-bold flex items-center gap-2">
-                                        {companyInfo?.company_name || 'Fundamental Analysis'}
-                                        <Badge variant="outline" className="text-sm h-6">
-                                            {selectedSymbol}
-                                        </Badge>
-                                    </CardTitle>
-                                    <div className="text-sm text-muted-foreground mt-1">
-                                        {companyInfo?.sector} • {companyInfo?.category || 'N/A'}
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-wrap gap-2">
-                                    {marketSummary?.market_cap && (
-                                        <div className="text-right">
-                                            <div className="text-sm text-muted-foreground">Market Cap</div>
-                                            <div className="font-medium">{formatNumber(marketSummary.market_cap as any)}</div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </CardHeader>
-                    </Card>
-
-                    {/* Score and Insights Row */}
-                    {selectedStockScore && (
-                        <div className="grid md:grid-cols-2 gap-6">
-                            <FundamentalScoreCard
-                                overallScore={selectedStockScore.score}
-                                breakdown={selectedStockScore.breakdown}
-                                explanation="Based on valuation, dividend yield, financial health, profitability, and market strength"
-                            />
-                            <QuickInsightsPanel insights={selectedStockScore.insights} />
-                        </div>
-                    )}
-
-                    {/* Key Metrics Grid */}
-                    {(() => {
-                        const selectedStock = displayedStocks.find(s => s.symbol === selectedSymbol);
-                        if (!selectedStock) return null;
-                        
-                        return (
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <MetricCard
-                                    label="P/E Ratio"
-                                    value={formatNumber(selectedStock.pe)}
-                                    status={selectedStock.pe && selectedStock.pe > 0 && selectedStock.pe < 15 ? 'good' : selectedStock.pe && selectedStock.pe < 25 ? 'fair' : 'poor'}
-                                    description="Price-to-Earnings ratio indicates valuation"
-                                />
-                                <MetricCard
-                                    label="Dividend Yield"
-                                    value={formatPct(selectedStock.dividendYield)}
-                                    status={selectedStock.dividendYield && selectedStock.dividendYield > 3 ? 'good' : selectedStock.dividendYield && selectedStock.dividendYield > 1 ? 'fair' : 'poor'}
-                                    description="Annual dividend as percentage of price"
-                                />
-                                <MetricCard
-                                    label="Market Cap"
-                                    value={`${formatNumber(selectedStock.marketCap)}M`}
-                                    description="Total market value of the company"
-                                />
-                                <MetricCard
-                                    label="NAV/Share"
-                                    value={formatNumber(selectedStock.navPerShare)}
-                                    description="Net Asset Value per share"
-                                />
-                            </div>
-                        );
-                    })()}
-
-                    {/* Detailed Tabs */}
-                    <Tabs defaultValue="overview">
-                        <TabsList className="flex flex-wrap gap-2">
-                            <TabsTrigger value="overview"><Building2 className="h-4 w-4 mr-1" /> Overview</TabsTrigger>
-                            <TabsTrigger value="earnings"><TrendingUp className="h-4 w-4 mr-1" /> Earnings</TabsTrigger>
-                            <TabsTrigger value="financial-health"><Activity className="h-4 w-4 mr-1" /> Financial Health</TabsTrigger>
-                            <TabsTrigger value="shareholding"><Users className="h-4 w-4 mr-1" /> Shareholding</TabsTrigger>
-                            <TabsTrigger value="dividends"><Percent className="h-4 w-4 mr-1" /> Dividends</TabsTrigger>
-                            <TabsTrigger value="ratios"><BarChart3 className="h-4 w-4 mr-1" /> Historical Ratios</TabsTrigger>
-                            <TabsTrigger value="chart"><LineChart className="h-4 w-4 mr-1" /> Price Chart</TabsTrigger>
-                        </TabsList>
-
-                        {/* Overview Tab */}
-                        <TabsContent value="overview" className="space-y-4">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Company Profile & Listing</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                                        <div><div className="text-muted-foreground">Trading Code</div><div className="font-medium">{companyInfo?.trading_code || selectedSymbol || "-"}</div></div>
-                                        <div><div className="text-muted-foreground">Company Name</div><div className="font-medium">{companyInfo?.company_name || "-"}</div></div>
-                                        <div><div className="text-muted-foreground">Sector</div><div className="font-medium">{companyInfo?.sector || "-"}</div></div>
-                                        <div><div className="text-muted-foreground">Category</div><div className="font-medium">{companyInfo?.category || "-"}</div></div>
-                                        <div><div className="text-muted-foreground">Listing Year</div><div className="font-medium">{companyInfo?.listing_year || "-"}</div></div>
-                                        <div><div className="text-muted-foreground">Website</div><div className="font-medium text-blue-600 dark:text-blue-400">{companyInfo?.website || "-"}</div></div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Market Summary</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                        <div>
-                                            <div className="text-muted-foreground">Last Price (LTP)</div>
-                                            <div className="font-bold text-lg">{marketSummary?.ltp}</div>
-                                        </div>
-                                        <div><div className="text-muted-foreground">Current P/E</div><div className="font-medium">{formatNumber(marketSummary?.current_pe)}</div></div>
-                                        <div><div className="text-muted-foreground">Dividend Yield</div><div className="font-medium">{formatPct(marketSummary?.dividend_yield)}</div></div>
-                                        <div><div className="text-muted-foreground">NAV</div><div className="font-medium">{formatTk(marketSummary?.nav)}</div></div>
-                                        <div><div className="text-muted-foreground">Market Cap</div><div className="font-medium">{formatTk(marketSummary?.market_cap)}M</div></div>
-                                        <div><div className="text-muted-foreground">52W Low</div><div className="font-medium">{formatTk(marketSummary?.week_52_range?.low)}</div></div>
-                                        <div><div className="text-muted-foreground">52W High</div><div className="font-medium">{formatTk(marketSummary?.week_52_range?.high)}</div></div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-
-                        {/* Earnings Tab */}
-                        <TabsContent value="earnings" className="space-y-4">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Earnings & Profitability</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {earnings ? (
-                                        <div className="space-y-4">
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                                <div>
-                                                    <div className="text-sm text-muted-foreground">Revenue</div>
-                                                    <div className="text-lg font-semibold">{formatNumber((earnings as any).revenue)}M</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-sm text-muted-foreground">Net Profit</div>
-                                                    <div className="text-lg font-semibold">{formatNumber((earnings as any).net_profit)}M</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-sm text-muted-foreground">EPS</div>
-                                                    <div className="text-lg font-semibold">{formatNumber((earnings as any).eps)}</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-sm text-muted-foreground">ROE</div>
-                                                    <div className="text-lg font-semibold">{formatPct((earnings as any).roe)}</div>
-                                                </div>
-                                            </div>
-                                            <Separator />
-                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                                                <div><span className="text-muted-foreground">Operating Profit:</span> <span className="font-medium">{formatNumber((earnings as any).operating_profit)}M</span></div>
-                                                <div><span className="text-muted-foreground">Profit Margin:</span> <span className="font-medium">{formatPct((earnings as any).profit_margin)}</span></div>
-                                                <div><span className="text-muted-foreground">ROA:</span> <span className="font-medium">{formatPct((earnings as any).roa)}</span></div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="text-center text-muted-foreground py-8">No earnings data available</div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-
-                        {/* Financial Health Tab */}
-                        <TabsContent value="financial-health" className="space-y-4">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Financial Health</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {financialHealth ? (
-                                        <div className="space-y-4">
-                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                                <div>
-                                                    <div className="text-sm text-muted-foreground">Total Assets</div>
-                                                    <div className="text-lg font-semibold">{formatNumber((financialHealth as any).total_assets)}M</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-sm text-muted-foreground">Total Liabilities</div>
-                                                    <div className="text-lg font-semibold">{formatNumber((financialHealth as any).total_liabilities)}M</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-sm text-muted-foreground">Total Equity</div>
-                                                    <div className="text-lg font-semibold">{formatNumber(financialHealth.reserve_and_surplus)}M</div>
-                                                </div>
-                                            </div>
-                                            <Separator />
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                                <div><span className="text-muted-foreground">Total Loan:</span> <span className="font-medium">{formatNumber(financialHealth.total_loan)}M</span></div>
-                                                <div><span className="text-muted-foreground">Current Assets:</span> <span className="font-medium">{formatNumber((financialHealth as any).current_assets)}M</span></div>
-                                                <div><span className="text-muted-foreground">Current Liabilities:</span> <span className="font-medium">{formatNumber((financialHealth as any).current_liabilities)}M</span></div>
-                                                <div>
-                                                    <span className="text-muted-foreground">Current Ratio:</span>
-                                                    <span className="font-medium ml-1">
-                                                        {formatNumber(Number((financialHealth as any).current_assets) / Math.max(1, Number((financialHealth as any).current_liabilities)))}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="text-center text-muted-foreground py-8">No financial health data available</div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-
-                        {/* Shareholding Tab */}
-                        <TabsContent value="shareholding" className="space-y-4">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Shareholding Pattern</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {shareholding ? (
-                                        <div className="space-y-6">
-                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                                <div>
-                                                    <div className="text-sm text-muted-foreground">Sponsor/Directors</div>
-                                                    <div className="text-lg font-semibold">{formatPct((shareholding as any).sponsor_director)}</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-sm text-muted-foreground">Public shareholding</div>
-                                                    <div className="text-lg font-semibold">{formatPct((shareholding as any).public_shareholding)}</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-sm text-muted-foreground">Institutional</div>
-                                                    <div className="text-lg font-semibold">{formatPct((shareholding as any).institutional)}</div>
-                                                </div>
-                                            </div>
-                                            {(shareholding as any).sponsor_director && (shareholding as any).public_shareholding && (
-                                                <ShareholdingChart
-                                                    data={[
-                                                        { name: 'Sponsor/Directors', value: Number((shareholding as any).sponsor_director), color: '#0088FE' },
-                                                        { name: 'Public', value: Number((shareholding as any).public_shareholding), color: '#00C49F' },
-                                                        { name: 'Institutional', value: Number((shareholding as any).institutional) || 0, color: '#FFBB28' },
-                                                        { name: 'Government', value: Number((shareholding as any).government) || 0, color: '#FF8042' },
-                                                        { name: 'Foreign', value: Number((shareholding as any).foreign) || 0, color: '#8884d8' },
-                                                    ].filter(item => item.value > 0)}
-                                                />
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className="text-center text-muted-foreground py-8">No shareholding data available</div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-
-                        {/* Dividends Tab */}
-                        <TabsContent value="dividends" className="space-y-4">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Dividend History</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {dividends && Array.isArray(dividends) && dividends.length > 0 ? (
-                                        <div className="space-y-6">
-                                            <Table>
-                                                <TableHeader>
-                                                    <TableRow>
-                                                        <TableHead>Year</TableHead>
-                                                        <TableHead>Type</TableHead>
-                                                        <TableHead>Cash Dividend</TableHead>
-                                                        <TableHead>Stock Dividend</TableHead>
-                                                        <TableHead>Record Date</TableHead>
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {dividends.map((div: any, idx: number) => (
-                                                        <TableRow key={idx}>
-                                                            <TableCell className="font-medium">{div.year || '-'}</TableCell>
-                                                            <TableCell>{div.dividend_type || '-'}</TableCell>
-                                                            <TableCell>{div.cash_dividend ? `${div.cash_dividend}%` : '-'}</TableCell>
-                                                            <TableCell>{div.stock_dividend ? `${div.stock_dividend}%` : '-'}</TableCell>
-                                                            <TableCell>{div.record_date || '-'}</TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
-                                            <DividendsChart data={dividends as any} />
-                                        </div>
-                                    ) : (
-                                        <div className="text-center text-muted-foreground py-8">No dividend history available</div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-
-                        {/* Historical Ratios Tab */}
-                        <TabsContent value="ratios" className="space-y-4">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Historical Financial Ratios</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {historicalRatios && Array.isArray(historicalRatios) && historicalRatios.length > 0 ? (
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Year</TableHead>
-                                                    <TableHead>P/E Ratio</TableHead>
-                                                    <TableHead>ROE (%)</TableHead>
-                                                    <TableHead>ROA (%)</TableHead>
-                                                    <TableHead>Debt/Equity</TableHead>
-                                                    <TableHead>EPS</TableHead>
-                                                    <TableHead>NAV</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {historicalRatios.map((ratio: any, idx: number) => (
-                                                    <TableRow key={idx}>
-                                                        <TableCell className="font-medium">{ratio.year || '-'}</TableCell>
-                                                        <TableCell>{formatNumber(ratio.pe_ratio)}</TableCell>
-                                                        <TableCell>{formatNumber(ratio.roe)}</TableCell>
-                                                        <TableCell>{formatNumber(ratio.roa)}</TableCell>
-                                                        <TableCell>{formatNumber(ratio.debt_to_equity)}</TableCell>
-                                                        <TableCell>{formatNumber(ratio.eps)}</TableCell>
-                                                        <TableCell>{formatNumber(ratio.nav)}</TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    ) : (
-                                        <div className="text-center text-muted-foreground py-8">No historical ratio data available</div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-                        <TabsContent value="chart">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>5-Year Price History</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {chartLoading ? (
-                                        <div className="flex items-center justify-center h-96">
-                                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-                                        </div>
-                                    ) : Array.isArray(chart) && chart.length > 0 ? (
-                                        <div className="h-[500px] w-full">
-                                            <PriceChart
-                                                data={chart.map(c => ({
-                                                    time: c.date,
-                                                    open: c.open,
-                                                    high: c.high,
-                                                    low: c.low,
-                                                    close: c.close,
-                                                    volume: c.volume || 0
-                                                }))}
-                                            />
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center justify-center h-96 text-muted-foreground">
-                                            No chart data available
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-                    </Tabs>
-                </div>
+                <StockDetails
+                    symbol={selectedSymbol}
+                    data={displayedStocks.find(s => s.symbol === selectedSymbol)}
+                    onBack={() => setViewMode('grid')}
+                />
             )}
 
             {/* Quick Trade Dialog */}
