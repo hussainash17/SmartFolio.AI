@@ -58,14 +58,6 @@ export type AlertUpdate = {
     notes?: (string | null);
 };
 
-export type AllocationTargetCreate = {
-    category: string;
-    category_type?: string;
-    target_percent: (number | string);
-    min_percent?: (number | string | null);
-    max_percent?: (number | string | null);
-};
-
 export type AllocationTargetPublic = {
     category: string;
     category_type?: string;
@@ -116,6 +108,257 @@ export type AttributionResponse = {
 };
 
 /**
+ * Performance metrics from backtest.
+ */
+export type BacktestMetrics = {
+    /**
+     * Total return percentage
+     */
+    total_return_pct: number;
+    /**
+     * Total profit in absolute terms
+     */
+    total_profit: number;
+    /**
+     * Maximum drawdown percentage
+     */
+    max_drawdown_pct: number;
+    /**
+     * Sharpe ratio (risk-adjusted return)
+     */
+    sharpe?: (number | null);
+    /**
+     * Percentage of winning trades
+     */
+    win_rate?: (number | null);
+    /**
+     * Total number of trades executed
+     */
+    total_trades: number;
+};
+
+/**
+ * Parameters for backtesting strategies.
+ */
+export type BacktestParams = {
+    /**
+     * Initial cash amount
+     */
+    init_cash?: number;
+    /**
+     * Fast moving average period
+     */
+    fast?: number;
+    /**
+     * Slow moving average period
+     */
+    slow?: number;
+    /**
+     * RSI calculation window
+     */
+    rsi_window?: number;
+    /**
+     * RSI oversold threshold (buy signal)
+     */
+    rsi_buy_below?: number;
+    /**
+     * RSI overbought threshold (sell signal)
+     */
+    rsi_sell_above?: number;
+    /**
+     * Bollinger Bands calculation window
+     */
+    bb_window?: number;
+    /**
+     * Standard deviation multiplier
+     */
+    bb_n?: number;
+    /**
+     * MACD fast period
+     */
+    macd_fast?: number;
+    /**
+     * MACD slow period
+     */
+    macd_slow?: number;
+    /**
+     * MACD signal period
+     */
+    macd_signal?: number;
+    /**
+     * Stochastic %K calculation window
+     */
+    stoch_k_window?: number;
+    /**
+     * Stochastic %D smoothing period
+     */
+    stoch_d_window?: number;
+    /**
+     * Stochastic oversold threshold (buy signal)
+     */
+    stoch_buy_below?: number;
+    /**
+     * Stochastic overbought threshold (sell signal)
+     */
+    stoch_sell_above?: number;
+    /**
+     * ATR calculation window
+     */
+    atr_window?: number;
+    /**
+     * Lookback period for high/low bands
+     */
+    atr_lookback?: number;
+    /**
+     * ATR multiplier for breakout bands
+     */
+    atr_multiplier?: number;
+    /**
+     * Short moving average period
+     */
+    ma_short?: number;
+    /**
+     * Medium moving average period
+     */
+    ma_medium?: number;
+    /**
+     * Long moving average period
+     */
+    ma_long?: number;
+    /**
+     * Window for z-score calculation
+     */
+    zscore_window?: number;
+    /**
+     * Z-score threshold for mean reversion signals
+     */
+    zscore_threshold?: number;
+    /**
+     * ADX calculation window
+     */
+    adx_window?: number;
+    /**
+     * ADX threshold for trend strength
+     */
+    adx_threshold?: number;
+    /**
+     * Tenkan-sen (conversion line) period
+     */
+    ichimoku_conversion?: number;
+    /**
+     * Kijun-sen (base line) period
+     */
+    ichimoku_base?: number;
+    /**
+     * Senkou Span B period
+     */
+    ichimoku_span_b?: number;
+    /**
+     * Williams %R calculation period
+     */
+    williams_period?: number;
+    /**
+     * Williams %R oversold threshold
+     */
+    williams_buy_below?: number;
+    /**
+     * Williams %R overbought threshold
+     */
+    williams_sell_above?: number;
+    /**
+     * CCI calculation window
+     */
+    cci_window?: number;
+    /**
+     * CCI oversold threshold
+     */
+    cci_buy_below?: number;
+    /**
+     * CCI overbought threshold
+     */
+    cci_sell_above?: number;
+    /**
+     * VWMA calculation period
+     */
+    vwma_period?: number;
+    /**
+     * Donchian Channel period
+     */
+    donchian_period?: number;
+    /**
+     * Momentum calculation period
+     */
+    momentum_period?: number;
+    /**
+     * Momentum threshold (5% change)
+     */
+    momentum_threshold?: number;
+    /**
+     * Lookback period for support/resistance levels
+     */
+    sr_lookback?: number;
+    /**
+     * Price touch threshold (2% from level)
+     */
+    sr_touch_threshold?: number;
+};
+
+/**
+ * Request payload for running a backtest.
+ */
+export type BacktestRequest = {
+    /**
+     * Stock symbol to backtest
+     */
+    symbol: string;
+    /**
+     * Start date for backtest
+     */
+    from_: string;
+    /**
+     * End date for backtest
+     */
+    to: string;
+    /**
+     * Strategy to use
+     */
+    strategy: 'buy_hold' | 'sma' | 'ema' | 'rsi' | 'bbands' | 'macd' | 'stochastic' | 'atr_breakout' | 'triple_ma' | 'zscore_reversion' | 'adx_trend' | 'ichimoku' | 'williams_r' | 'cci' | 'vwma_crossover' | 'donchian' | 'momentum' | 'sr_reversion';
+    /**
+     * Strategy parameters
+     */
+    params?: BacktestParams;
+};
+
+/**
+ * Strategy to use
+ */
+export type strategy = 'buy_hold' | 'sma' | 'ema' | 'rsi' | 'bbands' | 'macd' | 'stochastic' | 'atr_breakout' | 'triple_ma' | 'zscore_reversion' | 'adx_trend' | 'ichimoku' | 'williams_r' | 'cci' | 'vwma_crossover' | 'donchian' | 'momentum' | 'sr_reversion';
+
+/**
+ * Response containing backtest results.
+ */
+export type BacktestResponse = {
+    /**
+     * Performance metrics
+     */
+    metrics: BacktestMetrics;
+    /**
+     * Portfolio value over time
+     */
+    equity_curve: Array<EquityCurvePoint>;
+    /**
+     * List of executed trades
+     */
+    trades: Array<TradeRecord>;
+    /**
+     * Price data with signals for charting
+     */
+    price_data?: Array<{
+        [key: string]: unknown;
+    }>;
+};
+
+/**
  * Benchmark comparison for a single period
  */
 export type BenchmarkComparisonPeriod = {
@@ -161,10 +404,6 @@ export type BenchmarkPublic = {
     created_at: string;
 };
 
-export type Body_analytics_upsert_allocation_targets = {
-    targets: Array<AllocationTargetCreate>;
-};
-
 export type Body_login_login_access_token = {
     grant_type?: (string | null);
     username: string;
@@ -176,6 +415,11 @@ export type Body_login_login_access_token = {
 
 export type Body_portfolio_upload_portfolio_statement = {
     file: (Blob | File);
+};
+
+export type Body_risk_management_update_risk_alert = {
+    is_active?: (boolean | null);
+    resolved_at?: (string | null);
 };
 
 /**
@@ -342,6 +586,20 @@ export type DividendHistory = {
 export type EarningsProfitResponse = {
     quarters?: Array<QuarterlyEarnings>;
     annual?: (AnnualEarnings | null);
+};
+
+/**
+ * Single point on the equity curve.
+ */
+export type EquityCurvePoint = {
+    /**
+     * Date in YYYY-MM-DD format
+     */
+    time: string;
+    /**
+     * Portfolio value at this point
+     */
+    value: number;
 };
 
 /**
@@ -546,6 +804,22 @@ export type HoldingItem_Output = {
 export type HTTPValidationError = {
     detail?: Array<ValidationError>;
 };
+
+export type IdeaBias = 'LONG' | 'SHORT' | 'NEUTRAL';
+
+export type IdeaCommentCreate = {
+    content: string;
+};
+
+export type IdeaCommentPublic = {
+    content: string;
+    id: string;
+    idea_id: string;
+    user_id: string;
+    created_at: string;
+};
+
+export type IdeaTimeframe = '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1D' | '1W' | '1M';
 
 /**
  * Investment objectives
@@ -778,6 +1052,25 @@ export type NewsPublic = {
     updated_at: string;
 };
 
+export type NewsPublicWithSymbols = {
+    title: string;
+    content: string;
+    summary?: (string | null);
+    source: string;
+    source_url?: (string | null);
+    author?: (string | null);
+    category: string;
+    tags?: Array<(string)>;
+    sentiment?: (string | null);
+    sentiment_score?: (string | null);
+    published_at: string;
+    is_active?: boolean;
+    id: string;
+    created_at: string;
+    updated_at: string;
+    symbols?: Array<(string)>;
+};
+
 export type OrderCreate = {
     order_type: OrderType;
     side: OrderSide;
@@ -961,11 +1254,21 @@ export type PerformanceSummaryResponse = {
     summary: PerformanceSummary;
 };
 
+export type PortfolioAggregatedHistory = {
+    valuation_date: (string);
+    total_value: number;
+    cash_value: number;
+    securities_value: number;
+    daily_return: number;
+    cumulative_return: number;
+};
+
 export type PortfolioCreate = {
     name: string;
     description?: (string | null);
     is_default?: boolean;
     is_active?: boolean;
+    broker_commission?: (number | string);
 };
 
 export type PortfolioPositionPublic = {
@@ -986,11 +1289,18 @@ export type PortfolioPublic = {
     description?: (string | null);
     is_default?: boolean;
     is_active?: boolean;
+    broker_commission: string;
     id: string;
     user_id: string;
     created_at: string;
     updated_at: string;
     cash_balance?: (string | null);
+    realized_pnl?: (string | null);
+};
+
+export type PortfolioSparklinePoint = {
+    valuation_date: (string);
+    total_value: number;
 };
 
 /**
@@ -1026,6 +1336,7 @@ export type PortfolioUpdate = {
     is_default?: (boolean | null);
     is_active?: (boolean | null);
     cash_balance?: (number | string | null);
+    broker_commission?: (number | string | null);
 };
 
 export type PrivateUserCreate = {
@@ -1180,6 +1491,16 @@ export type RebalancingTradePublic = {
     quantity: number;
     price: string;
     value: string;
+};
+
+export type RiskAlertCreate = {
+    alert_type: string;
+    severity: string;
+    message: string;
+    metric_value?: (number | string | null);
+    threshold_value?: (number | string | null);
+    is_active?: boolean;
+    portfolio_id?: (string | null);
 };
 
 export type RiskAlertPublic = {
@@ -1361,6 +1682,40 @@ export type TradePublic = {
     created_at: string;
 };
 
+/**
+ * Record of a single trade.
+ */
+export type TradeRecord = {
+    /**
+     * Entry date in YYYY-MM-DD format
+     */
+    entry_time: string;
+    /**
+     * Exit date (None if still open)
+     */
+    exit_time?: (string | null);
+    /**
+     * Entry price
+     */
+    entry_price: number;
+    /**
+     * Exit price
+     */
+    exit_price?: (number | null);
+    /**
+     * Position size (number of shares)
+     */
+    size: number;
+    /**
+     * Profit/loss for this trade
+     */
+    pnl: number;
+    /**
+     * Return percentage for this trade
+     */
+    return_pct: number;
+};
+
 export type TradeUpdate = {
     trade_type?: (string | null);
     quantity?: (number | null);
@@ -1394,7 +1749,90 @@ export type TradeWithDetails = {
     company_name: string;
 };
 
+export type TradingIdeaCreate = {
+    title: string;
+    content: string;
+    symbols?: Array<(string)>;
+    timeframe?: (IdeaTimeframe | null);
+    bias?: (IdeaBias | null);
+    chart_state?: ({
+    [key: string]: unknown;
+} | null);
+};
+
+export type TradingIdeaPublic = {
+    title: string;
+    content: string;
+    symbols?: Array<(string)>;
+    timeframe?: (IdeaTimeframe | null);
+    bias?: (IdeaBias | null);
+    chart_state?: ({
+    [key: string]: unknown;
+} | null);
+    id: string;
+    user_id: string;
+    view_count: number;
+    is_published: boolean;
+    created_at: string;
+    updated_at: string;
+    like_count?: number;
+    comment_count?: number;
+};
+
+export type TradingIdeaUpdate = {
+    title?: (string | null);
+    content?: (string | null);
+    symbols?: (Array<(string)> | null);
+    timeframe?: (IdeaTimeframe | null);
+    bias?: (IdeaBias | null);
+    chart_state?: ({
+    [key: string]: unknown;
+} | null);
+    is_published?: (boolean | null);
+};
+
 export type TransactionType = 'DEPOSIT' | 'WITHDRAWAL' | 'BUY' | 'SELL' | 'ORDER_PLACED' | 'ORDER_CANCELLED' | 'DIVIDEND' | 'FEE' | 'ADJUSTMENT';
+
+export type UpcomingEventCreate = {
+    code: string;
+    post_date: string;
+    timestamp: number;
+    date: string;
+    time: string;
+    type: string;
+};
+
+export type UpcomingEventPublic = {
+    code: string;
+    post_date: string;
+    timestamp: number;
+    date: string;
+    time: string;
+    type: string;
+    id: string;
+    created_at: string;
+    updated_at: string;
+};
+
+/**
+ * Pagination response model for upcoming events
+ */
+export type UpcomingEventsPublic = {
+    data: Array<UpcomingEventPublic>;
+    count: number;
+    page: number;
+    limit: number;
+    total_pages: number;
+};
+
+export type UpcomingEventUpdate = {
+    code?: (string | null);
+    post_date?: (string | null);
+    timestamp?: (number | null);
+    date?: (string | null);
+    time?: (string | null);
+    type?: (string | null);
+};
 
 export type UpdatePassword = {
     current_password: string;
@@ -1795,10 +2233,57 @@ export type AnalyticsGetAllocationTargetsResponse = (Array<AllocationTargetPubli
 
 export type AnalyticsUpsertAllocationTargetsData = {
     portfolioId: string;
-    requestBody: Body_analytics_upsert_allocation_targets;
+    requestBody: {
+        [key: string]: unknown;
+    };
 };
 
 export type AnalyticsUpsertAllocationTargetsResponse = (Array<AllocationTargetPublic>);
+
+export type AnalyticsGetSectorsListResponse = (unknown);
+
+export type AnalyticsGetTopLiquidStocksBySectorData = {
+    /**
+     * Number of stocks to return
+     */
+    limit?: number;
+    /**
+     * Sector name
+     */
+    sector: string;
+};
+
+export type AnalyticsGetTopLiquidStocksBySectorResponse = (unknown);
+
+export type AnalyticsGetDonchianChannelData = {
+    /**
+     * Comma-separated list of periods (e.g., '5,10,20')
+     */
+    periods?: string;
+    symbol: string;
+};
+
+export type AnalyticsGetDonchianChannelResponse = (unknown);
+
+export type AnalyticsGetProfitTargetsData = {
+    /**
+     * Current market price
+     */
+    currentPrice: number;
+    /**
+     * Entry price of the position
+     */
+    entryPrice: number;
+    symbol: string;
+};
+
+export type AnalyticsGetProfitTargetsResponse = (unknown);
+
+export type AnalyticsGetPortfolioImpactResponse = (unknown);
+
+export type AnalyticsGetUserAllocationResponse = (unknown);
+
+export type AnalyticsGetUserHoldingsResponse = (unknown);
 
 export type DashboardGetDashboardSummaryResponse = (unknown);
 
@@ -1922,6 +2407,101 @@ export type FundsUpdateFundsSettingsData = {
 };
 
 export type FundsUpdateFundsSettingsResponse = (unknown);
+
+export type IdeasListIdeasData = {
+    bias?: (IdeaBias | null);
+    limit?: number;
+    offset?: number;
+    symbol?: (string | null);
+    timeframe?: (IdeaTimeframe | null);
+    userId?: (string | null);
+};
+
+export type IdeasListIdeasResponse = (Array<{
+    [key: string]: unknown;
+}>);
+
+export type IdeasCreateIdeaData = {
+    requestBody: TradingIdeaCreate;
+};
+
+export type IdeasCreateIdeaResponse = (TradingIdeaPublic);
+
+export type IdeasGetIdeaData = {
+    id: string;
+};
+
+export type IdeasGetIdeaResponse = ({
+    [key: string]: unknown;
+});
+
+export type IdeasUpdateIdeaData = {
+    id: string;
+    requestBody: TradingIdeaUpdate;
+};
+
+export type IdeasUpdateIdeaResponse = (TradingIdeaPublic);
+
+export type IdeasDeleteIdeaData = {
+    id: string;
+};
+
+export type IdeasDeleteIdeaResponse = (unknown);
+
+export type IdeasToggleLikeData = {
+    id: string;
+};
+
+export type IdeasToggleLikeResponse = (unknown);
+
+export type IdeasAddCommentData = {
+    id: string;
+    requestBody: IdeaCommentCreate;
+};
+
+export type IdeasAddCommentResponse = (IdeaCommentPublic);
+
+export type IdeasGetCommentsData = {
+    id: string;
+    limit?: number;
+    offset?: number;
+};
+
+export type IdeasGetCommentsResponse = (Array<{
+    [key: string]: unknown;
+}>);
+
+export type IdeasFollowUserData = {
+    userId: string;
+};
+
+export type IdeasFollowUserResponse = (unknown);
+
+export type IdeasUnfollowUserData = {
+    userId: string;
+};
+
+export type IdeasUnfollowUserResponse = (unknown);
+
+export type IdeasFollowSymbolData = {
+    symbol: string;
+};
+
+export type IdeasFollowSymbolResponse = (unknown);
+
+export type IdeasUnfollowSymbolData = {
+    symbol: string;
+};
+
+export type IdeasUnfollowSymbolResponse = (unknown);
+
+export type IdeasGetUserProfileData = {
+    userId: string;
+};
+
+export type IdeasGetUserProfileResponse = ({
+    [key: string]: unknown;
+});
 
 export type ItemsReadItemsData = {
     limit?: number;
@@ -2095,7 +2675,39 @@ export type LoginRecoverPasswordHtmlContentData = {
 
 export type LoginRecoverPasswordHtmlContentResponse = (string);
 
+export type MarketGetBenchmarkLast5DaysData = {
+    benchmarkId: string;
+    /**
+     * Number of trading days to fetch
+     */
+    days?: number;
+};
+
+export type MarketGetBenchmarkLast5DaysResponse = ({
+    [key: string]: unknown;
+});
+
+export type MarketGetBenchmarkDataData = {
+    benchmarkId: string;
+};
+
+export type MarketGetBenchmarkDataResponse = ({
+    [key: string]: unknown;
+});
+
+export type MarketGetBenchmarkPerformanceData = {
+    benchmarkId: string;
+};
+
+export type MarketGetBenchmarkPerformanceResponse = ({
+    [key: string]: unknown;
+});
+
 export type MarketGetMarketSummaryResponse = ({
+    [key: string]: unknown;
+});
+
+export type MarketGetStockDistributionResponse = ({
     [key: string]: unknown;
 });
 
@@ -2110,6 +2722,72 @@ export type MarketListStocksData = {
 };
 
 export type MarketListStocksResponse = (Array<{
+    [key: string]: unknown;
+}>);
+
+export type MarketListFundamentalsData = {
+    limit?: number;
+    /**
+     * Maximum debt to equity ratio
+     */
+    maxDebtEquity?: (number | null);
+    /**
+     * Maximum dividend yield %
+     */
+    maxDividendYield?: (number | null);
+    /**
+     * Maximum market cap (in millions)
+     */
+    maxMarketCap?: (number | null);
+    /**
+     * Maximum P/E ratio
+     */
+    maxPe?: (number | null);
+    /**
+     * Maximum ROE %
+     */
+    maxRoe?: (number | null);
+    /**
+     * Minimum debt to equity ratio
+     */
+    minDebtEquity?: (number | null);
+    /**
+     * Minimum dividend yield %
+     */
+    minDividendYield?: (number | null);
+    /**
+     * Minimum market cap (in millions)
+     */
+    minMarketCap?: (number | null);
+    /**
+     * Minimum P/E ratio
+     */
+    minPe?: (number | null);
+    /**
+     * Minimum ROE %
+     */
+    minRoe?: (number | null);
+    /**
+     * Minimum fundamental score
+     */
+    minScore?: (number | null);
+    offset?: number;
+    /**
+     * Search by symbol or company name
+     */
+    q?: (string | null);
+    sector?: (string | null);
+    /**
+     * Sort field: pe, dividend_yield, market_cap, score, roe, debt_equity, symbol
+     */
+    sortBy?: (string | null);
+    /**
+     * Sort order: asc or desc
+     */
+    sortOrder?: (string | null);
+};
+
+export type MarketListFundamentalsResponse = (Array<{
     [key: string]: unknown;
 }>);
 
@@ -2171,11 +2849,34 @@ export type MarketGetMacroSnapshotResponse = ({
     [key: string]: unknown;
 });
 
-export type MarketGetUpcomingEventsData = {
+export type MarketGetSectorAnalysisResponse = ({
+    [key: string]: unknown;
+});
+
+export type MarketGetMostVolatileStocksData = {
+    /**
+     * Number of stocks to return
+     */
     limit?: number;
+    /**
+     * Minimum trades count filter
+     */
+    minTrades?: number;
+    /**
+     * Minimum volume filter
+     */
+    minVolume?: number;
 };
 
-export type MarketGetUpcomingEventsResponse = ({
+export type MarketGetMostVolatileStocksResponse = (Array<{
+    [key: string]: unknown;
+}>);
+
+export type MarketGetMarketDepthData = {
+    symbol: string;
+};
+
+export type MarketGetMarketDepthResponse = ({
     [key: string]: unknown;
 });
 
@@ -2184,9 +2885,13 @@ export type NewsListNewsData = {
     days?: number;
     limit?: number;
     offset?: number;
+    /**
+     * Filter by trading code
+     */
+    symbol?: (string | null);
 };
 
-export type NewsListNewsResponse = (Array<NewsPublic>);
+export type NewsListNewsResponse = (Array<NewsPublicWithSymbols>);
 
 export type NewsCreateNewsData = {
     requestBody: NewsCreate;
@@ -2196,7 +2901,6 @@ export type NewsCreateNewsResponse = (NewsPublic);
 
 export type NewsGetStockNewsData = {
     days?: number;
-    symbol: string;
 };
 
 export type NewsGetStockNewsResponse = (Array<NewsPublic>);
@@ -2313,6 +3017,13 @@ export type PerformanceGetBenchmarkComparisonResponse = (BenchmarkComparisonResp
 
 export type PerformanceGetAvailableBenchmarksResponse = (BenchmarkListResponse);
 
+export type PerformanceGetBenchmarkTimeseriesData = {
+    benchmarkId: string;
+    period?: string;
+};
+
+export type PerformanceGetBenchmarkTimeseriesResponse = (unknown);
+
 export type PerformanceGetMonthlyReturnsData = {
     portfolioId: string;
     year?: (number | null);
@@ -2326,6 +3037,13 @@ export type PerformanceGetAssetClassAttributionData = {
 };
 
 export type PerformanceGetAssetClassAttributionResponse = (AttributionResponse);
+
+export type PerformanceGetPortfolioPeriodValuationData = {
+    period?: string;
+    portfolioId: string;
+};
+
+export type PerformanceGetPortfolioPeriodValuationResponse = (unknown);
 
 export type PerformanceGetSectorAttributionData = {
     benchmarkId?: (string | null);
@@ -2378,6 +3096,14 @@ export type PerformanceBackfillAllPortfoliosData = {
 };
 
 export type PerformanceBackfillAllPortfoliosResponse = (unknown);
+
+export type PerformanceGetClientPerformanceReturnsData = {
+    period?: string;
+};
+
+export type PerformanceGetClientPerformanceReturnsResponse = (unknown);
+
+export type PortfolioGetPortfoliosAggregateResponse = (unknown);
 
 export type PortfolioGetUserPortfoliosResponse = (Array<PortfolioPublic>);
 
@@ -2476,6 +3202,20 @@ export type PortfolioDeleteTradeData = {
 };
 
 export type PortfolioDeleteTradeResponse = (unknown);
+
+export type PortfolioGetPortfolioHistoryData = {
+    portfolioId: string;
+};
+
+export type PortfolioGetPortfolioHistoryResponse = (unknown);
+
+export type PortfolioGetAggregatedPortfolioHistoryData = {
+    limit?: number;
+};
+
+export type PortfolioGetAggregatedPortfolioHistoryResponse = (Array<PortfolioAggregatedHistory>);
+
+export type PortfolioGetAggregatedPortfolioSparklineResponse = (Array<PortfolioSparklinePoint>);
 
 export type PortfolioGetPortfolioSummaryData = {
     portfolioId: string;
@@ -2683,6 +3423,12 @@ export type ResearchGetEarningsHighlightsResponse = (unknown);
 
 export type ResearchGetThematicIdeasResponse = (unknown);
 
+export type ResearchRunBacktestData = {
+    requestBody: BacktestRequest;
+};
+
+export type ResearchRunBacktestResponse = (BacktestResponse);
+
 export type RiskManagementGetUserRiskProfileResponse = (UserRiskProfilePublic);
 
 export type RiskManagementCreateUserRiskProfileData = {
@@ -2698,6 +3444,12 @@ export type RiskManagementGetRiskAlertsData = {
 
 export type RiskManagementGetRiskAlertsResponse = (Array<RiskAlertPublic>);
 
+export type RiskManagementCreateRiskAlertData = {
+    requestBody: RiskAlertCreate;
+};
+
+export type RiskManagementCreateRiskAlertResponse = (RiskAlertPublic);
+
 export type RiskManagementCreateStockScreenerData = {
     requestBody: StockScreenerCreate;
 };
@@ -2709,6 +3461,73 @@ export type RiskManagementGetStockScreenersData = {
 };
 
 export type RiskManagementGetStockScreenersResponse = (Array<StockScreenerPublic>);
+
+export type RiskManagementGetRiskOverviewData = {
+    benchmarkId?: (string | null);
+    period?: string;
+    portfolioId: string;
+};
+
+export type RiskManagementGetRiskOverviewResponse = (unknown);
+
+export type RiskManagementGetRiskMetricsData = {
+    benchmarkId?: (string | null);
+    period?: string;
+    portfolioId: string;
+};
+
+export type RiskManagementGetRiskMetricsResponse = (unknown);
+
+export type RiskManagementGetRiskMetricsTimeseriesData = {
+    benchmarkId?: (string | null);
+    period?: string;
+    portfolioId: string;
+};
+
+export type RiskManagementGetRiskMetricsTimeseriesResponse = (unknown);
+
+export type RiskManagementGetSectorConcentrationData = {
+    benchmarkId?: (string | null);
+    period?: string;
+    portfolioId: string;
+};
+
+export type RiskManagementGetSectorConcentrationResponse = (unknown);
+
+export type RiskManagementGetCorrelationAnalysisData = {
+    period?: string;
+    portfolioId: string;
+    top?: number;
+};
+
+export type RiskManagementGetCorrelationAnalysisResponse = (unknown);
+
+export type RiskManagementGetStressTestsData = {
+    benchmarkId?: (string | null);
+    portfolioId: string;
+    /**
+     * Comma-separated scenario keys: 2008,covid,rate_hike,tech_crash
+     */
+    scenarios?: (string | null);
+};
+
+export type RiskManagementGetStressTestsResponse = (unknown);
+
+export type RiskManagementUpdateRiskAlertData = {
+    alertId: string;
+    requestBody?: Body_risk_management_update_risk_alert;
+};
+
+export type RiskManagementUpdateRiskAlertResponse = (RiskAlertPublic);
+
+export type RiskManagementGetRebalancingRecommendationsData = {
+    portfolioId: string;
+    requestBody?: ({
+    [key: string]: (number);
+} | null);
+};
+
+export type RiskManagementGetRebalancingRecommendationsResponse = (unknown);
 
 export type SubscriptionsListPlansResponse = (Array<SubscriptionPlanPublic>);
 
@@ -2765,6 +3584,17 @@ export type TradingviewSearchSymbolsResponse = (({
     [key: string]: unknown;
 }>));
 
+export type TradingviewGetSymbolInfoData = {
+    /**
+     * Exchange group
+     */
+    group?: (string | null);
+};
+
+export type TradingviewGetSymbolInfoResponse = ({
+    [key: string]: unknown;
+});
+
 export type TradingviewSearchSymbolsSearchData = {
     /**
      * Exchange filter
@@ -2787,17 +3617,6 @@ export type TradingviewSearchSymbolsSearchData = {
 export type TradingviewSearchSymbolsSearchResponse = (Array<{
     [key: string]: unknown;
 }>);
-
-export type TradingviewGetSymbolInfoData = {
-    /**
-     * Exchange group
-     */
-    group?: (string | null);
-};
-
-export type TradingviewGetSymbolInfoResponse = ({
-    [key: string]: unknown;
-});
 
 export type TradingviewGetHistoryData = {
     /**
@@ -2842,6 +3661,90 @@ export type TradingviewGetPositionsForTradingviewData = {
 };
 
 export type TradingviewGetPositionsForTradingviewResponse = (unknown);
+
+export type UpcomingEventsListUpcomingEventsData = {
+    /**
+     * Filter by stock code/symbol (case-insensitive partial match)
+     */
+    code?: (string | null);
+    /**
+     * Filter by event type (e.g., 'AGM', 'Board Meeting', 'Record Date')
+     */
+    eventType?: (string | null);
+    /**
+     * Number of items per page
+     */
+    limit?: number;
+    /**
+     * Filter events with timestamp <= max_timestamp (Unix timestamp)
+     */
+    maxTimestamp?: (number | null);
+    /**
+     * Filter events with timestamp >= min_timestamp (Unix timestamp)
+     */
+    minTimestamp?: (number | null);
+    /**
+     * Field to order by. Prefix with '-' for descending. Options: timestamp, post_date, code
+     */
+    orderBy?: string;
+    /**
+     * Page number (1-indexed)
+     */
+    page?: number;
+};
+
+export type UpcomingEventsListUpcomingEventsResponse = (UpcomingEventsPublic);
+
+export type UpcomingEventsCreateEventData = {
+    requestBody: UpcomingEventCreate;
+};
+
+export type UpcomingEventsCreateEventResponse = (UpcomingEventPublic);
+
+export type UpcomingEventsGetEventsByCodeData = {
+    code: string;
+    /**
+     * Maximum number of results
+     */
+    limit?: (number | null);
+};
+
+export type UpcomingEventsGetEventsByCodeResponse = (Array<UpcomingEventPublic>);
+
+export type UpcomingEventsGetEventsByTypeData = {
+    eventType: string;
+    /**
+     * Maximum number of results
+     */
+    limit?: number;
+};
+
+export type UpcomingEventsGetEventsByTypeResponse = (Array<UpcomingEventPublic>);
+
+export type UpcomingEventsGetEventByIdData = {
+    eventId: string;
+};
+
+export type UpcomingEventsGetEventByIdResponse = (UpcomingEventPublic);
+
+export type UpcomingEventsUpdateEventData = {
+    eventId: string;
+    requestBody: UpcomingEventUpdate;
+};
+
+export type UpcomingEventsUpdateEventResponse = (UpcomingEventPublic);
+
+export type UpcomingEventsDeleteEventData = {
+    eventId: string;
+};
+
+export type UpcomingEventsDeleteEventResponse = (void);
+
+export type UpcomingEventsBulkCreateEventsData = {
+    requestBody: Array<UpcomingEventCreate>;
+};
+
+export type UpcomingEventsBulkCreateEventsResponse = (Array<UpcomingEventPublic>);
 
 export type UsersReadUsersData = {
     limit?: number;

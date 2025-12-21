@@ -39,6 +39,7 @@ const Fundamentals = lazy(() => import("./components/Fundamentals").then(m => ({
 const ResearchWorkspace = lazy(() => import("./components/ResearchWorkspace").then(m => ({ default: m.ResearchWorkspace })));
 const SettingsView = lazy(() => import("./components/SettingsView").then(m => ({ default: m.SettingsView })));
 const HelpSupportView = lazy(() => import("./components/HelpSupportView").then(m => ({ default: m.HelpSupportView })));
+const TradingIdeas = lazy(() => import("./components/TradingIdeas").then(m => ({ default: m.TradingIdeas })));
 
 type View =
     | "dashboard"
@@ -68,7 +69,8 @@ type View =
     | "settings"
     | "help"
     | "chart"
-    | "analytics";
+    | "analytics"
+    | "ideas";
 
 type AuthView = "login" | "signup";
 
@@ -409,16 +411,8 @@ export default function App() {
                 return (
                     <Suspense fallback={<div>Loading Comprehensive Dashboard...</div>}>
                         <ComprehensiveDashboard
-                            accountBalance={accountBalance}
-                            recentOrders={orders.slice(0, 5)}
                             recentTransactions={transactions.slice(0, 5)}
-                            news={news}
-                            marketData={marketData}
-                            onQuickTrade={handleQuickTrade}
-                            onChartStock={handleChartStock}
                             onNavigate={handleViewChange}
-                            onSelectPortfolioId={setSelectedPortfolioId}
-                            selectedPortfolioId={selectedPortfolio?.id}
                         />
                     </Suspense>
                 );
@@ -562,6 +556,13 @@ export default function App() {
                 return (
                     <Suspense fallback={<div>Loading Market News & Insights...</div>}>
                         <MarketNewsInsights />
+                    </Suspense>
+                );
+
+            case "ideas":
+                return (
+                    <Suspense fallback={<div>Loading Trading Ideas...</div>}>
+                        <TradingIdeas />
                     </Suspense>
                 );
 
@@ -730,15 +731,8 @@ export default function App() {
                 return (
                     <Suspense fallback={<div>Loading Comprehensive Dashboard...</div>}>
                         <ComprehensiveDashboard
-                            accountBalance={accountBalance}
-                            recentOrders={orders.slice(0, 5)}
                             recentTransactions={transactions.slice(0, 5)}
-                            news={news}
-                            marketData={marketData}
-                            onQuickTrade={handleQuickTrade}
-                            onChartStock={handleChartStock}
                             onNavigate={handleViewChange}
-                            selectedPortfolioId={selectedPortfolio?.id}
                         />
                     </Suspense>
                 );

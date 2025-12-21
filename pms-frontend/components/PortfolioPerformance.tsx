@@ -1,12 +1,12 @@
-import {useEffect, useState} from "react";
-import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "./ui/card";
-import {Tabs, TabsContent, TabsList, TabsTrigger} from "./ui/tabs";
-import {Button} from "./ui/button";
-import {Badge} from "./ui/badge";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "./ui/select";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "./ui/table";
-import {Input} from "./ui/input";
-import {Label} from "./ui/label";
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 import {
     Activity,
     AlertCircle,
@@ -24,6 +24,7 @@ import {
     Plus,
     Receipt,
     TrendingUp,
+    TrendingDown,
     TrendingUp as TrendingUpIcon
 } from "lucide-react";
 import {
@@ -44,7 +45,7 @@ import {
     XAxis,
     YAxis
 } from "recharts";
-import {usePortfolios} from "../hooks/usePortfolios";
+import { usePortfolios } from "../hooks/usePortfolios";
 import { formatCurrency, formatPercent } from "../lib/utils";
 import {
     useAvailableBenchmarks,
@@ -67,37 +68,15 @@ interface PortfolioPerformanceProps {
     portfolioName?: string;
 }
 
-// Mock data for features not yet implemented via API
-const MOCK_ASSET_ATTRIBUTION = [
-    {
-        assetClass: "Equities",
-        weight: 100,
-        return: 0,
-        contribution: 0,
-        allocationEffect: 0,
-        selectionEffect: 0,
-        interactionEffect: 0
-    }
-];
-
-const MOCK_RETURN_DECOMPOSITION = {
-    dividends: 0,
-    interest: 0,
-    capitalGains: 0,
-    realized: 0,
-    unrealized: 0,
-    currencyEffect: 0
-};
-
 const MOCK_ROLLING_RETURNS: any[] = [];
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
 export function PortfolioPerformance({
-                                         portfolioId: initialPortfolioId,
-                                         portfolioName: initialPortfolioName
-                                     }: PortfolioPerformanceProps = {}) {
-    const {portfolios, loading: portfoliosLoading} = usePortfolios();
+    portfolioId: initialPortfolioId,
+    portfolioName: initialPortfolioName
+}: PortfolioPerformanceProps = {}) {
+    const { portfolios, loading: portfoliosLoading } = usePortfolios();
     const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(initialPortfolioId || null);
     const [selectedPeriod, setSelectedPeriod] = useState("1W");
     const [selectedBenchmark, setSelectedBenchmark] = useState("DSEX");
@@ -119,15 +98,15 @@ export function PortfolioPerformance({
     const shouldFetchData = !!selectedPortfolioId;
 
     // Fetch performance data from NEW OPTIMIZED SPLIT APIs
-    const {data: currentValue, isLoading: valueLoading} = useCurrentValue(selectedPortfolioId, {
+    const { data: currentValue, isLoading: valueLoading } = useCurrentValue(selectedPortfolioId, {
         enabled: shouldFetchData
     });
-    const {data: returns, isLoading: returnsLoading} = usePerformanceReturns(selectedPortfolioId, selectedPeriod, {
+    const { data: returns, isLoading: returnsLoading } = usePerformanceReturns(selectedPortfolioId, selectedPeriod, {
         enabled: shouldFetchData
     });
-    const {data: riskMetrics, isLoading: riskLoading} = usePerformanceRiskMetrics(selectedPortfolioId, selectedPeriod);
-    const {data: bestWorst, isLoading: bestWorstLoading} = useBestWorstPeriods(selectedPortfolioId, selectedPeriod);
-    const {data: cashFlows, isLoading: cashFlowsLoading} = useCashFlows(selectedPortfolioId, selectedPeriod);
+    const { data: riskMetrics, isLoading: riskLoading } = usePerformanceRiskMetrics(selectedPortfolioId, selectedPeriod);
+    const { data: bestWorst, isLoading: bestWorstLoading } = useBestWorstPeriods(selectedPortfolioId, selectedPeriod);
+    const { data: cashFlows, isLoading: cashFlowsLoading } = useCashFlows(selectedPortfolioId, selectedPeriod);
 
     // Fetch other performance data
     const {
@@ -146,10 +125,10 @@ export function PortfolioPerformance({
     } = useBenchmarkComparison(selectedPortfolioId, selectedBenchmark, {
         enabled: shouldFetchData
     });
-    const {data: availableBenchmarks} = useAvailableBenchmarks({
+    const { data: availableBenchmarks } = useAvailableBenchmarks({
         enabled: shouldFetchData
     });
-    const {data: monthlyReturns, isLoading: monthlyLoading} = useMonthlyReturns(selectedPortfolioId, undefined, {
+    const { data: monthlyReturns, isLoading: monthlyLoading } = useMonthlyReturns(selectedPortfolioId, undefined, {
         enabled: shouldFetchData
     });
     const {
@@ -210,7 +189,7 @@ export function PortfolioPerformance({
         return (
             <div className="flex items-center justify-center py-12">
                 <div className="text-center">
-                    <Activity className="h-12 w-12 animate-pulse text-primary mx-auto mb-4"/>
+                    <Activity className="h-12 w-12 animate-pulse text-primary mx-auto mb-4" />
                     <p className="text-muted-foreground">Loading portfolios...</p>
                 </div>
             </div>
@@ -221,7 +200,7 @@ export function PortfolioPerformance({
     if (portfolios.length === 0) {
         return (
             <div className="text-center py-12">
-                <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4"/>
+                <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">No Portfolios Found</h3>
                 <p className="text-muted-foreground">Create a portfolio to view performance analytics.</p>
             </div>
@@ -239,13 +218,13 @@ export function PortfolioPerformance({
                 <div className="flex flex-wrap items-center gap-2">
                     {/* Portfolio Selector */}
                     <div className="flex items-center gap-2">
-                        <Briefcase className="h-4 w-4 text-muted-foreground"/>
+                        <Briefcase className="h-4 w-4 text-muted-foreground" />
                         <Select
                             value={selectedPortfolioId || ''}
                             onValueChange={setSelectedPortfolioId}
                         >
                             <SelectTrigger className="w-[200px]">
-                                <SelectValue placeholder="Select Portfolio"/>
+                                <SelectValue placeholder="Select Portfolio" />
                             </SelectTrigger>
                             <SelectContent>
                                 {portfolios.map((portfolio) => (
@@ -260,7 +239,7 @@ export function PortfolioPerformance({
                     {/* Period Selector */}
                     <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
                         <SelectTrigger className="w-[140px]">
-                            <SelectValue/>
+                            <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="1W">1 Week</SelectItem>
@@ -276,7 +255,7 @@ export function PortfolioPerformance({
                     </Select>
 
                     <Button variant="outline" onClick={handleExportReport} className="flex items-center gap-2">
-                        <Download className="h-4 w-4"/>
+                        <Download className="h-4 w-4" />
                         Export Report
                     </Button>
                 </div>
@@ -288,7 +267,7 @@ export function PortfolioPerformance({
                     <CardContent className="py-3">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <Briefcase className="h-5 w-5 text-primary"/>
+                                <Briefcase className="h-5 w-5 text-primary" />
                                 <div>
                                     <h3 className="font-semibold">{selectedPortfolio.name}</h3>
                                     <p className="text-sm text-muted-foreground">
@@ -325,17 +304,17 @@ export function PortfolioPerformance({
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                <DollarSign className="h-4 w-4"/>
+                                <DollarSign className="h-4 w-4" />
                                 Total Portfolio Value
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold">{formatCurrency(currentValue.current_value)}</div>
                             <div className="flex items-center gap-1 text-sm mt-1">
-                                <TrendingUp className={`h-3 w-3 ${getReturnColor(returns.time_weighted_return)}`}/>
+                                <TrendingUp className={`h-3 w-3 ${getReturnColor(returns.time_weighted_return)}`} />
                                 <span className={getReturnColor(returns.time_weighted_return)}>
-                  {formatPercent(returns.time_weighted_return)}
-                </span>
+                                    {formatPercent(returns.time_weighted_return)}
+                                </span>
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">Since inception</p>
                         </CardContent>
@@ -344,7 +323,7 @@ export function PortfolioPerformance({
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                <Activity className="h-4 w-4"/>
+                                <Activity className="h-4 w-4" />
                                 Time-Weighted Return
                             </CardTitle>
                         </CardHeader>
@@ -360,7 +339,7 @@ export function PortfolioPerformance({
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                <Percent className="h-4 w-4"/>
+                                <Percent className="h-4 w-4" />
                                 Money-Weighted Return
                             </CardTitle>
                         </CardHeader>
@@ -376,7 +355,7 @@ export function PortfolioPerformance({
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                <TrendingUp className="h-4 w-4"/>
+                                <TrendingUp className="h-4 w-4" />
                                 Annualized Return
                             </CardTitle>
                         </CardHeader>
@@ -403,11 +382,10 @@ export function PortfolioPerformance({
 
             {/* Main Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="grid w-full grid-cols-8">
+                <TabsList className="grid w-full grid-cols-7">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="benchmark">Benchmarking</TabsTrigger>
                     <TabsTrigger value="attribution">Attribution</TabsTrigger>
-                    <TabsTrigger value="decomposition">Decomposition</TabsTrigger>
                     <TabsTrigger value="dividends">Dividends</TabsTrigger>
                     <TabsTrigger value="cost-basis">Cost Basis</TabsTrigger>
                     <TabsTrigger value="periods">Periods</TabsTrigger>
@@ -416,11 +394,11 @@ export function PortfolioPerformance({
 
                 {/* Overview Tab */}
                 <TabsContent value="overview" className="space-y-6">
-                    {/* Portfolio Value Chart */}
+                    {/* Portfolio Return Chart */}
                     <Card>
                         <CardHeader>
-                            <CardTitle>Portfolio Value Over Time</CardTitle>
-                            <CardDescription>Track your portfolio growth compared to benchmark</CardDescription>
+                            <CardTitle>Portfolio Return vs Benchmark</CardTitle>
+                            <CardDescription>Cumulative return comparison (Time-Weighted)</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <ResponsiveContainer width="100%" height={400}>
@@ -429,36 +407,34 @@ export function PortfolioPerformance({
                                         month: 'short',
                                         year: '2-digit'
                                     }),
-                                    portfolio: d.portfolio_value,
-                                    benchmark: d.benchmark_value || 0,
-                                    portfolioReturn: d.portfolio_cumulative_return,
-                                    benchmarkReturn: d.benchmark_cumulative_return || 0
+                                    portfolio: d.portfolio_cumulative_return,
+                                    benchmark: d.benchmark_cumulative_return || 0
                                 })) || []}>
                                     <defs>
                                         <linearGradient id="colorPortfolio" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                                         </linearGradient>
                                         <linearGradient id="colorBenchmark" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" opacity={0.3}/>
-                                    <XAxis dataKey="date"/>
-                                    <YAxis tickFormatter={(value) => formatCurrency(value)}/>
+                                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                                    <XAxis dataKey="date" />
+                                    <YAxis tickFormatter={(value) => `${value}%`} />
                                     <Tooltip
-                                        formatter={(value: number) => formatCurrency(value)}
-                                        labelStyle={{color: '#000'}}
+                                        formatter={(value: number) => `${value.toFixed(2)}%`}
+                                        labelStyle={{ color: '#000' }}
                                     />
-                                    <Legend/>
+                                    <Legend />
                                     <Area
                                         type="monotone"
                                         dataKey="portfolio"
                                         stroke="#3b82f6"
                                         fillOpacity={1}
                                         fill="url(#colorPortfolio)"
-                                        name="Portfolio Value"
+                                        name="Portfolio Return"
                                         strokeWidth={2}
                                     />
                                     <Area
@@ -523,26 +499,26 @@ export function PortfolioPerformance({
                             </CardHeader>
                             <CardContent className="space-y-3">
                                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground flex items-center gap-1">
-                    <Plus className="h-3 w-3"/>
-                    Net Contributions:
-                  </span>
+                                    <span className="text-sm text-muted-foreground flex items-center gap-1">
+                                        <Plus className="h-3 w-3" />
+                                        Net Contributions:
+                                    </span>
                                     <span
                                         className="font-medium text-green-600">{formatCurrency(cashFlows?.net_contributions || 0)}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground flex items-center gap-1">
-                    <Minus className="h-3 w-3"/>
-                    Net Withdrawals:
-                  </span>
+                                    <span className="text-sm text-muted-foreground flex items-center gap-1">
+                                        <Minus className="h-3 w-3" />
+                                        Net Withdrawals:
+                                    </span>
                                     <span
                                         className="font-medium text-red-600">{formatCurrency(cashFlows?.net_withdrawals || 0)}</span>
                                 </div>
                                 <div className="flex justify-between items-center pt-2 border-t">
                                     <span className="text-sm text-muted-foreground">Net Cash Flow:</span>
                                     <span className="font-bold">
-                    {formatCurrency(cashFlows?.net_flow || 0)}
-                  </span>
+                                        {formatCurrency(cashFlows?.net_flow || 0)}
+                                    </span>
                                 </div>
                             </CardContent>
                         </Card>
@@ -553,10 +529,10 @@ export function PortfolioPerformance({
                             </CardHeader>
                             <CardContent className="space-y-3">
                                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground flex items-center gap-1">
-                    <Calendar className="h-3 w-3"/>
-                    Inception Date:
-                  </span>
+                                    <span className="text-sm text-muted-foreground flex items-center gap-1">
+                                        <Calendar className="h-3 w-3" />
+                                        Inception Date:
+                                    </span>
                                     <span className="font-medium">{currentValue?.as_of_date || 'N/A'}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
@@ -571,8 +547,8 @@ export function PortfolioPerformance({
                                 <div className="flex justify-between items-center pt-2 border-t">
                                     <span className="text-sm text-muted-foreground">Total Gain/Loss:</span>
                                     <span className={`font-bold ${getReturnColor(returns?.time_weighted_return || 0)}`}>
-                    {formatPercent(returns?.time_weighted_return || 0)}
-                  </span>
+                                        {formatPercent(returns?.time_weighted_return || 0)}
+                                    </span>
                                 </div>
                             </CardContent>
                         </Card>
@@ -590,15 +566,15 @@ export function PortfolioPerformance({
                                     month: m.month,
                                     return: m.return_value
                                 })) || []}>
-                                    <CartesianGrid strokeDasharray="3 3" opacity={0.3}/>
-                                    <XAxis dataKey="month"/>
-                                    <YAxis tickFormatter={(value) => `${value}%`}/>
-                                    <Tooltip formatter={(value: number) => `${value}%`}/>
-                                    <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3"/>
+                                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                                    <XAxis dataKey="month" />
+                                    <YAxis tickFormatter={(value) => `${value}%`} />
+                                    <Tooltip formatter={(value: number) => `${value}%`} />
+                                    <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />
                                     <Bar dataKey="return" name="Monthly Return">
                                         {(monthlyReturns?.monthly_returns || []).map((entry, index) => (
                                             <Cell key={`cell-${index}`}
-                                                  fill={entry.return_value >= 0 ? '#10b981' : '#ef4444'}/>
+                                                fill={entry.return_value >= 0 ? '#10b981' : '#ef4444'} />
                                         ))}
                                     </Bar>
                                 </BarChart>
@@ -621,7 +597,7 @@ export function PortfolioPerformance({
                                     <Label>Primary Benchmark</Label>
                                     <Select value={selectedBenchmark} onValueChange={setSelectedBenchmark}>
                                         <SelectTrigger>
-                                            <SelectValue/>
+                                            <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {(availableBenchmarks?.benchmarks || []).map((bm) => (
@@ -650,7 +626,7 @@ export function PortfolioPerformance({
                                         {(availableBenchmarks?.benchmarks || []).slice(0, 4).map((bm) => (
                                             <div key={bm.id} className="flex items-center gap-2">
                                                 <Label className="flex-1 text-sm">{bm.name}:</Label>
-                                                <Input type="number" placeholder="0" className="w-20"/>
+                                                <Input type="number" placeholder="0" className="w-20" />
                                                 <span className="text-sm text-muted-foreground">%</span>
                                             </div>
                                         ))}
@@ -677,11 +653,11 @@ export function PortfolioPerformance({
                                     portfolioReturn: d.portfolio_cumulative_return,
                                     benchmarkReturn: d.benchmark_cumulative_return || 0
                                 })) || []}>
-                                    <CartesianGrid strokeDasharray="3 3" opacity={0.3}/>
-                                    <XAxis dataKey="date"/>
-                                    <YAxis tickFormatter={(value) => `${value}%`}/>
-                                    <Tooltip formatter={(value: number) => `${value}%`}/>
-                                    <Legend/>
+                                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                                    <XAxis dataKey="date" />
+                                    <YAxis tickFormatter={(value) => `${value}%`} />
+                                    <Tooltip formatter={(value: number) => `${value}%`} />
+                                    <Legend />
                                     <Line
                                         type="monotone"
                                         dataKey="portfolioReturn"
@@ -764,15 +740,15 @@ export function PortfolioPerformance({
                                 })) || []}>
                                     <defs>
                                         <linearGradient id="colorAlpha" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
-                                            <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                                            <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" opacity={0.3}/>
-                                    <XAxis dataKey="date"/>
-                                    <YAxis tickFormatter={(value) => `${value}%`}/>
-                                    <Tooltip formatter={(value: number) => `${formatNumber(value)}%`}/>
-                                    <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3"/>
+                                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                                    <XAxis dataKey="date" />
+                                    <YAxis tickFormatter={(value) => `${value}%`} />
+                                    <Tooltip formatter={(value: number) => `${formatNumber(value)}%`} />
+                                    <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />
                                     <Area
                                         type="monotone"
                                         dataKey="alpha"
@@ -789,435 +765,215 @@ export function PortfolioPerformance({
                 </TabsContent>
 
                 {/* Attribution Tab */}
-                <TabsContent value="attribution" className="space-y-6">
-                    {/* Asset Class Attribution */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Asset Class Attribution</CardTitle>
-                            <CardDescription>Performance contribution by asset class</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <div>
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Asset Class</TableHead>
-                                                <TableHead className="text-right">Weight</TableHead>
-                                                <TableHead className="text-right">Return</TableHead>
-                                                <TableHead className="text-right">Contribution</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {MOCK_ASSET_ATTRIBUTION.map((asset) => (
-                                                <TableRow key={asset.assetClass}>
-                                                    <TableCell className="font-medium">{asset.assetClass}</TableCell>
-                                                    <TableCell className="text-right">{asset.weight}%</TableCell>
-                                                    <TableCell className={`text-right ${getReturnColor(asset.return)}`}>
-                                                        {formatPercent(asset.return)}
-                                                    </TableCell>
-                                                    <TableCell
-                                                        className={`text-right font-medium ${getReturnColor(asset.contribution)}`}>
-                                                        {formatPercent(asset.contribution)}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                                <div>
-                                    <ResponsiveContainer width="100%" height={300}>
-                                        <PieChart>
-                                            <Pie
-                                                data={MOCK_ASSET_ATTRIBUTION}
-                                                dataKey="contribution"
-                                                nameKey="assetClass"
-                                                cx="50%"
-                                                cy="50%"
-                                                outerRadius={100}
-                                                label={({
-                                                            assetClass,
-                                                            contribution
-                                                        }) => `${assetClass}: ${formatPercent(contribution)}`}
-                                            >
-                                                {MOCK_ASSET_ATTRIBUTION.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]}/>
-                                                ))}
-                                            </Pie>
-                                            <Tooltip formatter={(value: number) => formatPercent(value)}/>
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Sector Attribution */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Sector Attribution</CardTitle>
-                            <CardDescription>Performance breakdown by sector within equities</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Sector</TableHead>
-                                        <TableHead className="text-right">Weight</TableHead>
-                                        <TableHead className="text-right">Benchmark</TableHead>
-                                        <TableHead className="text-right">Return</TableHead>
-                                        <TableHead className="text-right">BM Return</TableHead>
-                                        <TableHead className="text-right">Contribution</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {(sectorAttribution?.attribution || []).map((sector) => (
-                                        <TableRow key={sector.sector}>
-                                            <TableCell className="font-medium">{sector.sector}</TableCell>
-                                            <TableCell className="text-right">{sector.weight}%</TableCell>
-                                            <TableCell
-                                                className="text-right text-muted-foreground">{sector.benchmark_weight}%</TableCell>
-                                            <TableCell className={`text-right ${getReturnColor(sector.return)}`}>
-                                                {formatPercent(sector.return)}
-                                            </TableCell>
-                                            <TableCell className="text-right text-muted-foreground">
-                                                {formatPercent(sector.benchmark_return)}
-                                            </TableCell>
-                                            <TableCell
-                                                className={`text-right font-medium ${getReturnColor(sector.contribution)}`}>
-                                                {formatPercent(sector.contribution)}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-
-                            <div className="mt-6">
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <BarChart data={sectorAttribution?.attribution || []}>
-                                        <CartesianGrid strokeDasharray="3 3" opacity={0.3}/>
-                                        <XAxis dataKey="sector" angle={-45} textAnchor="end" height={100}/>
-                                        <YAxis tickFormatter={(value) => `${value}%`}/>
-                                        <Tooltip formatter={(value: number) => formatPercent(value)}/>
-                                        <Legend/>
-                                        <Bar dataKey="contribution" name="Contribution" fill="#3b82f6"/>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Attribution Effects */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Attribution Analysis</CardTitle>
-                            <CardDescription>Allocation effect vs. Selection effect vs. Interaction</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
-                                <div className="border rounded-lg p-4 bg-muted/30">
-                                    <div className="flex items-start gap-2 mb-2">
-                                        <Info className="h-4 w-4 text-muted-foreground mt-0.5"/>
-                                        <div className="text-sm text-muted-foreground">
-                                            <p><strong>Allocation Effect:</strong> Impact of
-                                                overweighting/underweighting sectors vs. benchmark</p>
-                                            <p className="mt-1"><strong>Selection Effect:</strong> Impact of
-                                                stock-picking skill within sectors</p>
-                                            <p className="mt-1"><strong>Interaction Effect:</strong> Combined impact of
-                                                allocation and selection decisions</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Sector</TableHead>
-                                            <TableHead className="text-right">Allocation</TableHead>
-                                            <TableHead className="text-right">Selection</TableHead>
-                                            <TableHead className="text-right">Interaction</TableHead>
-                                            <TableHead className="text-right">Total</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {(sectorAttribution?.attribution || []).map((sector) => (
-                                            <TableRow key={sector.sector}>
-                                                <TableCell className="font-medium">{sector.sector}</TableCell>
-                                                <TableCell
-                                                    className={`text-right ${getReturnColor(sector.allocation_effect)}`}>
-                                                    {formatPercent(sector.allocation_effect)}
-                                                </TableCell>
-                                                <TableCell
-                                                    className={`text-right ${getReturnColor(sector.selection_effect)}`}>
-                                                    {formatPercent(sector.selection_effect)}
-                                                </TableCell>
-                                                <TableCell className="text-right text-muted-foreground">
-                                                    {formatPercent(sector.allocation_effect + sector.selection_effect - sector.contribution)}
-                                                </TableCell>
-                                                <TableCell
-                                                    className={`text-right font-medium ${getReturnColor(sector.contribution)}`}>
-                                                    {formatPercent(sector.contribution)}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Top Contributors & Detractors */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <ArrowUpRight className="h-5 w-5 text-green-600"/>
-                                    Top Contributors
-                                </CardTitle>
-                                <CardDescription>Securities that added the most value</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Symbol</TableHead>
-                                            <TableHead className="text-right">Return</TableHead>
-                                            <TableHead className="text-right">Contribution</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {(securityAttribution?.top_contributors || []).map((stock) => (
-                                            <TableRow key={stock.symbol}>
-                                                <TableCell>
-                                                    <div>
-                                                        <div className="font-medium">{stock.symbol}</div>
-                                                        <div
-                                                            className="text-xs text-muted-foreground">{stock.name}</div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-right text-green-600">
-                                                    {formatPercent(stock.return)}
-                                                </TableCell>
-                                                <TableCell className="text-right font-medium text-green-600">
-                                                    {formatPercent(stock.contribution)}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <ArrowDownRight className="h-5 w-5 text-red-600"/>
-                                    Top Detractors
-                                </CardTitle>
-                                <CardDescription>Securities that reduced portfolio value</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Symbol</TableHead>
-                                            <TableHead className="text-right">Return</TableHead>
-                                            <TableHead className="text-right">Impact</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {(securityAttribution?.top_detractors || []).map((stock) => (
-                                            <TableRow key={stock.symbol}>
-                                                <TableCell>
-                                                    <div>
-                                                        <div className="font-medium">{stock.symbol}</div>
-                                                        <div
-                                                            className="text-xs text-muted-foreground">{stock.name}</div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-right text-red-600">
-                                                    {formatPercent(stock.return)}
-                                                </TableCell>
-                                                <TableCell className="text-right font-medium text-red-600">
-                                                    {formatPercent(stock.contribution)}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </TabsContent>
-
-                {/* Decomposition Tab */}
-                <TabsContent value="decomposition" className="space-y-6">
-                    {/* Return Sources */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Return Sources</CardTitle>
-                                <CardDescription>Breakdown of income vs. capital gains</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
-                                        <span className="font-medium">Dividends</span>
-                                        <span className="text-lg font-bold text-green-600">
-                      {formatPercent(MOCK_RETURN_DECOMPOSITION.dividends)}
-                    </span>
-                                    </div>
-                                    <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
-                                        <span className="font-medium">Interest Income</span>
-                                        <span className="text-lg font-bold text-green-600">
-                      {formatPercent(MOCK_RETURN_DECOMPOSITION.interest)}
-                    </span>
-                                    </div>
-                                    <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
-                                        <span className="font-medium">Capital Gains</span>
-                                        <span className="text-lg font-bold text-blue-600">
-                      {formatPercent(MOCK_RETURN_DECOMPOSITION.capitalGains)}
-                    </span>
-                                    </div>
-                                    <div
-                                        className="flex justify-between items-center p-3 bg-primary/10 rounded-lg border-2 border-primary">
-                                        <span className="font-bold">Total Return</span>
-                                        <span className="text-xl font-bold text-primary">
-                      {formatPercent(
-                          MOCK_RETURN_DECOMPOSITION.dividends +
-                          MOCK_RETURN_DECOMPOSITION.interest +
-                          MOCK_RETURN_DECOMPOSITION.capitalGains
-                      )}
-                    </span>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Return Composition</CardTitle>
-                                <CardDescription>Visual breakdown of return sources</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <PieChart>
-                                        <Pie
-                                            data={[
-                                                {name: 'Dividends', value: MOCK_RETURN_DECOMPOSITION.dividends},
-                                                {name: 'Interest', value: MOCK_RETURN_DECOMPOSITION.interest},
-                                                {name: 'Capital Gains', value: MOCK_RETURN_DECOMPOSITION.capitalGains}
-                                            ]}
-                                            dataKey="value"
-                                            nameKey="name"
-                                            cx="50%"
-                                            cy="50%"
-                                            outerRadius={100}
-                                            label={({name, value}) => `${name}: ${formatPercent(value)}`}
-                                        >
-                                            <Cell fill="#10b981"/>
-                                            <Cell fill="#3b82f6"/>
-                                            <Cell fill="#8b5cf6"/>
-                                        </Pie>
-                                        <Tooltip formatter={(value: number) => formatPercent(value)}/>
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </CardContent>
-                        </Card>
+                <TabsContent value="attribution" className="space-y-8">
+                    {/* Header */}
+                    <div>
+                        <h3 className="text-lg font-semibold text-foreground">Performance Insights</h3>
+                        <p className="text-sm text-muted-foreground">How you beat the market</p>
                     </div>
 
-                    {/* Realized vs Unrealized */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Realized vs. Unrealized Gains</CardTitle>
-                            <CardDescription>Split between locked-in and paper gains</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* 1. Performance Scorecard (Hero) */}
+                    <Card className="overflow-hidden border-none shadow-md bg-gradient-to-br from-white to-slate-50 dark:from-slate-950 dark:to-slate-900">
+                        <CardContent className="p-8">
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
                                 <div>
-                                    <div className="space-y-4">
+                                    <p className="text-sm font-medium text-muted-foreground mb-1">Total Return</p>
+                                    <div className="flex items-baseline gap-3">
+                                        <h2 className={`text-5xl font-bold tracking-tight ${getReturnColor(returns?.time_weighted_return || 0)}`}>
+                                            {formatPercent(returns?.time_weighted_return || 0)}
+                                        </h2>
+                                        <Badge variant="outline" className={`text-sm px-2 py-0.5 h-6 ${(returns?.time_weighted_return || 0) - (benchmarkComparison?.comparison?.[0]?.benchmark_return || 0) >= 0 ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                            {(returns?.time_weighted_return || 0) - (benchmarkComparison?.comparison?.[0]?.benchmark_return || 0) >= 0 ? '+' : ''}
+                                            {formatPercent((returns?.time_weighted_return || 0) - (benchmarkComparison?.comparison?.[0]?.benchmark_return || 0))} vs {benchmarkComparison?.benchmark_name || 'DSEX'}
+                                        </Badge>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Visual Comparison Bar */}
+                            <div className="space-y-6">
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-sm font-medium">
+                                        <span className="text-foreground">You</span>
+                                        <span className={getReturnColor(returns?.time_weighted_return || 0)}>{formatPercent(returns?.time_weighted_return || 0)}</span>
+                                    </div>
+                                    <div className="h-4 w-full bg-muted/30 rounded-full overflow-hidden">
                                         <div
-                                            className="flex justify-between items-center p-4 bg-green-50 rounded-lg border border-green-200">
-                                            <div>
-                                                <div className="text-sm text-muted-foreground">Realized Gains</div>
-                                                <div className="text-xs text-muted-foreground mt-1">Locked in through
-                                                    sales
-                                                </div>
+                                            className={`h-full rounded-full ${getReturnColor(returns?.time_weighted_return || 0).includes('green') ? 'bg-green-500' : 'bg-red-500'}`}
+                                            style={{ width: `${Math.min(Math.abs(returns?.time_weighted_return || 0) * 2, 100)}%` }} // Mock width scaling for demo
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-sm font-medium">
+                                        <span className="text-muted-foreground">Market ({benchmarkComparison?.benchmark_name || 'DSEX'})</span>
+                                        <span className="text-muted-foreground">{formatPercent(benchmarkComparison?.comparison?.[0]?.benchmark_return || 0)}</span>
+                                    </div>
+                                    <div className="h-4 w-full bg-muted/30 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full rounded-full bg-slate-400"
+                                            style={{ width: `${Math.min(Math.abs(benchmarkComparison?.comparison?.[0]?.benchmark_return || 0) * 2, 100)}%` }} // Mock width scaling
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* 2. Return Drivers (The Bridge) */}
+                    <div>
+                        <h4 className="text-base font-semibold mb-4 flex items-center gap-2">
+                            <Activity className="h-4 w-4 text-primary" />
+                            Return Drivers
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <Card className="bg-slate-50/50 dark:bg-slate-900/50 border-none shadow-sm">
+                                <CardContent className="p-4 flex flex-col items-center text-center">
+                                    <p className="text-xs text-muted-foreground mb-1">Market Return</p>
+                                    <p className="text-lg font-bold text-slate-600 dark:text-slate-400">
+                                        {formatPercent(benchmarkComparison?.comparison?.[0]?.benchmark_return || 0)}
+                                    </p>
+                                    <div className="mt-2 h-1 w-12 bg-slate-300 rounded-full" />
+                                </CardContent>
+                            </Card>
+
+                            <div className="hidden md:flex items-center justify-center text-muted-foreground">
+                                <Plus className="h-4 w-4" />
+                            </div>
+
+                            <Card className="bg-slate-50/50 dark:bg-slate-900/50 border-none shadow-sm">
+                                <CardContent className="p-4 flex flex-col items-center text-center">
+                                    <p className="text-xs text-muted-foreground mb-1">Sector Bets</p>
+                                    <p className={`text-lg font-bold ${(sectorAttribution?.attribution.reduce((acc, curr) => acc + curr.allocation_effect, 0) || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {(sectorAttribution?.attribution.reduce((acc, curr) => acc + curr.allocation_effect, 0) || 0) >= 0 ? '+' : ''}
+                                        {formatPercent(sectorAttribution?.attribution.reduce((acc, curr) => acc + curr.allocation_effect, 0) || 0)}
+                                    </p>
+                                    <div className={`mt-2 h-1 w-12 rounded-full ${(sectorAttribution?.attribution.reduce((acc, curr) => acc + curr.allocation_effect, 0) || 0) >= 0 ? 'bg-green-500' : 'bg-red-500'}`} />
+                                </CardContent>
+                            </Card>
+
+                            <div className="hidden md:flex items-center justify-center text-muted-foreground">
+                                <Plus className="h-4 w-4" />
+                            </div>
+
+                            <Card className="bg-slate-50/50 dark:bg-slate-900/50 border-none shadow-sm">
+                                <CardContent className="p-4 flex flex-col items-center text-center">
+                                    <p className="text-xs text-muted-foreground mb-1">Stock Picks</p>
+                                    <p className={`text-lg font-bold ${(sectorAttribution?.attribution.reduce((acc, curr) => acc + curr.selection_effect, 0) || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {(sectorAttribution?.attribution.reduce((acc, curr) => acc + curr.selection_effect, 0) || 0) >= 0 ? '+' : ''}
+                                        {formatPercent(sectorAttribution?.attribution.reduce((acc, curr) => acc + curr.selection_effect, 0) || 0)}
+                                    </p>
+                                    <div className={`mt-2 h-1 w-12 rounded-full ${(sectorAttribution?.attribution.reduce((acc, curr) => acc + curr.selection_effect, 0) || 0) >= 0 ? 'bg-green-500' : 'bg-red-500'}`} />
+                                </CardContent>
+                            </Card>
+
+                            <div className="hidden md:flex items-center justify-center text-muted-foreground">
+                                <ArrowUpRight className="h-4 w-4" />
+                            </div>
+
+                            <Card className="bg-primary/5 border-primary/20 shadow-sm">
+                                <CardContent className="p-4 flex flex-col items-center text-center">
+                                    <p className="text-xs text-primary/80 mb-1 font-medium">Your Return</p>
+                                    <p className={`text-xl font-bold ${getReturnColor(returns?.time_weighted_return || 0)}`}>
+                                        {formatPercent(returns?.time_weighted_return || 0)}
+                                    </p>
+                                    <div className="mt-2 h-1.5 w-12 bg-primary rounded-full" />
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </div>
+
+                    {/* 3. Top Movers (Visual Lists) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Winners */}
+                        <div>
+                            <h4 className="text-base font-semibold mb-4 flex items-center gap-2 text-green-700">
+                                <TrendingUp className="h-4 w-4" />
+                                Leading the Charge
+                            </h4>
+                            <div className="space-y-3">
+                                {(securityAttribution?.top_contributors || []).slice(0, 5).map((stock) => (
+                                    <div key={stock.symbol} className="group flex items-center gap-4 p-3 rounded-xl bg-white dark:bg-slate-950 border border-border/50 hover:border-green-200 hover:shadow-sm transition-all">
+                                        <div className="h-10 w-10 rounded-full bg-green-50 flex items-center justify-center text-green-700 font-bold text-xs">
+                                            {stock.symbol.substring(0, 2)}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="font-semibold text-sm truncate">{stock.symbol}</span>
+                                                <span className="font-bold text-sm text-green-600">+{formatPercent(stock.contribution)}</span>
                                             </div>
-                                            <div className="text-2xl font-bold text-green-600">
-                                                {formatPercent(MOCK_RETURN_DECOMPOSITION.realized)}
+                                            <div className="h-1.5 w-full bg-muted/30 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full bg-green-500 rounded-full"
+                                                    style={{ width: `${Math.min(stock.contribution * 20, 100)}%` }}
+                                                />
                                             </div>
                                         </div>
-                                        <div
-                                            className="flex justify-between items-center p-4 bg-blue-50 rounded-lg border border-blue-200">
-                                            <div>
-                                                <div className="text-sm text-muted-foreground">Unrealized Gains</div>
-                                                <div className="text-xs text-muted-foreground mt-1">Paper gains (current
-                                                    holdings)
-                                                </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Losers */}
+                        <div>
+                            <h4 className="text-base font-semibold mb-4 flex items-center gap-2 text-red-700">
+                                <TrendingDown className="h-4 w-4" />
+                                Dragging Down
+                            </h4>
+                            <div className="space-y-3">
+                                {(securityAttribution?.top_detractors || []).slice(0, 5).map((stock) => (
+                                    <div key={stock.symbol} className="group flex items-center gap-4 p-3 rounded-xl bg-white dark:bg-slate-950 border border-border/50 hover:border-red-200 hover:shadow-sm transition-all">
+                                        <div className="h-10 w-10 rounded-full bg-red-50 flex items-center justify-center text-red-700 font-bold text-xs">
+                                            {stock.symbol.substring(0, 2)}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="font-semibold text-sm truncate">{stock.symbol}</span>
+                                                <span className="font-bold text-sm text-red-600">{formatPercent(stock.contribution)}</span>
                                             </div>
-                                            <div className="text-2xl font-bold text-blue-600">
-                                                {formatPercent(MOCK_RETURN_DECOMPOSITION.unrealized)}
+                                            <div className="h-1.5 w-full bg-muted/30 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full bg-red-500 rounded-full"
+                                                    style={{ width: `${Math.min(Math.abs(stock.contribution) * 20, 100)}%` }}
+                                                />
                                             </div>
                                         </div>
-                                        {MOCK_RETURN_DECOMPOSITION.currencyEffect !== 0 && (
-                                            <div
-                                                className="flex justify-between items-center p-4 bg-amber-50 rounded-lg border border-amber-200">
-                                                <div>
-                                                    <div className="text-sm text-muted-foreground">Currency Effect</div>
-                                                    <div className="text-xs text-muted-foreground mt-1">FX impact on
-                                                        returns
-                                                    </div>
-                                                </div>
-                                                <div className="text-2xl font-bold text-amber-600">
-                                                    {formatPercent(MOCK_RETURN_DECOMPOSITION.currencyEffect)}
-                                                </div>
-                                            </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 4. Sector Heatmap (Visual Grid) */}
+                    <div>
+                        <h4 className="text-base font-semibold mb-4 flex items-center gap-2">
+                            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                            Sector Heatmap
+                        </h4>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                            {(sectorAttribution?.attribution || []).map((sector) => (
+                                <div
+                                    key={sector.sector}
+                                    className={`p-4 rounded-xl border transition-all hover:shadow-md ${sector.contribution >= 0 ? 'bg-green-50/50 border-green-100 dark:bg-green-900/10 dark:border-green-900/30' : 'bg-red-50/50 border-red-100 dark:bg-red-900/10 dark:border-red-900/30'}`}
+                                >
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{sector.sector}</span>
+                                        {sector.contribution >= 0 ? (
+                                            <ArrowUpRight className="h-3 w-3 text-green-600" />
+                                        ) : (
+                                            <ArrowDownRight className="h-3 w-3 text-red-600" />
                                         )}
                                     </div>
+                                    <div className={`text-xl font-bold ${sector.contribution >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                                        {sector.contribution >= 0 ? '+' : ''}{formatPercent(sector.contribution)}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                        Return: {formatPercent(sector.return)}
+                                    </div>
                                 </div>
-                                <div>
-                                    <ResponsiveContainer width="100%" height={300}>
-                                        <BarChart
-                                            data={[
-                                                {
-                                                    name: 'Gains',
-                                                    Realized: MOCK_RETURN_DECOMPOSITION.realized,
-                                                    Unrealized: MOCK_RETURN_DECOMPOSITION.unrealized
-                                                }
-                                            ]}
-                                            layout="vertical"
-                                        >
-                                            <CartesianGrid strokeDasharray="3 3" opacity={0.3}/>
-                                            <XAxis type="number" tickFormatter={(value) => `${value}%`}/>
-                                            <YAxis type="category" dataKey="name"/>
-                                            <Tooltip formatter={(value: number) => formatPercent(value)}/>
-                                            <Legend/>
-                                            <Bar dataKey="Realized" fill="#10b981"/>
-                                            <Bar dataKey="Unrealized" fill="#3b82f6"/>
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Income Generation */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Income Generation</CardTitle>
-                            <CardDescription>Track dividend and interest income over time</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-center py-8">
-                                <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-3"/>
-                                <p className="text-muted-foreground">
-                                    Detailed income tracking and forecasting will be available once API integration is
-                                    complete.
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
+                            ))}
+                        </div>
+                    </div>
                 </TabsContent>
 
                 {/* Dividends Tab */}
@@ -1227,14 +983,14 @@ export function PortfolioPerformance({
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                                    <TrendingUpIcon className="h-4 w-4 text-green-600"/>
+                                    <TrendingUpIcon className="h-4 w-4 text-green-600" />
                                     Annual Dividends
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">
                                     {dividendLoading ? (
-                                        <Activity className="h-5 w-5 animate-pulse"/>
+                                        <Activity className="h-5 w-5 animate-pulse" />
                                     ) : dividendError ? (
                                         <span className="text-muted-foreground">N/A</span>
                                     ) : (
@@ -1248,14 +1004,14 @@ export function PortfolioPerformance({
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                                    <Percent className="h-4 w-4 text-blue-600"/>
+                                    <Percent className="h-4 w-4 text-blue-600" />
                                     Dividend Yield
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">
                                     {dividendLoading ? (
-                                        <Activity className="h-5 w-5 animate-pulse"/>
+                                        <Activity className="h-5 w-5 animate-pulse" />
                                     ) : dividendError ? (
                                         <span className="text-muted-foreground">N/A</span>
                                     ) : (
@@ -1269,14 +1025,14 @@ export function PortfolioPerformance({
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                                    <Calendar className="h-4 w-4 text-purple-600"/>
+                                    <Calendar className="h-4 w-4 text-purple-600" />
                                     Quarterly Income
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">
                                     {dividendLoading ? (
-                                        <Activity className="h-5 w-5 animate-pulse"/>
+                                        <Activity className="h-5 w-5 animate-pulse" />
                                     ) : dividendError ? (
                                         <span className="text-muted-foreground">N/A</span>
                                     ) : (
@@ -1290,14 +1046,14 @@ export function PortfolioPerformance({
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                                    <DollarSign className="h-4 w-4 text-orange-600"/>
+                                    <DollarSign className="h-4 w-4 text-orange-600" />
                                     Monthly Income
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">
                                     {dividendLoading ? (
-                                        <Activity className="h-5 w-5 animate-pulse"/>
+                                        <Activity className="h-5 w-5 animate-pulse" />
                                     ) : dividendError ? (
                                         <span className="text-muted-foreground">N/A</span>
                                     ) : (
@@ -1318,11 +1074,11 @@ export function PortfolioPerformance({
                         <CardContent>
                             {dividendLoading ? (
                                 <div className="flex items-center justify-center py-12">
-                                    <Activity className="h-8 w-8 animate-spin text-muted-foreground"/>
+                                    <Activity className="h-8 w-8 animate-spin text-muted-foreground" />
                                 </div>
                             ) : dividendError ? (
                                 <div className="text-center py-12">
-                                    <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3"/>
+                                    <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
                                     <p className="text-muted-foreground">
                                         {dividendError?.status === 404
                                             ? "Portfolio not found. Please select a valid portfolio."
@@ -1363,7 +1119,7 @@ export function PortfolioPerformance({
                                 </Table>
                             ) : (
                                 <div className="text-center py-12">
-                                    <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-3"/>
+                                    <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
                                     <p className="text-muted-foreground">No dividend-paying stocks in this portfolio</p>
                                 </div>
                             )}
@@ -1401,14 +1157,14 @@ export function PortfolioPerformance({
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                                    <DollarSign className="h-4 w-4 text-blue-600"/>
+                                    <DollarSign className="h-4 w-4 text-blue-600" />
                                     Total Cost Basis
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">
                                     {costBasisLoading ? (
-                                        <Activity className="h-5 w-5 animate-pulse"/>
+                                        <Activity className="h-5 w-5 animate-pulse" />
                                     ) : costBasisError ? (
                                         <span className="text-muted-foreground">N/A</span>
                                     ) : (
@@ -1422,14 +1178,14 @@ export function PortfolioPerformance({
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                                    <TrendingUpIcon className="h-4 w-4 text-green-600"/>
+                                    <TrendingUpIcon className="h-4 w-4 text-green-600" />
                                     Current Value
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">
                                     {costBasisLoading ? (
-                                        <Activity className="h-5 w-5 animate-pulse"/>
+                                        <Activity className="h-5 w-5 animate-pulse" />
                                     ) : costBasisError ? (
                                         <span className="text-muted-foreground">N/A</span>
                                     ) : (
@@ -1443,7 +1199,7 @@ export function PortfolioPerformance({
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                                    <BarChart3 className="h-4 w-4 text-purple-600"/>
+                                    <BarChart3 className="h-4 w-4 text-purple-600" />
                                     Unrealized Gains
                                 </CardTitle>
                             </CardHeader>
@@ -1451,7 +1207,7 @@ export function PortfolioPerformance({
                                 <div
                                     className={`text-2xl font-bold ${((costBasisAnalysis as any)?.total_unrealized_gains || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                     {costBasisLoading ? (
-                                        <Activity className="h-5 w-5 animate-pulse"/>
+                                        <Activity className="h-5 w-5 animate-pulse" />
                                     ) : costBasisError ? (
                                         <span className="text-muted-foreground">N/A</span>
                                     ) : (
@@ -1465,14 +1221,14 @@ export function PortfolioPerformance({
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                                    <Receipt className="h-4 w-4 text-orange-600"/>
+                                    <Receipt className="h-4 w-4 text-orange-600" />
                                     Tax Liability
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-orange-600">
                                     {costBasisLoading ? (
-                                        <Activity className="h-5 w-5 animate-pulse"/>
+                                        <Activity className="h-5 w-5 animate-pulse" />
                                     ) : costBasisError ? (
                                         <span className="text-muted-foreground">N/A</span>
                                     ) : (
@@ -1493,11 +1249,11 @@ export function PortfolioPerformance({
                         <CardContent>
                             {costBasisLoading ? (
                                 <div className="flex items-center justify-center py-12">
-                                    <Activity className="h-8 w-8 animate-spin text-muted-foreground"/>
+                                    <Activity className="h-8 w-8 animate-spin text-muted-foreground" />
                                 </div>
                             ) : costBasisError ? (
                                 <div className="text-center py-12">
-                                    <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3"/>
+                                    <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
                                     <p className="text-muted-foreground">
                                         {costBasisError?.status === 404
                                             ? "Portfolio not found. Please select a valid portfolio."
@@ -1544,7 +1300,7 @@ export function PortfolioPerformance({
                                 </Table>
                             ) : (
                                 <div className="text-center py-12">
-                                    <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-3"/>
+                                    <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
                                     <p className="text-muted-foreground">No cost basis data available</p>
                                 </div>
                             )}
@@ -1552,49 +1308,49 @@ export function PortfolioPerformance({
                     </Card>
 
                     {/* Tax Loss Harvesting Opportunities */}
-                    {costBasisAnalysis && 
-                     typeof costBasisAnalysis === 'object' && 
-                     'tax_loss_opportunities' in costBasisAnalysis && 
-                     Array.isArray((costBasisAnalysis as any).tax_loss_opportunities) && 
-                     (costBasisAnalysis as any).tax_loss_opportunities.length > 0 && (
-                        <Card className="border-orange-200 bg-orange-50/50">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Receipt className="h-5 w-5 text-orange-600"/>
-                                    Tax Loss Harvesting Opportunities
-                                </CardTitle>
-                                <CardDescription>Stocks with significant unrealized losses that could offset
-                                    gains</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Symbol</TableHead>
-                                            <TableHead className="text-right">Unrealized Loss</TableHead>
-                                            <TableHead className="text-right">Current Value</TableHead>
-                                            <TableHead className="text-right">Tax Savings Estimate</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {(costBasisAnalysis?.tax_loss_opportunities as any[])?.map((opp: any) => (
-                                            <TableRow key={opp.symbol}>
-                                                <TableCell className="font-medium">{opp.symbol}</TableCell>
-                                                <TableCell className="text-right text-red-600 font-medium">
-                                                    {formatCurrency(opp.unrealized_loss)}
-                                                </TableCell>
-                                                <TableCell
-                                                    className="text-right">{formatCurrency(opp.current_value)}</TableCell>
-                                                <TableCell className="text-right font-medium text-green-600">
-                                                    {formatCurrency(opp.tax_savings_estimate)}
-                                                </TableCell>
+                    {costBasisAnalysis &&
+                        typeof costBasisAnalysis === 'object' &&
+                        'tax_loss_opportunities' in costBasisAnalysis &&
+                        Array.isArray((costBasisAnalysis as any).tax_loss_opportunities) &&
+                        (costBasisAnalysis as any).tax_loss_opportunities.length > 0 && (
+                            <Card className="border-orange-200 bg-orange-50/50">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Receipt className="h-5 w-5 text-orange-600" />
+                                        Tax Loss Harvesting Opportunities
+                                    </CardTitle>
+                                    <CardDescription>Stocks with significant unrealized losses that could offset
+                                        gains</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Symbol</TableHead>
+                                                <TableHead className="text-right">Unrealized Loss</TableHead>
+                                                <TableHead className="text-right">Current Value</TableHead>
+                                                <TableHead className="text-right">Tax Savings Estimate</TableHead>
                                             </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </CardContent>
-                        </Card>
-                    )}
+                                        </TableHeader>
+                                        <TableBody>
+                                            {(costBasisAnalysis?.tax_loss_opportunities as any[])?.map((opp: any) => (
+                                                <TableRow key={opp.symbol}>
+                                                    <TableCell className="font-medium">{opp.symbol}</TableCell>
+                                                    <TableCell className="text-right text-red-600 font-medium">
+                                                        {formatCurrency(opp.unrealized_loss)}
+                                                    </TableCell>
+                                                    <TableCell
+                                                        className="text-right">{formatCurrency(opp.current_value)}</TableCell>
+                                                    <TableCell className="text-right font-medium text-green-600">
+                                                        {formatCurrency(opp.tax_savings_estimate)}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </CardContent>
+                            </Card>
+                        )}
                 </TabsContent>
 
                 {/* Periods Tab */}
@@ -1634,7 +1390,7 @@ export function PortfolioPerformance({
                                             <TableCell className="text-right">
                                                 {row.relative_return >= 0 ? (
                                                     <Badge variant="default"
-                                                           className="bg-green-600">Outperforming</Badge>
+                                                        className="bg-green-600">Outperforming</Badge>
                                                 ) : (
                                                     <Badge variant="destructive">Underperforming</Badge>
                                                 )}
@@ -1655,17 +1411,17 @@ export function PortfolioPerformance({
                         <CardContent>
                             <ResponsiveContainer width="100%" height={300}>
                                 <LineChart data={MOCK_ROLLING_RETURNS}>
-                                    <CartesianGrid strokeDasharray="3 3" opacity={0.3}/>
-                                    <XAxis dataKey="period"/>
-                                    <YAxis tickFormatter={(value) => `${value}%`}/>
-                                    <Tooltip formatter={(value: number) => formatPercent(value)}/>
-                                    <Legend/>
+                                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                                    <XAxis dataKey="period" />
+                                    <YAxis tickFormatter={(value) => `${value}%`} />
+                                    <Tooltip formatter={(value: number) => formatPercent(value)} />
+                                    <Legend />
                                     <Line type="monotone" dataKey="rolling3M" stroke="#3b82f6" name="3 Month Rolling"
-                                          strokeWidth={2}/>
+                                        strokeWidth={2} />
                                     <Line type="monotone" dataKey="rolling6M" stroke="#10b981" name="6 Month Rolling"
-                                          strokeWidth={2}/>
+                                        strokeWidth={2} />
                                     <Line type="monotone" dataKey="rolling12M" stroke="#8b5cf6" name="12 Month Rolling"
-                                          strokeWidth={2}/>
+                                        strokeWidth={2} />
                                 </LineChart>
                             </ResponsiveContainer>
                         </CardContent>
@@ -1681,11 +1437,11 @@ export function PortfolioPerformance({
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <Label>Start Date</Label>
-                                    <Input type="date" className="mt-1"/>
+                                    <Input type="date" className="mt-1" />
                                 </div>
                                 <div>
                                     <Label>End Date</Label>
-                                    <Input type="date" className="mt-1"/>
+                                    <Input type="date" className="mt-1" />
                                 </div>
                             </div>
                             <Button className="w-full mt-4">Analyze Custom Period</Button>
@@ -1708,7 +1464,7 @@ export function PortfolioPerformance({
                                     <div
                                         className="border rounded-lg p-4 hover:bg-muted/50 cursor-pointer transition-colors">
                                         <div className="flex items-start gap-3">
-                                            <FileText className="h-5 w-5 text-primary mt-0.5"/>
+                                            <FileText className="h-5 w-5 text-primary mt-0.5" />
                                             <div className="flex-1">
                                                 <h4 className="font-medium">Monthly Performance Summary</h4>
                                                 <p className="text-sm text-muted-foreground mt-1">
@@ -1725,7 +1481,7 @@ export function PortfolioPerformance({
                                     <div
                                         className="border rounded-lg p-4 hover:bg-muted/50 cursor-pointer transition-colors">
                                         <div className="flex items-start gap-3">
-                                            <FileText className="h-5 w-5 text-primary mt-0.5"/>
+                                            <FileText className="h-5 w-5 text-primary mt-0.5" />
                                             <div className="flex-1">
                                                 <h4 className="font-medium">Quarterly Review</h4>
                                                 <p className="text-sm text-muted-foreground mt-1">
@@ -1742,7 +1498,7 @@ export function PortfolioPerformance({
                                     <div
                                         className="border rounded-lg p-4 hover:bg-muted/50 cursor-pointer transition-colors">
                                         <div className="flex items-start gap-3">
-                                            <FileText className="h-5 w-5 text-primary mt-0.5"/>
+                                            <FileText className="h-5 w-5 text-primary mt-0.5" />
                                             <div className="flex-1">
                                                 <h4 className="font-medium">Annual Performance Report</h4>
                                                 <p className="text-sm text-muted-foreground mt-1">
@@ -1759,7 +1515,7 @@ export function PortfolioPerformance({
                                     <div
                                         className="border rounded-lg p-4 hover:bg-muted/50 cursor-pointer transition-colors">
                                         <div className="flex items-start gap-3">
-                                            <FileText className="h-5 w-5 text-primary mt-0.5"/>
+                                            <FileText className="h-5 w-5 text-primary mt-0.5" />
                                             <div className="flex-1">
                                                 <h4 className="font-medium">Attribution Analysis</h4>
                                                 <p className="text-sm text-muted-foreground mt-1">
@@ -1802,7 +1558,7 @@ export function PortfolioPerformance({
                                         </div>
                                     </div>
                                     <Button variant="outline" className="w-full mt-4">
-                                        <Plus className="h-4 w-4 mr-2"/>
+                                        <Plus className="h-4 w-4 mr-2" />
                                         Add Scheduled Report
                                     </Button>
                                 </div>
@@ -1827,7 +1583,7 @@ export function PortfolioPerformance({
                                             <TableCell>Nov 1, 2024</TableCell>
                                             <TableCell className="text-right">
                                                 <Button size="sm" variant="ghost">
-                                                    <Download className="h-4 w-4"/>
+                                                    <Download className="h-4 w-4" />
                                                 </Button>
                                             </TableCell>
                                         </TableRow>
@@ -1837,7 +1593,7 @@ export function PortfolioPerformance({
                                             <TableCell>Oct 1, 2024</TableCell>
                                             <TableCell className="text-right">
                                                 <Button size="sm" variant="ghost">
-                                                    <Download className="h-4 w-4"/>
+                                                    <Download className="h-4 w-4" />
                                                 </Button>
                                             </TableCell>
                                         </TableRow>
@@ -1847,7 +1603,7 @@ export function PortfolioPerformance({
                                             <TableCell>Oct 1, 2024</TableCell>
                                             <TableCell className="text-right">
                                                 <Button size="sm" variant="ghost">
-                                                    <Download className="h-4 w-4"/>
+                                                    <Download className="h-4 w-4" />
                                                 </Button>
                                             </TableCell>
                                         </TableRow>

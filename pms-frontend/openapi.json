@@ -978,6 +978,31 @@
         }
       }
     },
+    "/api/v1/portfolio/aggregates": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolios Aggregate",
+        "description": "Aggregate totals for all portfolios of the current user.\n\nReturns:\n    {\n      \"total_portfolio_value\": float,   # stocks + cash\n      \"total_invested_amount\": float,   # sum of positions total_investment\n      \"total_available_cash\": float,    # sum of portfolios cash_balance\n      \"total_gain_loss\": float,         # stock_value - total_invested_amount\n      \"total_day_change\": float         # today's change across all stocks\n    }",
+        "operationId": "portfolio-get_portfolios_aggregate",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/portfolio/": {
       "get": {
         "tags": [
@@ -1801,6 +1826,139 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/portfolio/{portfolio_id}/history": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolio History",
+        "description": "Get portfolio value history for the last 12 months, aggregated weekly.\nReturns the last valuation of each week.",
+        "operationId": "portfolio-get_portfolio_history",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "portfolio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Portfolio Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/portfolio/history/aggregated": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Aggregated Portfolio History",
+        "description": "Get aggregated history for all portfolios of the current user.\nReturns detailed daily stats including returns.",
+        "operationId": "portfolio-get_aggregated_portfolio_history",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 5,
+              "default": 30,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PortfolioAggregatedHistory"
+                  },
+                  "title": "Response Portfolio-Get Aggregated Portfolio History"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/portfolio/history/sparkline": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Aggregated Portfolio Sparkline",
+        "description": "Get minimal aggregated history for sparklines (last 10 days only).",
+        "operationId": "portfolio-get_aggregated_portfolio_sparkline",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PortfolioSparklinePoint"
+                  },
+                  "type": "array",
+                  "title": "Response Portfolio-Get Aggregated Portfolio Sparkline"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/portfolio/{portfolio_id}/summary": {
@@ -2769,7 +2927,7 @@
           "watchlist"
         ],
         "summary": "Get Watchlist Items With Details",
-        "description": "Get watchlist items with stock details",
+        "description": "Get watchlist items with stock details including market data",
         "operationId": "watchlist-get_watchlist_items_with_details",
         "security": [
           {
@@ -3413,6 +3571,51 @@
             }
           }
         }
+      },
+      "post": {
+        "tags": [
+          "risk-management"
+        ],
+        "summary": "Create Risk Alert",
+        "description": "Create a new risk alert",
+        "operationId": "risk-management-create_risk_alert",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RiskAlertCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskAlertPublic"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/risk/screeners": {
@@ -3503,6 +3706,579 @@
                   },
                   "title": "Response Risk-Management-Get Stock Screeners"
                 }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/risk/portfolios/{portfolio_id}/overview": {
+      "get": {
+        "tags": [
+          "risk-management"
+        ],
+        "summary": "Get Risk Overview",
+        "description": "Get comprehensive risk overview for a portfolio",
+        "operationId": "risk-management-get_risk_overview",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "portfolio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Portfolio Id"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(1M|3M|6M|1Y|3Y|5Y|ALL)$",
+              "default": "1Y",
+              "title": "Period"
+            }
+          },
+          {
+            "name": "benchmark_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Benchmark Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/risk/portfolios/{portfolio_id}/metrics": {
+      "get": {
+        "tags": [
+          "risk-management"
+        ],
+        "summary": "Get Risk Metrics",
+        "description": "Get detailed risk metrics for a portfolio",
+        "operationId": "risk-management-get_risk_metrics",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "portfolio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Portfolio Id"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(1M|3M|6M|1Y|3Y|5Y|ALL)$",
+              "default": "1Y",
+              "title": "Period"
+            }
+          },
+          {
+            "name": "benchmark_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Benchmark Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/risk/portfolios/{portfolio_id}/metrics/timeseries": {
+      "get": {
+        "tags": [
+          "risk-management"
+        ],
+        "summary": "Get Risk Metrics Timeseries",
+        "description": "Get risk metrics as time series",
+        "operationId": "risk-management-get_risk_metrics_timeseries",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "portfolio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Portfolio Id"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(1M|3M|6M|1Y|3Y|5Y|ALL)$",
+              "default": "1Y",
+              "title": "Period"
+            }
+          },
+          {
+            "name": "benchmark_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Benchmark Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/risk/portfolios/{portfolio_id}/concentration/sector": {
+      "get": {
+        "tags": [
+          "risk-management"
+        ],
+        "summary": "Get Sector Concentration",
+        "description": "Get sector concentration analysis",
+        "operationId": "risk-management-get_sector_concentration",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "portfolio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Portfolio Id"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(1M|3M|6M|1Y|3Y|5Y|ALL)$",
+              "default": "1Y",
+              "title": "Period"
+            }
+          },
+          {
+            "name": "benchmark_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Benchmark Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/risk/portfolios/{portfolio_id}/correlation": {
+      "get": {
+        "tags": [
+          "risk-management"
+        ],
+        "summary": "Get Correlation Analysis",
+        "description": "Get correlation analysis for portfolio holdings",
+        "operationId": "risk-management-get_correlation_analysis",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "portfolio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Portfolio Id"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(1M|3M|6M|1Y|3Y|5Y|ALL)$",
+              "default": "1Y",
+              "title": "Period"
+            }
+          },
+          {
+            "name": "top",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 30,
+              "minimum": 1,
+              "default": 10,
+              "title": "Top"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/risk/portfolios/{portfolio_id}/stress-tests": {
+      "get": {
+        "tags": [
+          "risk-management"
+        ],
+        "summary": "Get Stress Tests",
+        "description": "Get stress test results for various scenarios",
+        "operationId": "risk-management-get_stress_tests",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "portfolio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Portfolio Id"
+            }
+          },
+          {
+            "name": "scenarios",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated scenario keys: 2008,covid,rate_hike,tech_crash",
+              "title": "Scenarios"
+            },
+            "description": "Comma-separated scenario keys: 2008,covid,rate_hike,tech_crash"
+          },
+          {
+            "name": "benchmark_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Benchmark Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/risk/alerts/{alert_id}": {
+      "patch": {
+        "tags": [
+          "risk-management"
+        ],
+        "summary": "Update Risk Alert",
+        "description": "Update a risk alert (acknowledge/resolve)",
+        "operationId": "risk-management-update_risk_alert",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "alert_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Alert Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_risk-management-update_risk_alert"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskAlertPublic"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/risk/portfolios/{portfolio_id}/rebalancing/recommendations": {
+      "post": {
+        "tags": [
+          "risk-management"
+        ],
+        "summary": "Get Rebalancing Recommendations",
+        "description": "Get rebalancing recommendations for a portfolio",
+        "operationId": "risk-management-get_rebalancing_recommendations",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "portfolio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Portfolio Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "number"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Optional custom target weights by sector/asset",
+                "title": "Targets"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           },
@@ -4881,7 +5657,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Body_analytics-upsert_allocation_targets"
+                "type": "object",
+                "title": "Targets"
               }
             }
           }
@@ -4914,6 +5691,279 @@
         }
       }
     },
+    "/api/v1/analytics/sectors": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Sectors List",
+        "description": "Get list of all available sectors",
+        "operationId": "analytics-get_sectors_list",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/stocks/by-sector": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Top Liquid Stocks By Sector",
+        "description": "Get top liquid stocks in a sector, sorted by volume/turnover",
+        "operationId": "analytics-get_top_liquid_stocks_by_sector",
+        "parameters": [
+          {
+            "name": "sector",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Sector name",
+              "title": "Sector"
+            },
+            "description": "Sector name"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10,
+              "minimum": 1,
+              "description": "Number of stocks to return",
+              "default": 3,
+              "title": "Limit"
+            },
+            "description": "Number of stocks to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/donchian-channel/{symbol}": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Donchian Channel",
+        "description": "Get Donchian Channel support and resistance levels for a stock symbol.\n\nUses daily caching to improve performance. Calculations for periods 5, 10, and 20\nare cached per symbol per day and reused for subsequent requests.\n\nDonchian Channels show the highest high and lowest low over a specified period.\n- Resistance (Upper Channel) = Highest high over N periods\n- Support (Lower Channel) = Lowest low over N periods\n- Middle Channel = (Upper Channel + Lower Channel) / 2\n\nArgs:\n    symbol: Stock trading code/symbol\n    periods: Comma-separated periods (default: 5,10,20)\n    \nReturns:\n    Support and resistance levels for each period",
+        "operationId": "analytics-get_donchian_channel",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "periods",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Comma-separated list of periods (e.g., '5,10,20')",
+              "default": "5,10,20",
+              "title": "Periods"
+            },
+            "description": "Comma-separated list of periods (e.g., '5,10,20')"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/profit-targets/{symbol}": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Profit Targets",
+        "description": "Calculate profit targets using multiple technical analysis methods.\n\nRequires authentication. Returns tiered exit strategy with:\n- Primary target based on technical resistance\n- Tiered targets (3 levels) with probability estimates\n- Alternative methods (risk_reward_2x, atr_3x, fibonacci_1.618)\n- Market context analysis",
+        "operationId": "analytics-get_profit_targets",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "entry_price",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "description": "Entry price of the position",
+              "title": "Entry Price"
+            },
+            "description": "Entry price of the position"
+          },
+          {
+            "name": "current_price",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "description": "Current market price",
+              "title": "Current Price"
+            },
+            "description": "Current market price"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/portfolio/impact": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Portfolio Impact",
+        "description": "Analyze market impact on user's portfolio.\nDetects significant market events (news, technical) and calculates \nhow they affect the user's holdings.\n\nOptimized to only process symbols and sectors that exist in the user's portfolio.",
+        "operationId": "analytics-get_portfolio_impact",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/analytics/user/allocation": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get User Allocation",
+        "description": "Get aggregated asset allocation across all user portfolios",
+        "operationId": "analytics-get_user_allocation",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/analytics/user/holdings": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get User Holdings",
+        "description": "Get aggregated holdings (quantity, value, gain) across all user portfolios",
+        "operationId": "analytics-get_user_holdings",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/research/stock-screener": {
       "get": {
         "tags": [
@@ -4922,11 +5972,6 @@
         "summary": "Stock Screener",
         "description": "Advanced stock screener with fundamental and technical filters",
         "operationId": "research-stock_screener",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
         "parameters": [
           {
             "name": "min_market_cap",
@@ -5458,7 +6503,7 @@
           "research"
         ],
         "summary": "Get Sector Analysis",
-        "description": "Get market sector performance analysis",
+        "description": "Get market sector performance analysis for last trading day",
         "operationId": "research-get_sector_analysis",
         "responses": {
           "200": {
@@ -5510,11 +6555,6 @@
         "summary": "Get Analyst Picks",
         "description": "Return a list of analyst picks with rating and target price.",
         "operationId": "research-get_analyst_picks",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
         "parameters": [
           {
             "name": "limit",
@@ -5559,11 +6599,6 @@
         "summary": "Get Earnings Highlights",
         "description": "Return latest quarterly results highlights (placeholder composition).",
         "operationId": "research-get_earnings_highlights",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
         "parameters": [
           {
             "name": "limit",
@@ -5625,12 +6660,159 @@
         ]
       }
     },
+    "/api/v1/market/benchmark/{benchmark_id}/last-5-days": {
+      "get": {
+        "tags": [
+          "market"
+        ],
+        "summary": "Get Benchmark Last 5 Days",
+        "description": "Get the last N trading days of benchmark data.\n\nReturns the last N trading days of benchmark data with date and value in crore.\nValues are converted from million (stored in DB) to crore.\n\nArgs:\n    benchmark_id: The benchmark identifier (e.g., 'DSEX')\n    session: Database session\n    days: Number of trading days to fetch (default 5, max 30)\n\nReturns:\n    Dict containing benchmark_id, data array with date and value_in_crore",
+        "operationId": "market-get_benchmark_last_5_days",
+        "parameters": [
+          {
+            "name": "benchmark_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Benchmark Id"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 30,
+              "minimum": 1,
+              "description": "Number of trading days to fetch",
+              "default": 5,
+              "title": "Days"
+            },
+            "description": "Number of trading days to fetch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Market-Get Benchmark Last 5 Days"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/market/benchmark/{benchmark_id}": {
+      "get": {
+        "tags": [
+          "market"
+        ],
+        "summary": "Get Benchmark Data",
+        "description": "Get benchmark index data by benchmark_id.\n\nReturns today's data if available, otherwise returns the most recent data.\nIncludes index value, change, trades, volume, and turnover.\n\nArgs:\n    benchmark_id: The benchmark identifier (e.g., 'DSEX', 'CSE')\n    session: Database session\n\nReturns:\n    Dict containing benchmark data including close_value, daily_return, \n    trades, volume, total_value (turnover), and date",
+        "operationId": "market-get_benchmark_data",
+        "parameters": [
+          {
+            "name": "benchmark_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Benchmark Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Market-Get Benchmark Data"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/market/benchmark/{benchmark_id}/performance": {
+      "get": {
+        "tags": [
+          "market"
+        ],
+        "summary": "Get Benchmark Performance",
+        "description": "Get benchmark performance over multiple time periods.\n\nReturns benchmark index performance changes over 1 day, 1 week, 1 month, and YTD.\nUseful for comparing portfolio performance against market benchmarks.\n\nArgs:\n    benchmark_id: The benchmark identifier (e.g., 'DSEX', 'DSES', 'DS30')\n    session: Database session\n\nReturns:\n    Dict containing benchmark info and performance metrics for each period",
+        "operationId": "market-get_benchmark_performance",
+        "parameters": [
+          {
+            "name": "benchmark_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Benchmark Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Market-Get Benchmark Performance"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/market/summary": {
       "get": {
         "tags": [
           "market"
         ],
         "summary": "Get Market Summary",
+        "description": "Get the latest market summary data.\n\nReturns the most recent market summary including:\n- DSE and CSE index values and changes\n- Market breadth (advancers, decliners, unchanged)\n- Trading statistics (total trades, volume, turnover)\n- Calculated breadth metrics (ad_ratio, net_breadth, total_active, sentiment)\n- Volume breadth (volume_breadth_up, volume_breadth_down)\n\nNo request parameters required - returns latest available data.",
         "operationId": "market-get_market_summary",
         "responses": {
           "200": {
@@ -5647,12 +6829,36 @@
         }
       }
     },
+    "/api/v1/market/stock-distribution": {
+      "get": {
+        "tags": [
+          "market"
+        ],
+        "summary": "Get Stock Distribution",
+        "description": "Get distribution of stocks grouped by percentage change.\n\nReturns a histogram of stocks grouped into predefined percentage change bins.\nUseful for visualizing market breadth distribution.\n\nBins:\n- 0%: Exactly 0\n- 0 to 2%: (0, 2]\n- 0 to -2%: [-2, 0)\n- 2 to 5%: (2, 5]\n- -2 to -5%: [-5, -2)\n- 5 to 10%: (5, 10]\n- -5 to -10%: [-10, -5)\n\nReturns:\n    Dict containing distribution with bin labels and counts",
+        "operationId": "market-get_stock_distribution",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Market-Get Stock Distribution"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/market/stocks": {
       "get": {
         "tags": [
           "market"
         ],
         "summary": "List Stocks",
+        "description": "Get basic market data for stocks.\nFast, lightweight endpoint for basic stock information.\nUse /market/fundamentals for detailed fundamental metrics.",
         "operationId": "market-list_stocks",
         "parameters": [
           {
@@ -5695,7 +6901,7 @@
             "required": false,
             "schema": {
               "type": "integer",
-              "maximum": 200,
+              "maximum": 500,
               "minimum": 1,
               "default": 50,
               "title": "Limit"
@@ -5724,6 +6930,337 @@
                     "type": "object"
                   },
                   "title": "Response Market-List Stocks"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/market/fundamentals": {
+      "get": {
+        "tags": [
+          "market"
+        ],
+        "summary": "List Fundamentals",
+        "description": "Get fundamental metrics for stocks with filtering and sorting.\nUse this endpoint for the Fundamentals page.",
+        "operationId": "market-list_fundamentals",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Search by symbol or company name",
+              "title": "Q"
+            },
+            "description": "Search by symbol or company name"
+          },
+          {
+            "name": "sector",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sector"
+            }
+          },
+          {
+            "name": "min_pe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Minimum P/E ratio",
+              "title": "Min Pe"
+            },
+            "description": "Minimum P/E ratio"
+          },
+          {
+            "name": "max_pe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum P/E ratio",
+              "title": "Max Pe"
+            },
+            "description": "Maximum P/E ratio"
+          },
+          {
+            "name": "min_dividend_yield",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Minimum dividend yield %",
+              "title": "Min Dividend Yield"
+            },
+            "description": "Minimum dividend yield %"
+          },
+          {
+            "name": "max_dividend_yield",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum dividend yield %",
+              "title": "Max Dividend Yield"
+            },
+            "description": "Maximum dividend yield %"
+          },
+          {
+            "name": "min_score",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Minimum fundamental score",
+              "title": "Min Score"
+            },
+            "description": "Minimum fundamental score"
+          },
+          {
+            "name": "min_market_cap",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Minimum market cap (in millions)",
+              "title": "Min Market Cap"
+            },
+            "description": "Minimum market cap (in millions)"
+          },
+          {
+            "name": "max_market_cap",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum market cap (in millions)",
+              "title": "Max Market Cap"
+            },
+            "description": "Maximum market cap (in millions)"
+          },
+          {
+            "name": "min_roe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Minimum ROE %",
+              "title": "Min Roe"
+            },
+            "description": "Minimum ROE %"
+          },
+          {
+            "name": "max_roe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum ROE %",
+              "title": "Max Roe"
+            },
+            "description": "Maximum ROE %"
+          },
+          {
+            "name": "min_debt_equity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Minimum debt to equity ratio",
+              "title": "Min Debt Equity"
+            },
+            "description": "Minimum debt to equity ratio"
+          },
+          {
+            "name": "max_debt_equity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum debt to equity ratio",
+              "title": "Max Debt Equity"
+            },
+            "description": "Maximum debt to equity ratio"
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sort field: pe, dividend_yield, market_cap, score, roe, debt_equity, symbol",
+              "default": "score",
+              "title": "Sort By"
+            },
+            "description": "Sort field: pe, dividend_yield, market_cap, score, roe, debt_equity, symbol"
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sort order: asc or desc",
+              "default": "desc",
+              "title": "Sort Order"
+            },
+            "description": "Sort order: asc or desc"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  },
+                  "title": "Response Market-List Fundamentals"
                 }
               }
             }
@@ -5946,7 +7483,7 @@
           "market"
         ],
         "summary": "Get Indices",
-        "description": "Return index levels and short history for sparklines.\nCurrently supports DSEX from MarketSummary; DS30 and DSES are placeholders until scraped.",
+        "description": "Return index levels and short history for sparklines.\nSupports DSEX from MarketSummary, and DS30/DSES from benchmark_data table.",
         "operationId": "market-get_indices",
         "parameters": [
           {
@@ -6056,14 +7593,37 @@
         }
       }
     },
-    "/api/v1/market/events/upcoming": {
+    "/api/v1/market/sector-analysis": {
       "get": {
         "tags": [
           "market"
         ],
-        "summary": "Get Upcoming Events",
-        "description": "Return upcoming market events (AGMs, EGMs, Record Dates, IPO listings). Placeholder content.",
-        "operationId": "market-get_upcoming_events",
+        "summary": "Get Sector Analysis",
+        "description": "Get sector analysis data for Advances/Declines and Turnover charts.\n\nReturns:\n    - advances_declines: List of sectors with up, down, unchanged counts\n    - turnover: List of sectors with total turnover values",
+        "operationId": "market-get_sector_analysis",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Market-Get Sector Analysis"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/market/most-volatile": {
+      "get": {
+        "tags": [
+          "market"
+        ],
+        "summary": "Get Most Volatile Stocks",
+        "description": "Get the most volatile stocks based on True Range calculation.\n\nTrue Range considers:\n- High - Low (intraday range)\n- High - Previous Close (gap up)\n- Low - Previous Close (gap down)\n\nReturns stocks with highest True Range percentage, filtered by minimum\ntrades count and volume to ensure meaningful liquidity.\n\nArgs:\n    limit: Maximum number of stocks to return (default: 10, max: 100)\n    min_trades: Minimum trades count filter (default: 10)\n    min_volume: Minimum volume filter (default: 1000)\n\nReturns:\n    List of stocks with volatility metrics including:\n    - company_name, stock_symbol\n    - high, low, previous_close\n    - true_range (absolute value)\n    - true_range_pct (percentage of previous close)\n    - volume, change_percent",
+        "operationId": "market-get_most_volatile_stocks",
         "parameters": [
           {
             "name": "limit",
@@ -6073,8 +7633,83 @@
               "type": "integer",
               "maximum": 100,
               "minimum": 1,
-              "default": 20,
+              "description": "Number of stocks to return",
+              "default": 10,
               "title": "Limit"
+            },
+            "description": "Number of stocks to return"
+          },
+          {
+            "name": "min_trades",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Minimum trades count filter",
+              "default": 10,
+              "title": "Min Trades"
+            },
+            "description": "Minimum trades count filter"
+          },
+          {
+            "name": "min_volume",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Minimum volume filter",
+              "default": 1000,
+              "title": "Min Volume"
+            },
+            "description": "Minimum volume filter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  },
+                  "title": "Response Market-Get Most Volatile Stocks"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/market/depth/{symbol}": {
+      "get": {
+        "tags": [
+          "market"
+        ],
+        "summary": "Get Market Depth",
+        "description": "Get real-time market depth (order book) for a stock from DSE.\n\nThis endpoint fetches live market depth data from the Dhaka Stock Exchange,\nincluding:\n- Buy orders (bid prices and volumes)\n- Sell orders (ask prices and volumes)\n- Price statistics (open, high, low, close, volume, trades, etc.)\n\nArgs:\n    symbol: Stock trading code (e.g., 'AFTABAUTO', 'GP', 'BATBC')\n\nReturns:\n    Dict containing buy_orders, sell_orders, and price_statistics",
+        "operationId": "market-get_market_depth",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
             }
           }
         ],
@@ -6085,7 +7720,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "title": "Response Market-Get Upcoming Events"
+                  "title": "Response Market-Get Market Depth"
                 }
               }
             }
@@ -6380,6 +8015,24 @@
               "default": 0,
               "title": "Offset"
             }
+          },
+          {
+            "name": "symbol",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by trading code",
+              "title": "Symbol"
+            },
+            "description": "Filter by trading code"
           }
         ],
         "responses": {
@@ -6390,7 +8043,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/NewsPublic"
+                    "$ref": "#/components/schemas/NewsPublicWithSymbols"
                   },
                   "title": "Response News-List News"
                 }
@@ -6462,15 +8115,6 @@
         "summary": "Get Stock News",
         "operationId": "news-get_stock_news",
         "parameters": [
-          {
-            "name": "symbol",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Symbol"
-            }
-          },
           {
             "name": "days",
             "in": "query",
@@ -7185,11 +8829,6 @@
         "summary": "Get Dividend History",
         "description": "Provide annual dividend information (cash, stock, yield)",
         "operationId": "fundamentals-get_dividend_history",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
         "parameters": [
           {
             "name": "trading_code",
@@ -7251,11 +8890,6 @@
         "summary": "Get Historical Financial Ratios",
         "description": "Return historical P/E, EPS, NAV, and profit data for charts",
         "operationId": "fundamentals-get_historical_ratios",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
         "parameters": [
           {
             "name": "trading_code",
@@ -7313,11 +8947,6 @@
         "summary": "Compare Multiple Companies",
         "description": "Compare key financial indicators among multiple companies",
         "operationId": "fundamentals-compare_companies",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
         "parameters": [
           {
             "name": "codes",
@@ -7368,11 +8997,6 @@
         "summary": "Search and Filter Companies",
         "description": "Filter companies based on category, sector, or performance range",
         "operationId": "fundamentals-search_companies",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
         "parameters": [
           {
             "name": "sector",
@@ -8093,6 +9717,58 @@
         }
       }
     },
+    "/api/v1/benchmarks/{benchmark_id}/timeseries": {
+      "get": {
+        "tags": [
+          "performance"
+        ],
+        "summary": "Get Benchmark Timeseries",
+        "description": "Get benchmark timeseries data for a date range.\n\nReturns:\n    Dictionary with dates, close values, and daily returns",
+        "operationId": "performance-get_benchmark_timeseries",
+        "parameters": [
+          {
+            "name": "benchmark_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Benchmark Id"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(1M|3M|6M|1Y|3Y|5Y|ALL)$",
+              "default": "1Y",
+              "title": "Period"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/portfolios/{portfolio_id}/performance/monthly-returns": {
       "get": {
         "tags": [
@@ -8199,6 +9875,63 @@
                 "schema": {
                   "$ref": "#/components/schemas/AttributionResponse"
                 }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/portfolios/{portfolio_id}/performance/valuation/period": {
+      "get": {
+        "tags": [
+          "performance"
+        ],
+        "summary": "Get Portfolio Period Valuation",
+        "description": "Return start and end portfolio values for a period and derived P/L.\n\n- start_value: Portfolio value at period start (on or before start_date)\n- end_value: Portfolio value at period end (on or before end_date)\n- absolute_pl: end_value - start_value\n- percent_pl: (absolute_pl / max(1, start_value)) * 100",
+        "operationId": "performance-get_portfolio_period_valuation",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "portfolio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Portfolio Id"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(1D|1W|1M|3M|6M|YTD|1Y|3Y|5Y|ALL)$",
+              "default": "1W",
+              "title": "Period"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           },
@@ -8585,6 +10318,54 @@
         }
       }
     },
+    "/api/v1/clients/me/performance/returns": {
+      "get": {
+        "tags": [
+          "performance"
+        ],
+        "summary": "Get Client Performance Returns",
+        "description": "Get combined TWR and MWR for all portfolios belonging to the current user.\n\nThis endpoint aggregates portfolio values across all user's active portfolios,\nthen calculates:\n- Combined Time-Weighted Return (TWR) - neutralizes impact of cash flows\n- Combined Money-Weighted Return (MWR) - accounts for timing of cash flows\n- Annualized return based on TWR\n\nThe TWR calculation:\n1. Aggregates daily values across all portfolios (V_Total = V_A + V_B + ...)\n2. Calculates subperiod returns on the combined values\n3. Chain-links the returns for final TWR\n\n- **period**: Time period (1W, 1M, 3M, 6M, YTD, 1Y, 3Y, 5Y, ALL)",
+        "operationId": "performance-get_client_performance_returns",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(1W|1M|3M|6M|YTD|1Y|3Y|5Y|ALL)$",
+              "default": "YTD",
+              "title": "Period"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tradingview/config": {
       "get": {
         "tags": [
@@ -8739,6 +10520,59 @@
         }
       }
     },
+    "/api/v1/tradingview/symbol_info": {
+      "get": {
+        "tags": [
+          "tradingview"
+        ],
+        "summary": "Get Symbol Info",
+        "description": "Returns symbol info for a group of symbols.\nhttps://www.tradingview.com/charting-library-docs/latest/connecting_data/UDF#symbol-info",
+        "operationId": "tradingview-get_symbol_info",
+        "parameters": [
+          {
+            "name": "group",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exchange group",
+              "title": "Group"
+            },
+            "description": "Exchange group"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Tradingview-Get Symbol Info"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tradingview/search": {
       "get": {
         "tags": [
@@ -8845,66 +10679,13 @@
         }
       }
     },
-    "/api/v1/tradingview/symbol_info": {
-      "get": {
-        "tags": [
-          "tradingview"
-        ],
-        "summary": "Get Symbol Info",
-        "description": "Returns symbol info for a group of symbols.\nhttps://www.tradingview.com/charting-library-docs/latest/connecting_data/UDF#symbol-info",
-        "operationId": "tradingview-get_symbol_info",
-        "parameters": [
-          {
-            "name": "group",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Exchange group",
-              "title": "Group"
-            },
-            "description": "Exchange group"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "title": "Response Tradingview-Get Symbol Info"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/tradingview/history": {
       "get": {
         "tags": [
           "tradingview"
         ],
         "summary": "Get History",
-        "description": "Returns historical bars for a symbol.\nhttps://www.tradingview.com/charting-library-docs/latest/connecting_data/UDF#history",
+        "description": "Returns historical bars for a symbol.\nhttps://www.tradingview.com/charting-library-docs/latest/connecting_data/UDF#history\n\nOptimization: Enforces minimum countback of 50 bars to prevent excessive small requests\nfrom TradingView's panning/zooming behavior (which can request as few as 2-3 bars).",
         "operationId": "tradingview-get_history",
         "parameters": [
           {
@@ -9047,8 +10828,13 @@
           "tradingview"
         ],
         "summary": "Get Positions For Tradingview",
-        "description": "Get positions for a symbol formatted for TradingView marks.\nThis endpoint is public (no auth) since TradingView widget needs to access it.\nReturns position marks with timestamp, price, quantity, and portfolio info.",
+        "description": "Get positions for a symbol formatted for TradingView marks.\nReturns position marks with timestamp, price, quantity, and portfolio info\nfor positions belonging to the authenticated user.",
         "operationId": "tradingview-get_positions_for_tradingview",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "symbol",
@@ -9390,6 +11176,1316 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RebalancingSettingsPublic"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/research/backtest": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Run Backtest",
+        "description": "Execute a strategy backtest on historical data.\n\nSupports the following strategies:\n- **buy_hold**: Buy at start, hold until end\n- **sma**: Simple Moving Average crossover\n- **ema**: Exponential Moving Average crossover\n- **rsi**: RSI overbought/oversold signals\n- **bbands**: Bollinger Bands mean reversion\n- **macd**: MACD/Signal line crossover\n\nReturns performance metrics, equity curve, and trade records.",
+        "operationId": "research-run_backtest",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BacktestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/upcoming-events/": {
+      "get": {
+        "tags": [
+          "upcoming-events"
+        ],
+        "summary": "Get Paginated Upcoming Events",
+        "description": "Retrieve upcoming corporate events with pagination and filtering options",
+        "operationId": "upcoming-events-list_upcoming_events",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number (1-indexed)",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number (1-indexed)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Number of items per page",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Number of items per page"
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by stock code/symbol (case-insensitive partial match)",
+              "title": "Code"
+            },
+            "description": "Filter by stock code/symbol (case-insensitive partial match)"
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by event type (e.g., 'AGM', 'Board Meeting', 'Record Date')",
+              "title": "Event Type"
+            },
+            "description": "Filter by event type (e.g., 'AGM', 'Board Meeting', 'Record Date')"
+          },
+          {
+            "name": "min_timestamp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter events with timestamp >= min_timestamp (Unix timestamp)",
+              "title": "Min Timestamp"
+            },
+            "description": "Filter events with timestamp >= min_timestamp (Unix timestamp)"
+          },
+          {
+            "name": "max_timestamp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter events with timestamp <= max_timestamp (Unix timestamp)",
+              "title": "Max Timestamp"
+            },
+            "description": "Filter events with timestamp <= max_timestamp (Unix timestamp)"
+          },
+          {
+            "name": "order_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Field to order by. Prefix with '-' for descending. Options: timestamp, post_date, code",
+              "default": "timestamp",
+              "title": "Order By"
+            },
+            "description": "Field to order by. Prefix with '-' for descending. Options: timestamp, post_date, code"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpcomingEventsPublic"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "upcoming-events"
+        ],
+        "summary": "Create Upcoming Event",
+        "description": "Create a new upcoming event (admin only)",
+        "operationId": "upcoming-events-create_event",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpcomingEventCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpcomingEventPublic"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/upcoming-events/code/{code}": {
+      "get": {
+        "tags": [
+          "upcoming-events"
+        ],
+        "summary": "Get Events by Stock Code",
+        "description": "Retrieve all upcoming events for a specific stock",
+        "operationId": "upcoming-events-get_events_by_code",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 500,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum number of results",
+              "title": "Limit"
+            },
+            "description": "Maximum number of results"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UpcomingEventPublic"
+                  },
+                  "title": "Response Upcoming-Events-Get Events By Code"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/upcoming-events/type/{event_type}": {
+      "get": {
+        "tags": [
+          "upcoming-events"
+        ],
+        "summary": "Get Events by Type",
+        "description": "Retrieve upcoming events filtered by event type",
+        "operationId": "upcoming-events-get_events_by_type",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Type"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Maximum number of results",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Maximum number of results"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UpcomingEventPublic"
+                  },
+                  "title": "Response Upcoming-Events-Get Events By Type"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/upcoming-events/{event_id}": {
+      "get": {
+        "tags": [
+          "upcoming-events"
+        ],
+        "summary": "Get Event by ID",
+        "description": "Retrieve a specific upcoming event by its ID",
+        "operationId": "upcoming-events-get_event_by_id",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpcomingEventPublic"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "upcoming-events"
+        ],
+        "summary": "Update Event",
+        "description": "Update an existing upcoming event (admin only)",
+        "operationId": "upcoming-events-update_event",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpcomingEventUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpcomingEventPublic"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "upcoming-events"
+        ],
+        "summary": "Delete Event",
+        "description": "Delete an upcoming event (admin only)",
+        "operationId": "upcoming-events-delete_event",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/upcoming-events/bulk": {
+      "post": {
+        "tags": [
+          "upcoming-events"
+        ],
+        "summary": "Bulk Create Events",
+        "description": "Create multiple upcoming events in a single transaction (admin only)",
+        "operationId": "upcoming-events-bulk_create_events",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/UpcomingEventCreate"
+                },
+                "type": "array",
+                "title": "Events"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UpcomingEventPublic"
+                  },
+                  "type": "array",
+                  "title": "Response Upcoming-Events-Bulk Create Events"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/ideas/": {
+      "get": {
+        "tags": [
+          "ideas"
+        ],
+        "summary": "List Ideas",
+        "description": "List trading ideas with filters.",
+        "operationId": "ideas-list_ideas",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "bias",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/IdeaBias"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bias"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/IdeaTimeframe"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Timeframe"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  },
+                  "title": "Response Ideas-List Ideas"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "ideas"
+        ],
+        "summary": "Create Idea",
+        "description": "Create a new trading idea.",
+        "operationId": "ideas-create_idea",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradingIdeaCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradingIdeaPublic"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ideas/{id}": {
+      "get": {
+        "tags": [
+          "ideas"
+        ],
+        "summary": "Get Idea",
+        "description": "Get a specific trading idea by ID.",
+        "operationId": "ideas-get_idea",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Ideas-Get Idea"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "ideas"
+        ],
+        "summary": "Update Idea",
+        "description": "Update a trading idea.",
+        "operationId": "ideas-update_idea",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradingIdeaUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradingIdeaPublic"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "ideas"
+        ],
+        "summary": "Delete Idea",
+        "description": "Delete a trading idea.",
+        "operationId": "ideas-delete_idea",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Ideas-Delete Idea"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ideas/{id}/like": {
+      "post": {
+        "tags": [
+          "ideas"
+        ],
+        "summary": "Toggle Like",
+        "description": "Toggle like on a trading idea.",
+        "operationId": "ideas-toggle_like",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Ideas-Toggle Like"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ideas/{id}/comment": {
+      "post": {
+        "tags": [
+          "ideas"
+        ],
+        "summary": "Add Comment",
+        "description": "Add a comment to a trading idea.",
+        "operationId": "ideas-add_comment",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdeaCommentCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdeaCommentPublic"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ideas/{id}/comments": {
+      "get": {
+        "tags": [
+          "ideas"
+        ],
+        "summary": "Get Comments",
+        "description": "Get comments for a trading idea.",
+        "operationId": "ideas-get_comments",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  },
+                  "title": "Response Ideas-Get Comments"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ideas/follow/user/{user_id}": {
+      "post": {
+        "tags": [
+          "ideas"
+        ],
+        "summary": "Follow User",
+        "description": "Follow a user.",
+        "operationId": "ideas-follow_user",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Ideas-Follow User"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "ideas"
+        ],
+        "summary": "Unfollow User",
+        "description": "Unfollow a user.",
+        "operationId": "ideas-unfollow_user",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Ideas-Unfollow User"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ideas/follow/symbol/{symbol}": {
+      "post": {
+        "tags": [
+          "ideas"
+        ],
+        "summary": "Follow Symbol",
+        "description": "Follow a symbol.",
+        "operationId": "ideas-follow_symbol",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Ideas-Follow Symbol"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "ideas"
+        ],
+        "summary": "Unfollow Symbol",
+        "description": "Unfollow a symbol.",
+        "operationId": "ideas-unfollow_symbol",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Ideas-Unfollow Symbol"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ideas/profile/{user_id}": {
+      "get": {
+        "tags": [
+          "ideas"
+        ],
+        "summary": "Get User Profile",
+        "description": "Get user profile social stats.",
+        "operationId": "ideas-get_user_profile",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Ideas-Get User Profile"
                 }
               }
             }
@@ -9849,64 +12945,6 @@
         "type": "object",
         "title": "AlertUpdate"
       },
-      "AllocationTargetCreate": {
-        "properties": {
-          "category": {
-            "type": "string",
-            "title": "Category"
-          },
-          "category_type": {
-            "type": "string",
-            "title": "Category Type",
-            "default": "SECTOR"
-          },
-          "target_percent": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              }
-            ],
-            "title": "Target Percent"
-          },
-          "min_percent": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Min Percent"
-          },
-          "max_percent": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Percent"
-          }
-        },
-        "type": "object",
-        "required": [
-          "category",
-          "target_percent"
-        ],
-        "title": "AllocationTargetCreate"
-      },
       "AllocationTargetPublic": {
         "properties": {
           "category": {
@@ -10108,6 +13146,409 @@
         ],
         "title": "AttributionResponse",
         "description": "Attribution analysis API response"
+      },
+      "BacktestMetrics": {
+        "properties": {
+          "total_return_pct": {
+            "type": "number",
+            "title": "Total Return Pct",
+            "description": "Total return percentage"
+          },
+          "total_profit": {
+            "type": "number",
+            "title": "Total Profit",
+            "description": "Total profit in absolute terms"
+          },
+          "max_drawdown_pct": {
+            "type": "number",
+            "title": "Max Drawdown Pct",
+            "description": "Maximum drawdown percentage"
+          },
+          "sharpe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharpe",
+            "description": "Sharpe ratio (risk-adjusted return)"
+          },
+          "win_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Rate",
+            "description": "Percentage of winning trades"
+          },
+          "total_trades": {
+            "type": "integer",
+            "title": "Total Trades",
+            "description": "Total number of trades executed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_return_pct",
+          "total_profit",
+          "max_drawdown_pct",
+          "total_trades"
+        ],
+        "title": "BacktestMetrics",
+        "description": "Performance metrics from backtest."
+      },
+      "BacktestParams": {
+        "properties": {
+          "init_cash": {
+            "type": "number",
+            "title": "Init Cash",
+            "description": "Initial cash amount",
+            "default": 100000.0
+          },
+          "fast": {
+            "type": "integer",
+            "title": "Fast",
+            "description": "Fast moving average period",
+            "default": 10
+          },
+          "slow": {
+            "type": "integer",
+            "title": "Slow",
+            "description": "Slow moving average period",
+            "default": 50
+          },
+          "rsi_window": {
+            "type": "integer",
+            "title": "Rsi Window",
+            "description": "RSI calculation window",
+            "default": 14
+          },
+          "rsi_buy_below": {
+            "type": "number",
+            "title": "Rsi Buy Below",
+            "description": "RSI oversold threshold (buy signal)",
+            "default": 30.0
+          },
+          "rsi_sell_above": {
+            "type": "number",
+            "title": "Rsi Sell Above",
+            "description": "RSI overbought threshold (sell signal)",
+            "default": 70.0
+          },
+          "bb_window": {
+            "type": "integer",
+            "title": "Bb Window",
+            "description": "Bollinger Bands calculation window",
+            "default": 20
+          },
+          "bb_n": {
+            "type": "number",
+            "title": "Bb N",
+            "description": "Standard deviation multiplier",
+            "default": 2.0
+          },
+          "macd_fast": {
+            "type": "integer",
+            "title": "Macd Fast",
+            "description": "MACD fast period",
+            "default": 12
+          },
+          "macd_slow": {
+            "type": "integer",
+            "title": "Macd Slow",
+            "description": "MACD slow period",
+            "default": 26
+          },
+          "macd_signal": {
+            "type": "integer",
+            "title": "Macd Signal",
+            "description": "MACD signal period",
+            "default": 9
+          },
+          "stoch_k_window": {
+            "type": "integer",
+            "title": "Stoch K Window",
+            "description": "Stochastic %K calculation window",
+            "default": 14
+          },
+          "stoch_d_window": {
+            "type": "integer",
+            "title": "Stoch D Window",
+            "description": "Stochastic %D smoothing period",
+            "default": 3
+          },
+          "stoch_buy_below": {
+            "type": "number",
+            "title": "Stoch Buy Below",
+            "description": "Stochastic oversold threshold (buy signal)",
+            "default": 20.0
+          },
+          "stoch_sell_above": {
+            "type": "number",
+            "title": "Stoch Sell Above",
+            "description": "Stochastic overbought threshold (sell signal)",
+            "default": 80.0
+          },
+          "atr_window": {
+            "type": "integer",
+            "title": "Atr Window",
+            "description": "ATR calculation window",
+            "default": 14
+          },
+          "atr_lookback": {
+            "type": "integer",
+            "title": "Atr Lookback",
+            "description": "Lookback period for high/low bands",
+            "default": 20
+          },
+          "atr_multiplier": {
+            "type": "number",
+            "title": "Atr Multiplier",
+            "description": "ATR multiplier for breakout bands",
+            "default": 1.5
+          },
+          "ma_short": {
+            "type": "integer",
+            "title": "Ma Short",
+            "description": "Short moving average period",
+            "default": 10
+          },
+          "ma_medium": {
+            "type": "integer",
+            "title": "Ma Medium",
+            "description": "Medium moving average period",
+            "default": 30
+          },
+          "ma_long": {
+            "type": "integer",
+            "title": "Ma Long",
+            "description": "Long moving average period",
+            "default": 50
+          },
+          "zscore_window": {
+            "type": "integer",
+            "title": "Zscore Window",
+            "description": "Window for z-score calculation",
+            "default": 20
+          },
+          "zscore_threshold": {
+            "type": "number",
+            "title": "Zscore Threshold",
+            "description": "Z-score threshold for mean reversion signals",
+            "default": 2.0
+          },
+          "adx_window": {
+            "type": "integer",
+            "title": "Adx Window",
+            "description": "ADX calculation window",
+            "default": 14
+          },
+          "adx_threshold": {
+            "type": "number",
+            "title": "Adx Threshold",
+            "description": "ADX threshold for trend strength",
+            "default": 25.0
+          },
+          "ichimoku_conversion": {
+            "type": "integer",
+            "title": "Ichimoku Conversion",
+            "description": "Tenkan-sen (conversion line) period",
+            "default": 9
+          },
+          "ichimoku_base": {
+            "type": "integer",
+            "title": "Ichimoku Base",
+            "description": "Kijun-sen (base line) period",
+            "default": 26
+          },
+          "ichimoku_span_b": {
+            "type": "integer",
+            "title": "Ichimoku Span B",
+            "description": "Senkou Span B period",
+            "default": 52
+          },
+          "williams_period": {
+            "type": "integer",
+            "title": "Williams Period",
+            "description": "Williams %R calculation period",
+            "default": 14
+          },
+          "williams_buy_below": {
+            "type": "number",
+            "title": "Williams Buy Below",
+            "description": "Williams %R oversold threshold",
+            "default": -80.0
+          },
+          "williams_sell_above": {
+            "type": "number",
+            "title": "Williams Sell Above",
+            "description": "Williams %R overbought threshold",
+            "default": -20.0
+          },
+          "cci_window": {
+            "type": "integer",
+            "title": "Cci Window",
+            "description": "CCI calculation window",
+            "default": 20
+          },
+          "cci_buy_below": {
+            "type": "number",
+            "title": "Cci Buy Below",
+            "description": "CCI oversold threshold",
+            "default": -100.0
+          },
+          "cci_sell_above": {
+            "type": "number",
+            "title": "Cci Sell Above",
+            "description": "CCI overbought threshold",
+            "default": 100.0
+          },
+          "vwma_period": {
+            "type": "integer",
+            "title": "Vwma Period",
+            "description": "VWMA calculation period",
+            "default": 20
+          },
+          "donchian_period": {
+            "type": "integer",
+            "title": "Donchian Period",
+            "description": "Donchian Channel period",
+            "default": 20
+          },
+          "momentum_period": {
+            "type": "integer",
+            "title": "Momentum Period",
+            "description": "Momentum calculation period",
+            "default": 10
+          },
+          "momentum_threshold": {
+            "type": "number",
+            "title": "Momentum Threshold",
+            "description": "Momentum threshold (5% change)",
+            "default": 0.05
+          },
+          "sr_lookback": {
+            "type": "integer",
+            "title": "Sr Lookback",
+            "description": "Lookback period for support/resistance levels",
+            "default": 20
+          },
+          "sr_touch_threshold": {
+            "type": "number",
+            "title": "Sr Touch Threshold",
+            "description": "Price touch threshold (2% from level)",
+            "default": 0.02
+          }
+        },
+        "type": "object",
+        "title": "BacktestParams",
+        "description": "Parameters for backtesting strategies."
+      },
+      "BacktestRequest": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol",
+            "description": "Stock symbol to backtest"
+          },
+          "from_": {
+            "type": "string",
+            "format": "date",
+            "title": "From ",
+            "description": "Start date for backtest"
+          },
+          "to": {
+            "type": "string",
+            "format": "date",
+            "title": "To",
+            "description": "End date for backtest"
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "buy_hold",
+              "sma",
+              "ema",
+              "rsi",
+              "bbands",
+              "macd",
+              "stochastic",
+              "atr_breakout",
+              "triple_ma",
+              "zscore_reversion",
+              "adx_trend",
+              "ichimoku",
+              "williams_r",
+              "cci",
+              "vwma_crossover",
+              "donchian",
+              "momentum",
+              "sr_reversion"
+            ],
+            "title": "Strategy",
+            "description": "Strategy to use"
+          },
+          "params": {
+            "$ref": "#/components/schemas/BacktestParams",
+            "description": "Strategy parameters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "from_",
+          "to",
+          "strategy"
+        ],
+        "title": "BacktestRequest",
+        "description": "Request payload for running a backtest."
+      },
+      "BacktestResponse": {
+        "properties": {
+          "metrics": {
+            "$ref": "#/components/schemas/BacktestMetrics",
+            "description": "Performance metrics"
+          },
+          "equity_curve": {
+            "items": {
+              "$ref": "#/components/schemas/EquityCurvePoint"
+            },
+            "type": "array",
+            "title": "Equity Curve",
+            "description": "Portfolio value over time"
+          },
+          "trades": {
+            "items": {
+              "$ref": "#/components/schemas/TradeRecord"
+            },
+            "type": "array",
+            "title": "Trades",
+            "description": "List of executed trades"
+          },
+          "price_data": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Price Data",
+            "description": "Price data with signals for charting"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metrics",
+          "equity_curve",
+          "trades"
+        ],
+        "title": "BacktestResponse",
+        "description": "Response containing backtest results."
       },
       "BenchmarkComparisonPeriod": {
         "properties": {
@@ -10321,22 +13762,6 @@
         "title": "BenchmarkPublic",
         "description": "Public benchmark model for API responses"
       },
-      "Body_analytics-upsert_allocation_targets": {
-        "properties": {
-          "targets": {
-            "items": {
-              "$ref": "#/components/schemas/AllocationTargetCreate"
-            },
-            "type": "array",
-            "title": "Targets"
-          }
-        },
-        "type": "object",
-        "required": [
-          "targets"
-        ],
-        "title": "Body_analytics-upsert_allocation_targets"
-      },
       "Body_login-login_access_token": {
         "properties": {
           "grant_type": {
@@ -10407,6 +13832,35 @@
           "file"
         ],
         "title": "Body_portfolio-upload_portfolio_statement"
+      },
+      "Body_risk-management-update_risk_alert": {
+        "properties": {
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          }
+        },
+        "type": "object",
+        "title": "Body_risk-management-update_risk_alert"
       },
       "BulkHoldingsSaveRequest": {
         "properties": {
@@ -10995,6 +14449,27 @@
         "title": "EarningsProfitResponse",
         "description": "Complete earnings and profit response"
       },
+      "EquityCurvePoint": {
+        "properties": {
+          "time": {
+            "type": "string",
+            "title": "Time",
+            "description": "Date in YYYY-MM-DD format"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value",
+            "description": "Portfolio value at this point"
+          }
+        },
+        "type": "object",
+        "required": [
+          "time",
+          "value"
+        ],
+        "title": "EquityCurvePoint",
+        "description": "Single point on the equity curve."
+      },
       "FinancialHealth": {
         "properties": {
           "short_term_loan": {
@@ -11566,6 +15041,80 @@
         ],
         "title": "HoldingItem",
         "description": "Individual holding/position from statement"
+      },
+      "IdeaBias": {
+        "type": "string",
+        "enum": [
+          "LONG",
+          "SHORT",
+          "NEUTRAL"
+        ],
+        "title": "IdeaBias"
+      },
+      "IdeaCommentCreate": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "IdeaCommentCreate"
+      },
+      "IdeaCommentPublic": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "idea_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Idea Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content",
+          "id",
+          "idea_id",
+          "user_id",
+          "created_at"
+        ],
+        "title": "IdeaCommentPublic"
+      },
+      "IdeaTimeframe": {
+        "type": "string",
+        "enum": [
+          "1m",
+          "5m",
+          "15m",
+          "30m",
+          "1h",
+          "4h",
+          "1D",
+          "1W",
+          "1M"
+        ],
+        "title": "IdeaTimeframe"
       },
       "InvestmentGoal": {
         "type": "string",
@@ -12584,8 +16133,7 @@
               "type": "string"
             },
             "type": "array",
-            "title": "Tags",
-            "default": []
+            "title": "Tags"
           },
           "sentiment": {
             "anyOf": [
@@ -12689,8 +16237,7 @@
               "type": "string"
             },
             "type": "array",
-            "title": "Tags",
-            "default": []
+            "title": "Tags"
           },
           "sentiment": {
             "anyOf": [
@@ -12752,6 +16299,132 @@
           "updated_at"
         ],
         "title": "NewsPublic"
+      },
+      "NewsPublicWithSymbols": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "sentiment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sentiment"
+          },
+          "sentiment_score": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sentiment Score"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Symbols"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "content",
+          "source",
+          "category",
+          "published_at",
+          "id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "NewsPublicWithSymbols"
       },
       "OrderCreate": {
         "properties": {
@@ -13802,6 +17475,53 @@
         "title": "PerformanceSummaryResponse",
         "description": "Complete performance summary API response"
       },
+      "PortfolioAggregatedHistory": {
+        "properties": {
+          "valuation_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              }
+            ],
+            "title": "Valuation Date"
+          },
+          "total_value": {
+            "type": "number",
+            "title": "Total Value"
+          },
+          "cash_value": {
+            "type": "number",
+            "title": "Cash Value"
+          },
+          "securities_value": {
+            "type": "number",
+            "title": "Securities Value"
+          },
+          "daily_return": {
+            "type": "number",
+            "title": "Daily Return"
+          },
+          "cumulative_return": {
+            "type": "number",
+            "title": "Cumulative Return"
+          }
+        },
+        "type": "object",
+        "required": [
+          "valuation_date",
+          "total_value",
+          "cash_value",
+          "securities_value",
+          "daily_return",
+          "cumulative_return"
+        ],
+        "title": "PortfolioAggregatedHistory"
+      },
       "PortfolioCreate": {
         "properties": {
           "name": {
@@ -13828,6 +17548,18 @@
             "type": "boolean",
             "title": "Is Active",
             "default": true
+          },
+          "broker_commission": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Broker Commission",
+            "default": "0.5"
           }
         },
         "type": "object",
@@ -13925,6 +17657,10 @@
             "title": "Is Active",
             "default": true
           },
+          "broker_commission": {
+            "type": "string",
+            "title": "Broker Commission"
+          },
           "id": {
             "type": "string",
             "format": "uuid",
@@ -13955,17 +17691,56 @@
               }
             ],
             "title": "Cash Balance"
+          },
+          "realized_pnl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realized Pnl"
           }
         },
         "type": "object",
         "required": [
           "name",
+          "broker_commission",
           "id",
           "user_id",
           "created_at",
           "updated_at"
         ],
         "title": "PortfolioPublic"
+      },
+      "PortfolioSparklinePoint": {
+        "properties": {
+          "valuation_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              }
+            ],
+            "title": "Valuation Date"
+          },
+          "total_value": {
+            "type": "number",
+            "title": "Total Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "valuation_date",
+          "total_value"
+        ],
+        "title": "PortfolioSparklinePoint"
       },
       "PortfolioStatementResponse": {
         "properties": {
@@ -14110,6 +17885,20 @@
               }
             ],
             "title": "Cash Balance"
+          },
+          "broker_commission": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Broker Commission"
           }
         },
         "type": "object",
@@ -14737,6 +18526,74 @@
         ],
         "title": "RebalancingTradePublic",
         "description": "Public trade info"
+      },
+      "RiskAlertCreate": {
+        "properties": {
+          "alert_type": {
+            "type": "string",
+            "title": "Alert Type"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "metric_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric Value"
+          },
+          "threshold_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold Value"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          },
+          "portfolio_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alert_type",
+          "severity",
+          "message"
+        ],
+        "title": "RiskAlertCreate"
       },
       "RiskAlertPublic": {
         "properties": {
@@ -15511,6 +19368,69 @@
         ],
         "title": "TradePublic"
       },
+      "TradeRecord": {
+        "properties": {
+          "entry_time": {
+            "type": "string",
+            "title": "Entry Time",
+            "description": "Entry date in YYYY-MM-DD format"
+          },
+          "exit_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Time",
+            "description": "Exit date (None if still open)"
+          },
+          "entry_price": {
+            "type": "number",
+            "title": "Entry Price",
+            "description": "Entry price"
+          },
+          "exit_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Price",
+            "description": "Exit price"
+          },
+          "size": {
+            "type": "number",
+            "title": "Size",
+            "description": "Position size (number of shares)"
+          },
+          "pnl": {
+            "type": "number",
+            "title": "Pnl",
+            "description": "Profit/loss for this trade"
+          },
+          "return_pct": {
+            "type": "number",
+            "title": "Return Pct",
+            "description": "Return percentage for this trade"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_time",
+          "entry_price",
+          "size",
+          "pnl",
+          "return_pct"
+        ],
+        "title": "TradeRecord",
+        "description": "Record of a single trade."
+      },
       "TradeUpdate": {
         "properties": {
           "trade_type": {
@@ -15731,6 +19651,250 @@
         "title": "TradeWithDetails",
         "description": "Public trade payload with stock details for UI convenience"
       },
+      "TradingIdeaCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Symbols",
+            "default": []
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdeaTimeframe"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bias": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdeaBias"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": "NEUTRAL"
+          },
+          "chart_state": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chart State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "content"
+        ],
+        "title": "TradingIdeaCreate"
+      },
+      "TradingIdeaPublic": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Symbols",
+            "default": []
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdeaTimeframe"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bias": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdeaBias"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": "NEUTRAL"
+          },
+          "chart_state": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chart State"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "view_count": {
+            "type": "integer",
+            "title": "View Count"
+          },
+          "is_published": {
+            "type": "boolean",
+            "title": "Is Published"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "like_count": {
+            "type": "integer",
+            "title": "Like Count",
+            "default": 0
+          },
+          "comment_count": {
+            "type": "integer",
+            "title": "Comment Count",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "content",
+          "id",
+          "user_id",
+          "view_count",
+          "is_published",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TradingIdeaPublic"
+      },
+      "TradingIdeaUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "symbols": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbols"
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdeaTimeframe"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bias": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdeaBias"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "chart_state": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chart State"
+          },
+          "is_published": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Published"
+          }
+        },
+        "type": "object",
+        "title": "TradingIdeaUpdate"
+      },
       "TransactionType": {
         "type": "string",
         "enum": [
@@ -15745,6 +19909,212 @@
           "ADJUSTMENT"
         ],
         "title": "TransactionType"
+      },
+      "UpcomingEventCreate": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "post_date": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Post Date"
+          },
+          "timestamp": {
+            "type": "integer",
+            "title": "Timestamp"
+          },
+          "date": {
+            "type": "string",
+            "title": "Date"
+          },
+          "time": {
+            "type": "string",
+            "title": "Time"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "post_date",
+          "timestamp",
+          "date",
+          "time",
+          "type"
+        ],
+        "title": "UpcomingEventCreate"
+      },
+      "UpcomingEventPublic": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "post_date": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Post Date"
+          },
+          "timestamp": {
+            "type": "integer",
+            "title": "Timestamp"
+          },
+          "date": {
+            "type": "string",
+            "title": "Date"
+          },
+          "time": {
+            "type": "string",
+            "title": "Time"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "post_date",
+          "timestamp",
+          "date",
+          "time",
+          "type",
+          "id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "UpcomingEventPublic"
+      },
+      "UpcomingEventUpdate": {
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "post_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Post Date"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          }
+        },
+        "type": "object",
+        "title": "UpcomingEventUpdate"
+      },
+      "UpcomingEventsPublic": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/UpcomingEventPublic"
+            },
+            "type": "array",
+            "title": "Data"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "count",
+          "page",
+          "limit",
+          "total_pages"
+        ],
+        "title": "UpcomingEventsPublic",
+        "description": "Pagination response model for upcoming events"
       },
       "UpdatePassword": {
         "properties": {

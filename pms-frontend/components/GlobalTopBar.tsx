@@ -10,11 +10,11 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
-import { 
-  DollarSign, 
-  TrendingUp, 
-  TrendingDown, 
-  ArrowUpRight, 
+import {
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  ArrowUpRight,
   ArrowDownRight,
   Plus,
   Search,
@@ -23,7 +23,8 @@ import {
   HelpCircle,
   User,
   LogOut,
-  ChevronDown
+  ChevronDown,
+  Clock
 } from "lucide-react";
 import { AccountBalance } from "../types/trading";
 import { AuthUser } from "../hooks/useAuth";
@@ -122,10 +123,17 @@ export function GlobalTopBar({ accountBalance, onQuickTrade, onOpenChart, onOpen
       <div className="flex items-center justify-between">
         {/* Left: Title + Time + Trading Hours */}
         <div className="flex items-center gap-6">
-          <div className="hidden sm:flex flex-col mr-2">
-            <span className="text-sm font-semibold">Market News & Insights</span>
-            <span className="text-xs text-muted-foreground">{timeLabel} · {isTradingHours ? 'Market Open (DSE)' : 'Market Closed (DSE)'}
-            </span>
+          <div className="hidden sm:flex flex-col items-start justify-center gap-0.5 mr-4 px-3 py-1 bg-muted/40 rounded-lg border border-border/40">
+            <div className="flex items-center gap-1.5">
+              <Clock className="h-3 w-3 text-muted-foreground/70" />
+              <span className="text-[10px] font-medium text-muted-foreground">{timeLabel}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className={`h-1.5 w-1.5 rounded-full ${isTradingHours ? 'bg-green-500 animate-pulse' : 'bg-destructive'}`} />
+              <span className="text-[11px] font-semibold text-foreground/90">
+                {isTradingHours ? 'Market Open' : 'Market Closed'}
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-1">
             <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -201,7 +209,7 @@ export function GlobalTopBar({ accountBalance, onQuickTrade, onOpenChart, onOpen
                 }
               }}
             />
-            
+
             <SymbolSearchDropdown
               query={searchTerm}
               onPickChart={handlePickChart}
@@ -223,7 +231,7 @@ export function GlobalTopBar({ accountBalance, onQuickTrade, onOpenChart, onOpen
             <Plus className="h-4 w-4 mr-1" />
             Quick Trade
           </Button>
-          
+
           <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
             <Bell className="h-4 w-4" />
           </Button>
@@ -231,8 +239,8 @@ export function GlobalTopBar({ accountBalance, onQuickTrade, onOpenChart, onOpen
           {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 className="h-9 px-2 gap-2 hover:bg-accent/50 transition-colors"
               >
                 <Avatar className="h-7 w-7 ring-2 ring-primary/20">
@@ -279,7 +287,7 @@ export function GlobalTopBar({ accountBalance, onQuickTrade, onOpenChart, onOpen
                 Help & Support
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 onClick={() => {
                   if (confirm('Are you sure you want to sign out?')) {
                     onLogout?.();

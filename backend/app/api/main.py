@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from app.api.routes import items, login, private, users, utils, portfolio, watchlist, orders, risk_management, kyc, \
     analytics, research, market, alerts, news, subscription, dashboard, funds, fundamentals, performance, tradingview, \
-    rebalancing, backtest, upcoming_events
+    rebalancing, backtest, upcoming_events, ideas
 from app.core.config import settings
 
 api_router = APIRouter()
@@ -29,6 +29,7 @@ api_router.include_router(tradingview.router)
 api_router.include_router(rebalancing.router)
 api_router.include_router(backtest.router)
 api_router.include_router(upcoming_events.router)
+api_router.include_router(ideas.router, prefix="/ideas", tags=["ideas"])
 
 if settings.ENVIRONMENT == "local":
     api_router.include_router(private.router)
