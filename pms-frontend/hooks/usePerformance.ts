@@ -1,6 +1,8 @@
-import {useQuery} from '@tanstack/react-query';
-import {AnalyticsService, OpenAPI} from '../src/client';
-import {queryKeys} from './queryKeys';
+import { useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { AnalyticsService, OpenAPI } from '../src/client';
+import { queryKeys } from './queryKeys';
+import { usePerformanceStore } from '../src/stores';
 
 // ============================================================================
 // NEW SPLIT API TYPES (Optimized)
@@ -223,7 +225,7 @@ export interface RiskMetricsResponse {
 async function fetchPerformanceAPI<T>(endpoint: string): Promise<T> {
     const baseUrl = (OpenAPI.BASE || '').replace(/\/$/, '');
     const response = await fetch(`${baseUrl}${endpoint}`, {
-        headers: OpenAPI.TOKEN ? {Authorization: `Bearer ${OpenAPI.TOKEN as unknown as string}`} : undefined,
+        headers: OpenAPI.TOKEN ? { Authorization: `Bearer ${OpenAPI.TOKEN as unknown as string}` } : undefined,
         credentials: OpenAPI.WITH_CREDENTIALS ? 'include' : 'omit',
     });
 
@@ -234,9 +236,15 @@ async function fetchPerformanceAPI<T>(endpoint: string): Promise<T> {
     return await response.json();
 }
 
-// Hook for performance summary
+// Hook for performance summary with Zustand sync
 export function usePerformanceSummary(portfolioId: string | null, period: string = 'YTD') {
-    return useQuery({
+    // Get cached data from Zustand for instant rendering
+    const cachedSummary = usePerformanceStore((state) =>
+        portfolioId ? state.getSummary(portfolioId, period) : undefined
+    );
+    const syncSummary = usePerformanceStore((state) => state.syncSummary);
+
+    const query = useQuery({
         queryKey: queryKeys.performanceSummary(portfolioId || '', period),
         queryFn: () => fetchPerformanceAPI<PerformanceSummary>(
             `/api/v1/portfolios/${portfolioId}/performance/summary?period=${period}`
@@ -244,17 +252,57 @@ export function usePerformanceSummary(portfolioId: string | null, period: string
         enabled: !!portfolioId && !!(OpenAPI as any).TOKEN,
         staleTime: 5 * 60 * 1000, // 5 minutes
     });
+
+    // Sync to Zustand on successful fetch
+    useEffect(() => {
+        if (query.data && portfolioId) {
+            const summary = query.data.summary;
+            syncSummary(portfolioId, period, {
+                portfolioName: query.data.portfolio_name,
+                totalValue: summary.total_value,
+                totalCost: summary.total_cost,
+                cumulativeReturn: summary.cumulative_return,
+                cumulativeReturnPercent: summary.cumulative_return_percent,
+                timeWeightedReturn: summary.time_weighted_return,
+                moneyWeightedReturn: summary.money_weighted_return,
+                annualizedReturn: summary.annualized_return,
+                sharpeRatio: summary.sharpe_ratio,
+                sortinoRatio: summary.sortino_ratio,
+                maxDrawdown: summary.max_drawdown,
+                volatility: summary.volatility,
+                netContributions: summary.net_contributions,
+                netWithdrawals: summary.net_withdrawals,
+            });
+        }
+    }, [query.data, portfolioId, period, syncSummary]);
+
+    // Return query with cache enhancement
+    return {
+        ...query,
+        // Show cached data instantly, replaced by fresh data when available
+        data: query.data,
+        cachedSummary,
+        // True only if no cache AND loading
+        isLoading: !cachedSummary && query.isLoading,
+        isUpdating: query.isFetching && !!cachedSummary,
+    };
 }
 
-// Hook for value history
+// Hook for value history with Zustand sync
 export function useValueHistory(
     portfolioId: string | null,
     period: string = 'YTD',
     benchmarkId: string = 'DSEX',
     frequency: string = 'daily',
-    options: { enabled?: boolean } = {enabled: true}
+    options: { enabled?: boolean } = { enabled: true }
 ) {
-    return useQuery({
+    // Get cached data from Zustand for instant rendering
+    const cachedHistory = usePerformanceStore((state) =>
+        portfolioId ? state.getHistory(portfolioId, period, benchmarkId) : undefined
+    );
+    const syncHistory = usePerformanceStore((state) => state.syncHistory);
+
+    const query = useQuery({
         queryKey: queryKeys.valueHistory(portfolioId || '', period, benchmarkId, frequency),
         queryFn: () => {
             const params = new URLSearchParams({
@@ -270,13 +318,67 @@ export function useValueHistory(
         enabled: !!portfolioId && !!(OpenAPI as any).TOKEN && options.enabled !== false,
         staleTime: 5 * 60 * 1000,
     });
+
+    // Sync to Zustand on successful fetch
+    useEffect(() => {
+        if (query.data && portfolioId) {
+            syncHistory(portfolioId, period, {
+                benchmarkId: query.data.benchmark_id,
+                benchmarkName: query.data.benchmark_name,
+                frequency: query.data.frequency,
+                data: query.data.data.map((point) => ({
+                    date: point.date,
+                    portfolioValue: point.portfolio_value,
+                    portfolioReturn: point.portfolio_return,
+                    portfolioCumulativeReturn: point.portfolio_cumulative_return,
+                    benchmarkValue: point.benchmark_value,
+                    benchmarkReturn: point.benchmark_return,
+                    benchmarkCumulativeReturn: point.benchmark_cumulative_return,
+                    relativeReturn: point.relative_return,
+                    alpha: point.alpha,
+                })),
+            });
+        }
+    }, [query.data, portfolioId, period, syncHistory]);
+
+    // Provide cached data as fallback
+    const effectiveData = useMemo(() => {
+        if (query.data) return query.data;
+        if (!cachedHistory) return undefined;
+        // Reconstruct from cache
+        return {
+            portfolio_id: cachedHistory.portfolioId,
+            benchmark_id: cachedHistory.benchmarkId,
+            benchmark_name: cachedHistory.benchmarkName,
+            frequency: cachedHistory.frequency,
+            data: cachedHistory.data.map((point) => ({
+                date: point.date,
+                portfolio_value: point.portfolioValue,
+                portfolio_return: point.portfolioReturn,
+                portfolio_cumulative_return: point.portfolioCumulativeReturn,
+                benchmark_value: point.benchmarkValue,
+                benchmark_return: point.benchmarkReturn,
+                benchmark_cumulative_return: point.benchmarkCumulativeReturn,
+                relative_return: point.relativeReturn,
+                alpha: point.alpha,
+            })),
+        } as ValueHistoryResponse;
+    }, [query.data, cachedHistory]);
+
+    return {
+        ...query,
+        data: effectiveData,
+        cachedHistory,
+        isLoading: !cachedHistory && query.isLoading,
+        isUpdating: query.isFetching && !!cachedHistory,
+    };
 }
 
 // Hook for benchmark comparison
 export function useBenchmarkComparison(
     portfolioId: string | null,
     benchmarkId: string = 'DSEX',
-    options: { enabled?: boolean } = {enabled: true}
+    options: { enabled?: boolean } = { enabled: true }
 ) {
     return useQuery({
         queryKey: queryKeys.benchmarkComparison(portfolioId || '', benchmarkId),
@@ -334,7 +436,7 @@ export function useSectorAttribution(portfolioId: string | null, period: string 
     return useQuery({
         queryKey: queryKeys.sectorAttribution(portfolioId || '', period, benchmarkId),
         queryFn: () => {
-            const params = new URLSearchParams({period});
+            const params = new URLSearchParams({ period });
             if (benchmarkId) params.append('benchmark_id', benchmarkId);
             return fetchPerformanceAPI<AttributionResponse>(
                 `/api/v1/portfolios/${portfolioId}/performance/attribution/sector?${params.toString()}`
@@ -345,12 +447,18 @@ export function useSectorAttribution(portfolioId: string | null, period: string 
     });
 }
 
-// Hook for risk metrics (DEPRECATED - use usePerformanceRiskMetrics instead)
+// Hook for risk metrics with Zustand sync (DEPRECATED - use usePerformanceRiskMetrics instead)
 export function useRiskMetrics(portfolioId: string | null, period: string = 'YTD', benchmarkId?: string) {
-    return useQuery({
+    // Get cached data from Zustand
+    const cachedRisk = usePerformanceStore((state) =>
+        portfolioId ? state.getRisk(portfolioId, period) : undefined
+    );
+    const syncRisk = usePerformanceStore((state) => state.syncRisk);
+
+    const query = useQuery({
         queryKey: queryKeys.riskMetrics(portfolioId || '', period, benchmarkId),
         queryFn: () => {
-            const params = new URLSearchParams({period});
+            const params = new URLSearchParams({ period });
             if (benchmarkId) params.append('benchmark_id', benchmarkId);
             return fetchPerformanceAPI<RiskMetricsResponse>(
                 `/api/v1/portfolios/${portfolioId}/performance/risk-metrics?${params.toString()}`
@@ -359,6 +467,30 @@ export function useRiskMetrics(portfolioId: string | null, period: string = 'YTD
         enabled: !!portfolioId && !!(OpenAPI as any).TOKEN,
         staleTime: 5 * 60 * 1000,
     });
+
+    // Sync to Zustand on successful fetch
+    useEffect(() => {
+        if (query.data && portfolioId) {
+            const metrics = query.data.risk_metrics;
+            syncRisk(portfolioId, period, {
+                volatility: metrics.volatility.annualized,
+                sharpeRatio: metrics.sharpe_ratio,
+                sortinoRatio: metrics.sortino_ratio,
+                maxDrawdown: metrics.max_drawdown.max_drawdown_percent,
+                beta: metrics.beta,
+                correlation: metrics.correlation,
+                var95: metrics.value_at_risk.var_95,
+                var99: metrics.value_at_risk.var_99,
+            });
+        }
+    }, [query.data, portfolioId, period, syncRisk]);
+
+    return {
+        ...query,
+        cachedRisk,
+        isLoading: !cachedRisk && query.isLoading,
+        isUpdating: query.isFetching && !!cachedRisk,
+    };
 }
 
 // ============================================================================
@@ -368,7 +500,7 @@ export function useRiskMetrics(portfolioId: string | null, period: string = 'YTD
 // Hook for current portfolio value (ULTRA FAST: 5-15ms)
 export function useCurrentValue(
     portfolioId: string | null,
-    options: { enabled?: boolean } = {enabled: true}
+    options: { enabled?: boolean } = { enabled: true }
 ) {
     return useQuery({
         queryKey: queryKeys.currentValue(portfolioId || ''),
@@ -385,7 +517,7 @@ export function useCurrentValue(
 export function usePerformanceReturns(
     portfolioId: string | null,
     period: string = 'YTD',
-    options: { enabled?: boolean } = {enabled: true}
+    options: { enabled?: boolean } = { enabled: true }
 ) {
     return useQuery({
         queryKey: queryKeys.performanceReturns(portfolioId || '', period),
