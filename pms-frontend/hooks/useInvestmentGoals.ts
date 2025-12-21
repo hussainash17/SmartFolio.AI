@@ -54,7 +54,7 @@ export interface UserInvestmentGoalContribution {
   id: string;
   goal_id: string;
   amount: number;
-  contribution_date: string;
+  contributed_at: string;
   description?: string;
   created_at: string;
 }
@@ -178,9 +178,27 @@ export interface GoalAlertResponse {
   overall_health_score: number;
 }
 
+export interface GoalLinkedAssetCreate {
+  symbol: string;
+  allocation_type: 'QUANTITY' | 'PERCENTAGE';
+  allocation_value: number;
+}
+
+export interface GoalLinkedAsset {
+  id: string;
+  goal_id: string;
+  symbol: string;
+  company_name?: string;
+  allocation_type: 'QUANTITY' | 'PERCENTAGE';
+  allocation_value: number;
+  linked_quantity: number;
+  current_value: number;
+  created_at: string;
+}
+
 // ==================== API FUNCTIONS ====================
 
-const apiRequest = async <T>(method: string, url: string, body?: any): Promise<T> => {
+const apiRequest = async <T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, body?: any): Promise<T> => {
   return request(OpenAPI, {
     method,
     url,
@@ -329,5 +347,46 @@ export function useGoalAlerts(goalId: string) {
     queryFn: () => apiRequest('GET', `/api/v1/kyc/goals/${goalId}/alerts`),
     enabled: !!goalId,
   });
+}
+
+// Goal Linked Assets
+export function useGoalLinkedAssets(goalId: string) {
+  const queryClient = useQueryClient();
+
+  // Fetch linked assets
+  const { data: linkedAssets = [], isLoading } = useQuery<GoalLinkedAsset[]>({
+    queryKey: ['goalLinkedAssets', goalId],
+    queryFn: () => apiRequest('GET', `/api/v1/kyc/goals/${goalId}/assets`),
+    enabled: !!goalId,
+  });
+
+  // Link asset
+  const linkAsset = useMutation({
+    mutationFn: (data: GoalLinkedAssetCreate) =>
+      apiRequest<GoalLinkedAsset>('POST', `/api/v1/kyc/goals/${goalId}/assets`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['goalLinkedAssets', goalId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.goalProgress(goalId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investmentGoals });
+    },
+  });
+
+  // Unlink asset
+  const unlinkAsset = useMutation({
+    mutationFn: (assetId: string) =>
+      apiRequest('DELETE', `/api/v1/kyc/goals/assets/${assetId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['goalLinkedAssets', goalId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.goalProgress(goalId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investmentGoals });
+    },
+  });
+
+  return {
+    linkedAssets,
+    isLoading,
+    linkAsset,
+    unlinkAsset,
+  };
 }
 

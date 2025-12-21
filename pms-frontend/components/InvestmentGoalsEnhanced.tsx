@@ -11,7 +11,10 @@ import {
   type UserInvestmentGoalCreate,
   type UserInvestmentGoalUpdate,
   type WhatIfScenarioRequest,
+  useGoalLinkedAssets,
+  type GoalLinkedAssetCreate,
 } from "../hooks/useInvestmentGoals";
+import { usePortfolios } from "../hooks/usePortfolios";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -40,6 +43,8 @@ import {
   Bell,
   Award,
   LineChart,
+  Link as LinkIcon,
+  Unlink,
 } from "lucide-react";
 
 const GOAL_TYPES = [
@@ -258,6 +263,10 @@ function GoalDetails({ goal, onUpdate, onClose }: any) {
           <Bell className="h-4 w-4" />
           Alerts
         </TabsTrigger>
+        <TabsTrigger value="linked-assets" className="gap-2">
+          <LinkIcon className="h-4 w-4" />
+          Linked Assets
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="overview" className="px-6 pb-6">
@@ -282,6 +291,10 @@ function GoalDetails({ goal, onUpdate, onClose }: any) {
 
       <TabsContent value="alerts" className="px-6 pb-6">
         <GoalAlerts goalId={goal.id} />
+      </TabsContent>
+
+      <TabsContent value="linked-assets" className="px-6 pb-6">
+        <GoalAssetLinking goalId={goal.id} />
       </TabsContent>
     </Tabs>
   );
@@ -328,10 +341,14 @@ function GoalOverview({ goal, onUpdate }: any) {
 
               <Progress value={Number(progress?.progress_percentage ?? 0)} className="h-3" />
 
-              <div className="grid md:grid-cols-3 gap-4 pt-4 border-t">
+              <div className="grid md:grid-cols-4 gap-4 pt-4 border-t">
                 <div>
                   <p className="text-sm text-muted-foreground">Contributions</p>
                   <p className="text-lg font-semibold">{(progress?.contributions_total ?? 0).toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Linked Assets</p>
+                  <p className="text-lg font-semibold">{(goal.linked_assets_value ?? 0).toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Returns</p>
@@ -473,7 +490,7 @@ function GoalOverview({ goal, onUpdate }: any) {
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {new Date(contrib.contribution_date).toLocaleDateString()}
+                      {new Date(contrib.contributed_at).toLocaleDateString()}
                     </p>
                   </div>
                   <Button
@@ -1084,7 +1101,7 @@ function GoalCreateForm({ onSuccess, onCreate }: any) {
           <Label>Goal Type*</Label>
           <Select
             value={formData.goal_type}
-            onValueChange={(v) => setFormData({ ...formData, goal_type: v })}
+            onValueChange={(v: any) => setFormData({ ...formData, goal_type: v })}
           >
             <SelectTrigger className="w-full">
               <SelectValue />
@@ -1228,5 +1245,156 @@ function getRiskColor(riskLevel: string): string {
     default:
       return "#6b7280";
   }
+}
+
+// ==================== GOAL ASSET LINKING ====================
+function GoalAssetLinking({ goalId }: { goalId: string }) {
+  const { linkedAssets, isLoading, linkAsset, unlinkAsset } = useGoalLinkedAssets(goalId);
+  const { getAvailableStocks } = usePortfolios();
+  const availableStocks = getAvailableStocks();
+
+  const [selectedSymbol, setSelectedSymbol] = useState("");
+  const [allocationType, setAllocationType] = useState<"QUANTITY" | "PERCENTAGE">("PERCENTAGE");
+  const [allocationValue, setAllocationValue] = useState("");
+
+  const handleLink = async () => {
+    if (!selectedSymbol || !allocationValue) return;
+
+    await linkAsset.mutateAsync({
+      symbol: selectedSymbol,
+      allocation_type: allocationType,
+      allocation_value: parseFloat(allocationValue),
+    });
+
+    setSelectedSymbol("");
+    setAllocationValue("");
+  };
+
+  const selectedStock = availableStocks.find(s => s.symbol === selectedSymbol);
+
+  return (
+    <div className="space-y-6 mt-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <LinkIcon className="h-5 w-5" />
+            Link Portfolio Assets
+          </CardTitle>
+          <CardDescription>
+            Soft-link your existing portfolio holdings to this goal to track progress without selling.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Link Asset Form */}
+          <div className="grid md:grid-cols-4 gap-4 items-end">
+            <div className="md:col-span-1">
+              <Label>Select Stock</Label>
+              <Select value={selectedSymbol} onValueChange={setSelectedSymbol}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose stock" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableStocks.map((stock) => (
+                    <SelectItem key={stock.symbol} value={stock.symbol}>
+                      {stock.symbol}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="md:col-span-1">
+              <Label>Allocation Type</Label>
+              <Select value={allocationType} onValueChange={(v: any) => setAllocationType(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PERCENTAGE">Percentage (%)</SelectItem>
+                  <SelectItem value="QUANTITY">Quantity (Units)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="md:col-span-1">
+              <Label>
+                {allocationType === "PERCENTAGE" ? "Percentage to Link" : "Quantity to Link"}
+              </Label>
+              <Input
+                type="number"
+                placeholder={allocationType === "PERCENTAGE" ? "e.g., 50" : "e.g., 100"}
+                value={allocationValue}
+                onChange={(e) => setAllocationValue(e.target.value)}
+                min="0"
+                max={allocationType === "PERCENTAGE" ? "100" : undefined}
+              />
+            </div>
+
+            <div className="md:col-span-1">
+              <Button onClick={handleLink} className="w-full gap-2" disabled={!selectedSymbol || !allocationValue || linkAsset.isPending}>
+                <LinkIcon className="h-4 w-4" />
+                Link Asset
+              </Button>
+            </div>
+          </div>
+
+          {selectedStock && (
+            <div className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
+              Available: <span className="font-medium">{selectedStock.companyName}</span> ({selectedStock.sector})
+              <br />
+              Current Price: {selectedStock.currentPrice.toLocaleString()}
+            </div>
+          )}
+
+          <Separator />
+
+          {/* Linked Assets List */}
+          <div className="space-y-4">
+            <h4 className="font-semibold">Linked Assets</h4>
+            {isLoading ? (
+              <div className="text-center py-4">Loading linked assets...</div>
+            ) : linkedAssets.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
+                No assets linked yet. Link stocks from your portfolio to track goal progress.
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {linkedAssets.map((asset) => (
+                  <div key={asset.id} className="flex items-center justify-between p-4 border rounded-lg bg-card">
+                    <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
+                        {asset.symbol.substring(0, 2)}
+                      </div>
+                      <div>
+                        <h5 className="font-semibold">{asset.symbol}</h5>
+                        <p className="text-sm text-muted-foreground">{asset.company_name}</p>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <p className="font-semibold">{asset.current_value.toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {asset.linked_quantity.toFixed(2)} units
+                        ({asset.allocation_type === 'PERCENTAGE' ? `${asset.allocation_value}%` : 'Fixed Qty'})
+                      </p>
+                    </div>
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => unlinkAsset.mutate(asset.id)}
+                    >
+                      <Unlink className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
