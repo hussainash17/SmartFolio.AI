@@ -25,9 +25,8 @@ public class FundamentalDataScheduler {
      * Scrape fundamental data daily at 4:00 PM (after market close)
      * Runs Monday to Thursday
      */
-//    @Scheduled(cron = "${scraper.schedule.fundamental-cron:0 0 16 * * MON-THU}",
-//               zone = "${scraper.schedule.timezone:Asia/Dhaka}")
-    @Bean
+    @Scheduled(cron = "${scraper.schedule.fundamental-cron:0 0 16 * * MON-THU}",
+               zone = "${scraper.schedule.timezone:Asia/Dhaka}")
     public void scrapeFundamentalData() {
         try {
             log.info("=== Fundamental data scraping started ===");
