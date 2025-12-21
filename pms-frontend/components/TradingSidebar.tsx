@@ -115,8 +115,8 @@ export function TradingSidebar({ currentView, onViewChange, user, onLogout }: Tr
           variant={isActive ? "default" : "ghost"}
           onClick={() => onViewChange(item.id)}
           className={`w-full justify-start h-12 px-4 mb-1 ${isActive
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'hover:bg-accent hover:text-accent-foreground text-muted-foreground hover:text-foreground'
+            ? 'bg-primary text-primary-foreground shadow-sm'
+            : 'hover:bg-accent hover:text-accent-foreground text-muted-foreground hover:text-foreground'
             } ${isCollapsed ? 'px-2' : ''}`}
         >
           <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} w-full`}>
@@ -155,26 +155,31 @@ export function TradingSidebar({ currentView, onViewChange, user, onLogout }: Tr
     <div className={`${isCollapsed ? 'w-20' : 'w-64'} h-full bg-card border-r border-border flex flex-col transition-all duration-300`}>
       {/* Header */}
       <div className="p-4 border-b border-border">
-        <div className="flex items-center justify-between">
-          {!isCollapsed && (
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-primary-foreground" />
-              </div>
+        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+          <div
+            className={`flex items-center ${isCollapsed ? 'justify-center cursor-pointer' : 'gap-3'}`}
+            onClick={() => isCollapsed && setIsCollapsed(false)}
+          >
+            <div className="w-10 h-10 flex items-center justify-center">
+              <img src="/logo.png" alt="SmartFolio.AI Logo" className="h-10 w-10 object-contain" />
+            </div>
+            {!isCollapsed && (
               <div>
                 <h3 className="text-lg font-semibold text-foreground">SmartFolio.AI</h3>
                 <p className="text-xs text-muted-foreground">Investment Platform</p>
               </div>
-            </div>
+            )}
+          </div>
+          {!isCollapsed && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsCollapsed(true)}
+              className="h-8 w-8 p-0"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="h-8 w-8 p-0"
-          >
-            {isCollapsed ? <Menu className="h-4 w-4" /> : <X className="h-4 w-4" />}
-          </Button>
         </div>
       </div>
 
