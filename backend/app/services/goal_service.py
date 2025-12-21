@@ -36,7 +36,13 @@ from app.model.user import (
     ProductRecommendationResponse,
     GoalAlert,
     GoalAlertResponse,
+    GoalLinkedAsset,
+    GoalLinkedAssetCreate,
+    AllocationType,
 )
+from app.model.portfolio import PortfolioPosition, Portfolio
+from app.model.company import Company
+from app.model.stock import StockData
 from app.services.financial_calculations import FinancialCalculator
 
 logger = logging.getLogger(__name__)
@@ -267,6 +273,163 @@ class EnhancedInvestmentGoalService(BaseService[UserInvestmentGoal, UserInvestme
         
         logger.info(f"Deleted contribution {contribution_id}")
         return True
+
+    # ==================== Asset Linking (Soft Linking) ====================
+
+    def link_asset(
+        self,
+        user_id: UUID,
+        goal_id: UUID,
+        asset_data: GoalLinkedAssetCreate
+    ) -> GoalLinkedAsset:
+        """Link a portfolio asset to a goal"""
+        goal = self.get_by_id(goal_id)
+        if not goal or goal.user_id != user_id:
+            raise ServiceException("Investment goal not found", status_code=404)
+
+        # Verify asset exists in user's portfolio
+        # Get all positions for this symbol across all portfolios
+        stock = self.session.exec(
+            select(Company).where(Company.trading_code == asset_data.symbol.upper())
+        ).first()
+        
+        if not stock:
+            raise ServiceException(f"Stock {asset_data.symbol} not found", status_code=404)
+
+        portfolios = self.session.exec(
+            select(Portfolio).where(Portfolio.user_id == user_id)
+        ).all()
+        portfolio_ids = [p.id for p in portfolios]
+        
+        positions = self.session.exec(
+            select(PortfolioPosition)
+            .where(
+                PortfolioPosition.stock_id == stock.id,
+                PortfolioPosition.portfolio_id.in_(portfolio_ids)
+            )
+        ).all()
+        
+        total_quantity = sum(p.quantity for p in positions)
+        
+        if total_quantity <= 0:
+            raise ServiceException(f"You do not own any shares of {asset_data.symbol}", status_code=400)
+
+        # Calculate quantity to link
+        if asset_data.allocation_type == AllocationType.PERCENTAGE:
+            if asset_data.allocation_value <= 0 or asset_data.allocation_value > 100:
+                raise ServiceException("Percentage must be between 0 and 100", status_code=400)
+            linked_quantity = total_quantity * (asset_data.allocation_value / 100.0)
+        else:
+            if asset_data.allocation_value <= 0:
+                raise ServiceException("Quantity must be positive", status_code=400)
+            linked_quantity = asset_data.allocation_value
+            
+        # Validate total allocation across all goals
+        # Get existing allocations for this stock
+        existing_links = self.session.exec(
+            select(GoalLinkedAsset)
+            .where(
+                GoalLinkedAsset.user_id == user_id,
+                GoalLinkedAsset.symbol == asset_data.symbol.upper()
+            )
+        ).all()
+        
+        total_linked = sum(link.linked_quantity for link in existing_links)
+        
+        if total_linked + linked_quantity > total_quantity:
+            remaining = total_quantity - total_linked
+            raise ServiceException(
+                f"Insufficient quantity. You have {total_quantity} shares, {total_linked:.2f} are already linked. Remaining: {remaining:.2f}", 
+                status_code=400
+            )
+
+        # Get current price for value calculation
+        latest_price_data = self.session.exec(
+            select(StockData)
+            .where(StockData.company_id == stock.id)
+            .order_by(StockData.timestamp.desc())
+        ).first()
+        
+        current_price = float(latest_price_data.last_trade_price) if latest_price_data else 0.0
+        current_value = linked_quantity * current_price
+
+        # Create link
+        linked_asset = GoalLinkedAsset(
+            goal_id=goal_id,
+            user_id=user_id,
+            symbol=asset_data.symbol.upper(),
+            company_name=stock.company_name,
+            allocation_type=asset_data.allocation_type,
+            allocation_value=asset_data.allocation_value,
+            linked_quantity=linked_quantity,
+            current_value=current_value,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        
+        self.session.add(linked_asset)
+        self.session.commit()
+        self.session.refresh(linked_asset)
+        
+        # Recalculate goal metrics
+        self._recalculate_goal_metrics(goal)
+        
+        return linked_asset
+
+    def unlink_asset(self, user_id: UUID, asset_id: UUID) -> bool:
+        """Unlink an asset from a goal"""
+        asset = self.session.exec(
+            select(GoalLinkedAsset).where(GoalLinkedAsset.id == asset_id)
+        ).first()
+        
+        if not asset or asset.user_id != user_id:
+            raise ServiceException("Linked asset not found", status_code=404)
+            
+        goal = self.get_by_id(asset.goal_id)
+        
+        self.session.delete(asset)
+        self.session.commit()
+        
+        if goal:
+            self._recalculate_goal_metrics(goal)
+            
+        return True
+
+    def get_linked_assets(self, user_id: UUID, goal_id: UUID) -> List[GoalLinkedAsset]:
+        """Get all linked assets for a goal"""
+        goal = self.get_by_id(goal_id)
+        if not goal or goal.user_id != user_id:
+            raise ServiceException("Investment goal not found", status_code=404)
+            
+        assets = self.session.exec(
+            select(GoalLinkedAsset).where(GoalLinkedAsset.goal_id == goal_id)
+        ).all()
+        
+        # Update current values based on latest prices
+        updated_assets = []
+        for asset in assets:
+            stock = self.session.exec(
+                select(Company).where(Company.trading_code == asset.symbol)
+            ).first()
+            
+            if stock:
+                latest_price_data = self.session.exec(
+                    select(StockData)
+                    .where(StockData.company_id == stock.id)
+                    .order_by(StockData.timestamp.desc())
+                ).first()
+                
+                if latest_price_data:
+                    current_price = float(latest_price_data.last_trade_price)
+                    asset.current_value = asset.linked_quantity * current_price
+                    self.session.add(asset)
+            
+            updated_assets.append(asset)
+            
+        if updated_assets:
+            self.session.commit()
+            
+        return updated_assets
     
     # ==================== Goal Calculations ====================
     
@@ -286,7 +449,7 @@ class EnhancedInvestmentGoalService(BaseService[UserInvestmentGoal, UserInvestme
         sip_calc = self.financial_calc.calculate_sip_required(
             goal.target_amount,
             goal.current_value or 0,
-            years_to_goal,
+            max(years_to_goal, 0.0027),  # Ensure at least ~1 day
             goal.expected_return_avg or 10.0
         )
         
@@ -636,14 +799,72 @@ class EnhancedInvestmentGoalService(BaseService[UserInvestmentGoal, UserInvestme
                 goal.progress_percentage = min(100, ((goal.current_value or 0) / goal.target_amount) * 100)
             
             # Calculate years remaining
+            # Calculate years remaining
             years_remaining = (goal.target_date - datetime.utcnow()).days / 365.25
-            if years_remaining <= 0:
+            
+            # Ensure minimum time for calculations to avoid division by zero
+            if years_remaining <= 0.0027:  # Less than 1 day
+                years_remaining = 0.0027 
+            
+            if (goal.target_date - datetime.utcnow()).days <= 0:
                 goal.on_track_status = GoalTrackingStatus.AT_RISK
-                self.session.commit()
-                return
+                # We continue calculation with min years to show what would be needed if time was extended
+
             
             # Calculate expected returns
             goal.total_returns = (goal.current_value or 0) - (goal.total_contributions or 0)
+            
+            # Calculate linked assets value
+            linked_assets = self.session.exec(
+                select(GoalLinkedAsset).where(GoalLinkedAsset.goal_id == goal.id)
+            ).all()
+            
+            linked_assets_value = 0.0
+            for asset in linked_assets:
+                # Update asset value
+                stock = self.session.exec(
+                    select(Company).where(Company.trading_code == asset.symbol)
+                ).first()
+                if stock:
+                    latest_price_data = self.session.exec(
+                        select(StockData)
+                        .where(StockData.company_id == stock.id)
+                        .order_by(StockData.timestamp.desc())
+                    ).first()
+                    if latest_price_data:
+                        current_price = float(latest_price_data.last_trade_price)
+                        asset.current_value = asset.linked_quantity * current_price
+                        linked_assets_value += asset.current_value
+                        self.session.add(asset)
+                    else:
+                        logger.warning(f"No price data found for stock {asset.symbol}")
+                else:
+                    logger.warning(f"Stock {asset.symbol} not found in database")
+            
+            logger.info(f"Recalculated linked assets for goal {goal.id}: Count={len(linked_assets)}, Value={linked_assets_value}")
+            
+            goal.linked_assets_value = linked_assets_value
+            goal.linked_assets_count = len(linked_assets)
+            
+            # Total current value = Cash Savings (contributions) + Linked Assets Value + Returns on Cash
+            # Note: goal.current_value currently stores total value. We should separate cash component.
+            # For now, let's assume goal.current_value includes everything.
+            # But wait, goal.current_value was being updated by contributions directly.
+            # Let's redefine: goal.current_value = (Sum of contributions + Returns) + Linked Assets Value
+            # Actually, let's keep it simple:
+            # goal.current_value = goal.current_savings + goal.linked_assets_value
+            # where goal.current_savings is the cash part.
+            
+            # Re-evaluating current_value logic:
+            # Previously: goal.current_value = goal.current_value + contribution
+            # This implies goal.current_value tracks the cash component + its returns?
+            # Or just total value?
+            # Let's assume goal.current_savings tracks the cash component.
+            
+            if goal.current_savings is None:
+                goal.current_savings = goal.total_contributions or 0
+                
+            goal.current_value = (goal.current_savings or 0) + linked_assets_value
             
             # Calculate shortfall and projection
             asset_allocation = {

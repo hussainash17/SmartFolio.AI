@@ -32,6 +32,8 @@ from app.model.user import (
     WhatIfScenarioResponse,
     ProductRecommendationResponse,
     GoalAlertResponse,
+    GoalLinkedAssetPublic,
+    GoalLinkedAssetCreate,
 )
 from app.services.goal_service import EnhancedInvestmentGoalService
 from app.services.kyc_service import KYCService, InvestmentGoalService, UserAccountService, ServiceException
@@ -231,6 +233,52 @@ def delete_goal_contribution(
                 detail="Contribution not found"
             )
         return {"message": "Contribution deleted successfully"}
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.post("/goals/{goal_id}/assets", response_model=GoalLinkedAssetPublic)
+def link_asset_to_goal(
+        goal_id: UUID,
+        asset_data: GoalLinkedAssetCreate,
+        current_user: CurrentUser,
+        goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
+):
+    """Link a portfolio asset to an investment goal."""
+    try:
+        return goal_service.link_asset(current_user.id, goal_id, asset_data)
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.delete("/goals/assets/{asset_id}")
+def unlink_asset_from_goal(
+        asset_id: UUID,
+        current_user: CurrentUser,
+        goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
+):
+    """Unlink an asset from an investment goal."""
+    try:
+        success = goal_service.unlink_asset(current_user.id, asset_id)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Linked asset not found"
+            )
+        return {"message": "Asset unlinked successfully"}
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.get("/goals/{goal_id}/assets", response_model=List[GoalLinkedAssetPublic])
+def get_goal_linked_assets(
+        goal_id: UUID,
+        current_user: CurrentUser,
+        goal_service: EnhancedInvestmentGoalService = Depends(get_enhanced_goal_service)
+):
+    """Get all assets linked to an investment goal."""
+    try:
+        return goal_service.get_linked_assets(current_user.id, goal_id)
     except ServiceException as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
 

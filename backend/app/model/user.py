@@ -181,6 +181,7 @@ class UserInvestmentGoal(SQLModel, table=True):
     user: "User" = Relationship(back_populates="investment_goals")
     linked_portfolio: Optional["Portfolio"] = Relationship(sa_relationship_kwargs={"foreign_keys": "[UserInvestmentGoal.linked_portfolio_id]"})
     contributions: list["UserInvestmentGoalContribution"] = Relationship(back_populates="goal", sa_relationship_kwargs={"cascade": "all, delete"})
+    linked_assets: list["GoalLinkedAsset"] = Relationship(back_populates="goal", sa_relationship_kwargs={"cascade": "all, delete"})
 
 
 # Investment Goal Contributions Model
@@ -297,6 +298,21 @@ class User(UserBase, table=True):
                                                                                sa_relationship_kwargs={"cascade": "all, delete"})
     accounts: list["UserAccount"] = Relationship(back_populates="user",
                                                  sa_relationship_kwargs={"cascade": "all, delete"})
+    linked_assets: list["GoalLinkedAsset"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
+
+    # Trading Ideas relationships
+    trading_ideas: list["TradingIdea"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
+    idea_comments: list["IdeaComment"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
+    idea_likes: list["IdeaLike"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
+    followers: list["UserFollow"] = Relationship(
+        sa_relationship_kwargs={"primaryjoin": "UserFollow.followed_id == User.id", "cascade": "all, delete"},
+        back_populates="followed"
+    )
+    following: list["UserFollow"] = Relationship(
+        sa_relationship_kwargs={"primaryjoin": "UserFollow.follower_id == User.id", "cascade": "all, delete"},
+        back_populates="follower"
+    )
+    symbol_follows: list["SymbolFollow"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
 
     # Trading Ideas relationships
     trading_ideas: list["TradingIdea"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
@@ -440,6 +456,10 @@ class UserInvestmentGoalPublic(UserInvestmentGoalBase):
     
     # Milestones
     milestones: dict = {}
+    
+    # Linked Assets Summary
+    linked_assets_value: float | None = None
+    linked_assets_count: int | None = None
     
     created_at: datetime
     updated_at: datetime
@@ -611,3 +631,54 @@ class TokenPayload(SQLModel):
 class NewPassword(SQLModel):
     token: str
     new_password: str = Field(min_length=8, max_length=40)
+
+
+class AllocationType(str, Enum):
+    """Type of asset allocation"""
+    QUANTITY = "QUANTITY"
+    PERCENTAGE = "PERCENTAGE"
+
+
+class GoalLinkedAsset(SQLModel, table=True):
+    """Asset linked to an investment goal (Soft Linking)"""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    goal_id: uuid.UUID = Field(foreign_key="userinvestmentgoal.id", index=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
+    
+    # Asset details
+    symbol: str = Field(index=True)
+    company_name: str | None = None
+    
+    # Allocation details
+    allocation_type: AllocationType
+    allocation_value: float = Field(description="Quantity or Percentage value")
+    
+    # Calculated values
+    linked_quantity: float = Field(description="Actual number of shares linked")
+    current_value: float = Field(default=0.0, description="Current market value of linked portion")
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Relationships
+    goal: "UserInvestmentGoal" = Relationship(back_populates="linked_assets")
+    user: "User" = Relationship(back_populates="linked_assets")
+
+
+class GoalLinkedAssetCreate(SQLModel):
+    symbol: str
+    allocation_type: AllocationType
+    allocation_value: float
+
+
+class GoalLinkedAssetPublic(SQLModel):
+    id: uuid.UUID
+    goal_id: uuid.UUID
+    symbol: str
+    company_name: str | None = None
+    allocation_type: AllocationType
+    allocation_value: float
+    linked_quantity: float
+    current_value: float
+    created_at: datetime
+
