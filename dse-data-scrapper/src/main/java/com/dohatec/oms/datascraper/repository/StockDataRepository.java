@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -21,7 +22,7 @@ public interface StockDataRepository extends JpaRepository<StockData, UUID> {
 
     /**
      * Find stock data by company ID
-     * 
+     *
      * @param companyId the company UUID
      * @return Optional containing the stock data if found
      */
@@ -29,14 +30,14 @@ public interface StockDataRepository extends JpaRepository<StockData, UUID> {
 
     /**
      * Find all stock data
-     * 
+     *
      * @return list of stock data for all companies
      */
     List<StockData> findAll();
 
     /**
      * Find stock data updated after a specific timestamp
-     * 
+     *
      * @param timestamp the timestamp
      * @return list of stock data
      */
@@ -44,7 +45,7 @@ public interface StockDataRepository extends JpaRepository<StockData, UUID> {
 
     /**
      * Find stock data by timestamp range
-     * 
+     *
      * @param startTime start timestamp
      * @param endTime   end timestamp
      * @return list of stock data
@@ -53,7 +54,7 @@ public interface StockDataRepository extends JpaRepository<StockData, UUID> {
 
     /**
      * Find stock data ordered by change percent descending (top gainers)
-     * 
+     *
      * @return list of stock data
      */
     @Query("SELECT s FROM StockData s ORDER BY s.changePercent DESC")
@@ -61,7 +62,7 @@ public interface StockDataRepository extends JpaRepository<StockData, UUID> {
 
     /**
      * Find stock data ordered by change percent ascending (top losers)
-     * 
+     *
      * @return list of stock data
      */
     @Query("SELECT s FROM StockData s ORDER BY s.changePercent ASC")
@@ -69,7 +70,7 @@ public interface StockDataRepository extends JpaRepository<StockData, UUID> {
 
     /**
      * Find stock data ordered by volume descending (most active)
-     * 
+     *
      * @return list of stock data
      */
     @Query("SELECT s FROM StockData s ORDER BY s.volume DESC")
@@ -77,7 +78,7 @@ public interface StockDataRepository extends JpaRepository<StockData, UUID> {
 
     /**
      * Delete old stock data (cleanup operation)
-     * 
+     *
      * @param timestamp cutoff timestamp
      */
     @Modifying
@@ -86,7 +87,7 @@ public interface StockDataRepository extends JpaRepository<StockData, UUID> {
 
     /**
      * Check if stock data exists for a company
-     * 
+     *
      * @param companyId the company UUID
      * @return true if exists, false otherwise
      */
@@ -94,7 +95,7 @@ public interface StockDataRepository extends JpaRepository<StockData, UUID> {
 
     /**
      * Count stock data records
-     * 
+     *
      * @return count of records
      */
     long count();
@@ -107,19 +108,20 @@ public interface StockDataRepository extends JpaRepository<StockData, UUID> {
     /**
      * Find stock data with null open price
      * Used by OpenPriceScraper to identify stocks needing open price update
-     * 
+     *
      * @return list of stock data with null open price
      */
     @Query("SELECT s FROM StockData s WHERE s.openPrice IS NULL")
     List<StockData> findByOpenPriceIsNull();
 
     /**
-     * Find stock data by trading date
+     * Find stock data by trading date or null trading date
      *
      * @param tradingDate the trading date
      * @return list of stock data
      */
-    List<StockData> findByTradingDate(java.time.LocalDate tradingDate);
+    @Query("SELECT sd FROM StockData sd WHERE sd.tradingDate = :tradingDate OR sd.tradingDate IS NULL")
+    List<StockData> findByTradingDate(@Param("tradingDate") LocalDate tradingDate);
 
     /**
      * Find stock data by trading date where open price is null
@@ -136,7 +138,10 @@ public interface StockDataRepository extends JpaRepository<StockData, UUID> {
      * @param updatedBefore timestamp to compare against
      * @return list of stock data
      */
-    @Query("SELECT sd FROM StockData sd WHERE sd.tradingDate = :tradingDate AND sd.updatedAt < :updatedBefore")
-    List<StockData> findByTradingDateAndUpdatedAtBefore(@Param("tradingDate") java.time.LocalDate tradingDate,
+    @Query("SELECT sd FROM StockData sd WHERE " +
+            "(sd.tradingDate = :tradingDate OR sd.tradingDate IS NULL) AND " +
+            "(sd.updatedAt < :updatedBefore OR sd.updatedAt IS NULL)")
+    List<StockData> findByTradingDateAndUpdatedAtBefore(
+            @Param("tradingDate") LocalDate tradingDate,
             @Param("updatedBefore") LocalDateTime updatedBefore);
 }
