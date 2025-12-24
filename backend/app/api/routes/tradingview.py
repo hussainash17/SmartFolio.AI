@@ -347,15 +347,29 @@ def get_history(
                 # Create a synthetic DailyOHLC bar from StockData
                 # This allows TradingView to show current day data during trading hours
                 class TodayBar:
-                    def __init__(self, stock_data):
+                    def __init__(self, stock_data, previous_close=None):
                         self.date = stock_data.timestamp.date()
-                        self.open_price = stock_data.open_price
-                        self.high = stock_data.high
-                        self.low = stock_data.low
+                        # Handle None values: use previous_close as fallback for open_price
+                        # If still None, use last_trade_price as last resort
+                        self.open_price = (
+                            stock_data.open_price 
+                            if stock_data.open_price is not None 
+                            else (previous_close if previous_close is not None else stock_data.last_trade_price)
+                        )
+                        # Use last_trade_price as fallback for high/low if None
+                        self.high = stock_data.high if stock_data.high is not None else stock_data.last_trade_price
+                        self.low = stock_data.low if stock_data.low is not None else stock_data.last_trade_price
                         self.close_price = stock_data.last_trade_price
-                        self.volume = stock_data.volume
+                        self.volume = stock_data.volume if stock_data.volume is not None else 0
                 
-                today_bar = TodayBar(latest_stock_data)
+                # Get previous bar's close_price as fallback for open_price
+                previous_close = None
+                if bars:
+                    last_bar = bars[-1] if isinstance(bars, list) else None
+                    if last_bar:
+                        previous_close = last_bar.close_price
+                
+                today_bar = TodayBar(latest_stock_data, previous_close)
                 bars = list(bars) if bars else []
                 bars.append(today_bar)
 
@@ -374,6 +388,18 @@ def get_history(
     volumes = []
 
     for bar in bars:
+        # Handle None values in price fields
+        # Use close_price as fallback for missing OHLC values
+        # Skip bar if close_price is also None (shouldn't happen for DailyOHLC, but handle gracefully)
+        if bar.close_price is None:
+            continue  # Skip bars without close price
+        
+        # Use fallback values for missing fields
+        open_price = bar.open_price if bar.open_price is not None else bar.close_price
+        high_price = bar.high if bar.high is not None else bar.close_price
+        low_price = bar.low if bar.low is not None else bar.close_price
+        close_price = bar.close_price
+        
         # Convert date to Unix timestamp (seconds) at UTC midnight
         # 
         # CRITICAL: TradingView UDF expects timestamps in UTC seconds.
@@ -389,10 +415,10 @@ def get_history(
         bar_date = bar.date.date() if isinstance(bar.date, datetime) else bar.date
         bar_datetime_utc = datetime.combine(bar_date, datetime.min.time(), tzinfo=timezone.utc)
         times.append(int(bar_datetime_utc.timestamp()))
-        opens.append(float(bar.open_price))
-        highs.append(float(bar.high))
-        lows.append(float(bar.low))
-        closes.append(float(bar.close_price))
+        opens.append(float(open_price))
+        highs.append(float(high_price))
+        lows.append(float(low_price))
+        closes.append(float(close_price))
         volumes.append(int(bar.volume) if bar.volume else 0)
 
     return {

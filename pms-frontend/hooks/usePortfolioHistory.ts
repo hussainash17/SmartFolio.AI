@@ -12,7 +12,7 @@ export function usePortfolioHistory(portfolioId: string) {
         queryKey: queryKeys.portfolioHistory(portfolioId),
         queryFn: async () => {
             const response = await fetch(
-                `${(OpenAPI.BASE || '').replace(/\/$/, '')}/api/v1/portfolios/${portfolioId}/history`,
+                `${(OpenAPI.BASE || '').replace(/\/$/, '')}/api/v1/portfolio/${portfolioId}/history`,
                 {
                     headers: OpenAPI.TOKEN ? { Authorization: `Bearer ${OpenAPI.TOKEN as unknown as string}` } : undefined,
                     credentials: OpenAPI.WITH_CREDENTIALS ? 'include' : 'omit',
