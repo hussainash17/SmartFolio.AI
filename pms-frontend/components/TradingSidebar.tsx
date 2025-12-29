@@ -73,7 +73,6 @@ export function TradingSidebar({ currentView, onViewChange, user, onLogout }: Tr
       title: "Trading",
       items: [
         { id: 'trading', label: 'Trade', icon: <DollarSign className="h-5 w-5" /> },
-        { id: 'orders', label: 'Orders & Trades', icon: <Activity className="h-5 w-5" /> },
         { id: 'market', label: 'Market Data', icon: <BarChart3 className="h-5 w-5" /> },
         { id: 'watchlist', label: 'Watchlists', icon: <BookOpen className="h-5 w-5" /> },
       ]
@@ -115,8 +114,8 @@ export function TradingSidebar({ currentView, onViewChange, user, onLogout }: Tr
           variant={isActive ? "default" : "ghost"}
           onClick={() => onViewChange(item.id)}
           className={`w-full justify-start h-12 px-4 mb-1 ${isActive
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'hover:bg-accent hover:text-accent-foreground text-muted-foreground hover:text-foreground'
+            ? 'bg-primary text-primary-foreground shadow-sm'
+            : 'hover:bg-accent hover:text-accent-foreground text-muted-foreground hover:text-foreground'
             } ${isCollapsed ? 'px-2' : ''}`}
         >
           <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} w-full`}>

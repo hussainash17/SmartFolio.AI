@@ -13,9 +13,8 @@ import { queryKeys } from "./hooks/queryKeys";
 
 // Lazy-loaded page components to reduce initial bundle size
 const ComprehensiveDashboard = lazy(() => import("./components/ComprehensiveDashboard").then(m => ({ default: m.ComprehensiveDashboard })));
-const TradingInterface = lazy(() => import("./components/TradingInterface").then(m => ({ default: m.TradingInterface })));
+const UnifiedTradingPage = lazy(() => import("./components/UnifiedTradingPage").then(m => ({ default: m.UnifiedTradingPage })));
 const MarketData = lazy(() => import("./components/MarketData").then(m => ({ default: m.MarketData })));
-const OrdersManager = lazy(() => import("./components/OrdersManager").then(m => ({ default: m.OrdersManager })));
 const AccountManager = lazy(() => import("./components/AccountManager").then(m => ({ default: m.AccountManager })));
 const PortfolioDashboard = lazy(() => import("./components/PortfolioDashboard").then(m => ({ default: m.PortfolioDashboard })));
 const PortfolioDetail = lazy(() => import("./components/PortfolioDetail").then(m => ({ default: m.PortfolioDetail })));
@@ -474,21 +473,18 @@ export default function App() {
                 );
 
             case "trading":
+            case "orders":
                 return (
-                    <Suspense fallback={<div>Loading Trading Interface...</div>}>
-                        <TradingInterface
+                    <Suspense fallback={<div>Loading Trading...</div>}>
+                        <UnifiedTradingPage
                             marketData={marketData}
                             onPlaceOrder={handlePlaceOrder}
                             portfolios={portfoliosWithLivePricing}
                             selectedPortfolioId={selectedPortfolio?.id}
+                            orders={orders}
+                            trades={trades}
+                            onCancelOrder={handleCancelOrder}
                         />
-                    </Suspense>
-                );
-
-            case "orders":
-                return (
-                    <Suspense fallback={<div>Loading Orders Manager...</div>}>
-                        <OrdersManager orders={orders} trades={trades} onCancelOrder={handleCancelOrder} />
                     </Suspense>
                 );
 
