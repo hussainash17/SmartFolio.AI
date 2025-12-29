@@ -242,8 +242,8 @@ export default function App() {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
                 <div className="text-center space-y-4">
-                    <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mx-auto">
-                        <TrendingUp className="h-7 w-7 text-primary-foreground animate-pulse" />
+                    <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mx-auto overflow-hidden">
+                        <img src="/logo.png" alt="Logo" className="w-full h-full object-cover animate-pulse" />
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-foreground">SmartFolio.AI</h1>

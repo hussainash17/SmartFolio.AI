@@ -157,8 +157,8 @@ export function TradingSidebar({ currentView, onViewChange, user, onLogout }: Tr
         <div className="flex items-center justify-between">
           {!isCollapsed && (
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-primary-foreground" />
+              <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center overflow-hidden">
+                <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" />
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-foreground">SmartFolio.AI</h3>
