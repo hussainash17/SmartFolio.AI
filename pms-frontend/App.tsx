@@ -472,41 +472,40 @@ export default function App() {
                     </Suspense>
                 );
 
-            case "trading":
-            case "orders":
-                return (
-                    <Suspense fallback={<div>Loading Trading...</div>}>
-                        <UnifiedTradingPage
-                            marketData={marketData}
-                            onPlaceOrder={handlePlaceOrder}
-                            portfolios={portfoliosWithLivePricing}
-                            selectedPortfolioId={selectedPortfolio?.id}
-                            orders={orders}
-                            trades={trades}
-                            onCancelOrder={handleCancelOrder}
-                        />
-                    </Suspense>
-                );
+            // case "trading":
+            //     return (
+            //         <Suspense fallback={<div>Loading Trading...</div>}>
+            //             <UnifiedTradingPage
+            //                 marketData={marketData}
+            //                 onPlaceOrder={handlePlaceOrder}
+            //                 portfolios={portfoliosWithLivePricing}
+            //                 selectedPortfolioId={selectedPortfolio?.id}
+            //                 orders={orders}
+            //                 trades={trades}
+            //                 onCancelOrder={handleCancelOrder}
+            //             />
+            //         </Suspense>
+            //     );
 
-            case "market":
-                return (
-                    <Suspense fallback={<div>Loading Market Data...</div>}>
-                        <MarketData
-                            marketData={marketData}
-                            watchlists={watchlists}
-                            news={news}
-                            onAddToWatchlist={addToWatchlist}
-                            onRemoveFromWatchlist={removeFromWatchlist}
-                            onQuickTrade={handleQuickTrade}
-                            onChartStock={handleChartStock}
-                            heldSymbols={new Set(((selectedPortfolioDisplay ?? selectedPortfolio)?.stocks || []).map(s => s.symbol))}
-                            onUpdateWatchlistNote={async (watchlistId: string, symbol: string, notes: string) => {
-                                await updateWatchlistItemNote(watchlistId, symbol, notes);
-                                toast.success('Note saved');
-                            }}
-                        />
-                    </Suspense>
-                );
+            // case "market":
+            //     return (
+            //         <Suspense fallback={<div>Loading Market Data...</div>}>
+            //             <MarketData
+            //                 marketData={marketData}
+            //                 watchlists={watchlists}
+            //                 news={news}
+            //                 onAddToWatchlist={addToWatchlist}
+            //                 onRemoveFromWatchlist={removeFromWatchlist}
+            //                 onQuickTrade={handleQuickTrade}
+            //                 onChartStock={handleChartStock}
+            //                 heldSymbols={new Set(((selectedPortfolioDisplay ?? selectedPortfolio)?.stocks || []).map(s => s.symbol))}
+            //                 onUpdateWatchlistNote={async (watchlistId: string, symbol: string, notes: string) => {
+            //                     await updateWatchlistItemNote(watchlistId, symbol, notes);
+            //                     toast.success('Note saved');
+            //                 }}
+            //             />
+            //         </Suspense>
+            //     );
 
             case "watchlist":
                 return (

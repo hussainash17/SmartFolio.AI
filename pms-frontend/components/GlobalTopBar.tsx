@@ -222,7 +222,7 @@ export function GlobalTopBar({ accountBalance, onQuickTrade, onOpenChart, onOpen
 
         {/* Right: Actions & User Menu */}
         <div className="flex items-center gap-3">
-          <Button
+          {/* <Button
             variant="default"
             size="sm"
             onClick={() => onQuickTrade()}
@@ -230,7 +230,7 @@ export function GlobalTopBar({ accountBalance, onQuickTrade, onOpenChart, onOpen
           >
             <Plus className="h-4 w-4 mr-1" />
             Quick Trade
-          </Button>
+          </Button> */}
 
           <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
             <Bell className="h-4 w-4" />

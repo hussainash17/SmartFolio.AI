@@ -122,6 +122,7 @@ export function StockScreener({ onQuickTrade, onChartStock, onAddToWatchlist }: 
             isEmptyState={isEmptyState}
             isQueryDisabled={isQueryDisabled}
             onChartStock={onChartStock}
+            // todo need to replace this with the add to my portfolio modal
             onQuickTrade={onQuickTrade}
             onAddToWatchlist={handleAddToWatchlistClick}
           />

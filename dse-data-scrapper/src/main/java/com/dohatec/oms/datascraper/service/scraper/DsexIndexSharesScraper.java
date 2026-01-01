@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DsexIndexScraper {
+public class DsexIndexSharesScraper {
 
     private static final String DSEX_INDEX_URL = "https://dsebd.org/dseX_share.php";
 

@@ -451,6 +451,9 @@ export function PortfolioDetail({
                                   <Target className="h-4 w-4" />
                                 </Button>
                                 <div className="w-px h-4 bg-border mx-1" />
+                                {/* todo  remove this button and then replace
+                                this with the Add Stock modal , but during loading the add stock modal
+                                use the selected stock symbol */}
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -460,6 +463,8 @@ export function PortfolioDetail({
                                 >
                                   <Plus className="h-4 w-4" />
                                 </Button>
+                                {/* todo  remove this button and then replace
+                                this with the Add Stock modal with the selected stock symbol */}
                                 <Button
                                   variant="ghost"
                                   size="icon"

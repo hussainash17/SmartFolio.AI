@@ -22,9 +22,9 @@ import {
   Briefcase
 } from "lucide-react";
 import { usePortfolios } from "../hooks/usePortfolios";
-import { 
-  useRiskOverview, 
-  useRiskMetrics, 
+import {
+  useRiskOverview,
+  useRiskMetrics,
   useSectorConcentration,
   useCorrelationAnalysis,
   useStressTests,
@@ -52,13 +52,13 @@ interface RiskMetric {
 export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics' }: RiskManagementProps) {
   const [selectedTimeframe, setSelectedTimeframe] = useState('1Y');
   const queryClient = useQueryClient();
-  
+
   // Get portfolios list
   const { portfolios, loading: portfoliosLoading } = usePortfolios();
-  
+
   // Manage selected portfolio internally - default to first portfolio or default portfolio
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(null);
-  
+
   // Initialize with default portfolio or first portfolio when portfolios load
   useEffect(() => {
     if (!selectedPortfolioId && portfolios.length > 0) {
@@ -72,10 +72,10 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
       }
     }
   }, [portfolios, selectedPortfolioId]);
-  
+
   // Use selected portfolio for queries
   const portfolioId = selectedPortfolioId;
-  
+
   // Get selected portfolio details
   const selectedPortfolio = portfolios.find(p => p.id === portfolioId);
 
@@ -84,37 +84,37 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
     portfolioId,
     selectedTimeframe
   );
-  
+
   const { data: riskMetrics, isLoading: metricsLoading } = useRiskMetrics(
     portfolioId,
     selectedTimeframe
   );
-  
+
   const { data: sectorData, isLoading: sectorLoading } = useSectorConcentration(
     portfolioId,
     selectedTimeframe
   );
-  
+
   const { data: correlationData, isLoading: correlationLoading } = useCorrelationAnalysis(
     portfolioId,
     selectedTimeframe,
     10
   );
-  
+
   const { data: stressTests, isLoading: stressLoading } = useStressTests(
     portfolioId
   );
-  
+
   const { data: riskAlertsData, isLoading: alertsLoading } = useRiskAlerts(portfolioId, true);
-  
+
   const { data: rebalancingData, isLoading: rebalancingLoading } = useRebalancingRecommendations(portfolioId);
-  
+
   const { data: riskProfile } = useUserRiskProfile();
   // Determine risk status
   const getRiskStatus = (value: number, target: number, lowerIsBetter: boolean = false): 'low' | 'medium' | 'high' => {
     const deviation = Math.abs(value - target);
     const percentDeviation = target !== 0 ? (deviation / Math.abs(target)) * 100 : 0;
-    
+
     if (lowerIsBetter) {
       if (value <= target) return 'low';
       if (percentDeviation < 20) return 'medium';
@@ -129,9 +129,9 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
   // Build risk metrics from API data
   const riskMetricsList: RiskMetric[] = useMemo(() => {
     if (!riskMetrics || !riskProfile) return [];
-    
+
     const profile = riskProfile;
-    
+
     return [
       {
         name: 'Portfolio Volatility',
@@ -189,7 +189,7 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
 
   // Find sectors with high concentration risk
   const highConcentrationSectors = useMemo(() => {
-    return sectorData?.items.filter(sector => 
+    return sectorData?.items.filter(sector =>
       Math.abs(sector.deviationPct) > 5
     ) || [];
   }, [sectorData]);
@@ -199,11 +199,11 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
     if (!rebalancingData?.suggestions || rebalancingData.suggestions.length === 0) {
       return 100; // Perfect alignment if no suggestions
     }
-    
+
     // Calculate how many sectors are within 1% of target
     const totalSuggestions = rebalancingData.suggestions.length;
     const alignedSuggestions = rebalancingData.suggestions.filter(s => Math.abs(s.differencePct) <= 1).length;
-    
+
     return Math.round((alignedSuggestions / totalSuggestions) * 100);
   }, [rebalancingData]);
 
@@ -298,8 +298,8 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
           {/* Portfolio Selector */}
           <div className="flex items-center gap-2">
             <Briefcase className="h-4 w-4 text-muted-foreground" />
-            <Select 
-              value={selectedPortfolioId || ''} 
+            <Select
+              value={selectedPortfolioId || ''}
               onValueChange={setSelectedPortfolioId}
             >
               <SelectTrigger className="w-[200px]">
@@ -315,7 +315,7 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
               </SelectContent>
             </Select>
           </div>
-          
+
           <Button variant="outline" onClick={() => onNavigate('risk-profile')}>
             <Settings className="h-4 w-4 mr-2" />
             Update Risk Profile
@@ -352,8 +352,8 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
                 </div>
                 <div className="flex items-center gap-2 mt-2">
                   <Badge variant="outline" className="text-orange-600 border-orange-200">
-                    {riskOverview?.riskScore && riskOverview.riskScore < 5 ? 'Low Risk' : 
-                     riskOverview?.riskScore && riskOverview.riskScore < 7.5 ? 'Moderate Risk' : 'High Risk'}
+                    {riskOverview?.riskScore && riskOverview.riskScore < 5 ? 'Low Risk' :
+                      riskOverview?.riskScore && riskOverview.riskScore < 7.5 ? 'Moderate Risk' : 'High Risk'}
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
@@ -395,8 +395,8 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
                 <div className="text-3xl font-bold text-blue-600">{rebalancingAlignment}%</div>
                 <div className="flex items-center gap-2 mt-2">
                   <Badge variant="outline" className="text-blue-600 border-blue-200">
-                    {rebalancingAlignment >= 90 ? 'Well Aligned' : 
-                     rebalancingAlignment >= 70 ? 'Minor Deviation' : 'Needs Rebalancing'}
+                    {rebalancingAlignment >= 90 ? 'Well Aligned' :
+                      rebalancingAlignment >= 70 ? 'Minor Deviation' : 'Needs Rebalancing'}
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
@@ -434,16 +434,16 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
                           </div>
                           <div className="flex items-center justify-between text-sm">
                             <span>
-                              Current: {metric.name.includes('VaR') || metric.name.includes('$') ? 
+                              Current: {metric.name.includes('VaR') || metric.name.includes('$') ?
                                 formatCurrency(metric.value) :
                                 metric.name.includes('%') || metric.name.includes('Ratio') ?
-                                formatPercent(metric.value) : metric.value.toFixed(2)}
+                                  formatPercent(metric.value) : metric.value.toFixed(2)}
                             </span>
                             <span className="text-muted-foreground">
-                              Target: {metric.name.includes('VaR') || metric.name.includes('$') ? 
+                              Target: {metric.name.includes('VaR') || metric.name.includes('$') ?
                                 formatCurrency(metric.target) :
                                 metric.name.includes('%') || metric.name.includes('Ratio') ?
-                                formatPercent(metric.target) : metric.target.toFixed(2)}
+                                  formatPercent(metric.target) : metric.target.toFixed(2)}
                             </span>
                           </div>
                           <Progress
@@ -652,6 +652,7 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
                                   value={Math.min(100, (suggestion.currentWeight / (suggestion.targetWeight || 1)) * 100)}
                                   className="flex-1 h-2"
                                 />
+                                {/* todo need to replace this with the add to my portfolio modal */}
                                 <Button
                                   size="sm"
                                   onClick={() => onQuickTrade(undefined, suggestion.action)}
@@ -709,7 +710,7 @@ export function RiskManagement({ onNavigate, onQuickTrade, defaultTab = 'metrics
                         const bgClass = isNegative ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200';
                         const textClass = isNegative ? 'text-red-800' : 'text-green-800';
                         const textLightClass = isNegative ? 'text-red-600' : 'text-green-600';
-                        
+
                         return (
                           <div key={scenario.key} className={`p-4 ${bgClass} border rounded-lg`}>
                             <h4 className={`font-medium ${textClass}`}>{scenario.label}</h4>

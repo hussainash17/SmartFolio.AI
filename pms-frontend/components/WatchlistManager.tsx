@@ -66,14 +66,14 @@ export function WatchlistManager({ onQuickTrade, onChartStock }: WatchlistManage
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isAddStockDialogOpen, setIsAddStockDialogOpen] = useState(false);
   const [editingWatchlist, setEditingWatchlist] = useState<WatchlistPublic | null>(null);
-  
+
   // Form states
   const [watchlistName, setWatchlistName] = useState("");
   const [watchlistDesc, setWatchlistDesc] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  
+
   // Local state for notes to prevent refresh on every keystroke
   const [localNotes, setLocalNotes] = useState<Record<string, string>>({});
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -104,7 +104,7 @@ export function WatchlistManager({ onQuickTrade, onChartStock }: WatchlistManage
       description: watchlistDesc || undefined,
       is_default: watchlists.length === 0,
     });
-    
+
     if (result) {
       setWatchlistName("");
       setWatchlistDesc("");
@@ -118,7 +118,7 @@ export function WatchlistManager({ onQuickTrade, onChartStock }: WatchlistManage
       name: watchlistName,
       description: watchlistDesc || undefined,
     });
-    
+
     if (result) {
       setEditingWatchlist(null);
       setWatchlistName("");
@@ -143,7 +143,7 @@ export function WatchlistManager({ onQuickTrade, onChartStock }: WatchlistManage
       description: watchlist.description || undefined,
       is_default: false,
     });
-    
+
     if (newWatchlist && currentWatchlist?.id === watchlist.id) {
       // Copy all items from current watchlist
       for (const item of watchlistItems) {
@@ -263,11 +263,10 @@ export function WatchlistManager({ onQuickTrade, onChartStock }: WatchlistManage
             {watchlists.map((watchlist) => (
               <Card
                 key={watchlist.id}
-                className={`cursor-pointer transition-all ${
-                  currentWatchlist?.id === watchlist.id
-                    ? "ring-2 ring-primary"
-                    : "hover:border-primary"
-                }`}
+                className={`cursor-pointer transition-all ${currentWatchlist?.id === watchlist.id
+                  ? "ring-2 ring-primary"
+                  : "hover:border-primary"
+                  }`}
                 onClick={() => setCurrentWatchlist(watchlist)}
               >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -413,7 +412,7 @@ export function WatchlistManager({ onQuickTrade, onChartStock }: WatchlistManage
                               <BarChart3 className="h-3 w-3" />
                             </Button>
                           )}
-                          {onQuickTrade && (
+                          {/* {onQuickTrade && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -422,7 +421,7 @@ export function WatchlistManager({ onQuickTrade, onChartStock }: WatchlistManage
                             >
                               <ShoppingCart className="h-3 w-3" />
                             </Button>
-                          )}
+                          )} */}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -543,13 +542,13 @@ export function WatchlistManager({ onQuickTrade, onChartStock }: WatchlistManage
                 />
               </div>
             </div>
-            
+
             {isSearching && (
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             )}
-            
+
             {searchResults.length > 0 && (
               <div className="max-h-[300px] overflow-y-auto border rounded-md">
                 {searchResults.map((stock) => (
@@ -567,7 +566,7 @@ export function WatchlistManager({ onQuickTrade, onChartStock }: WatchlistManage
                 ))}
               </div>
             )}
-            
+
             {searchQuery.length >= 2 && !isSearching && searchResults.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">
                 No stocks found

@@ -67,16 +67,17 @@ export function TradingSidebar({ currentView, onViewChange, user, onLogout }: Tr
         { id: 'performance', label: 'Performance', icon: <TrendingUp className="h-5 w-5" /> },
         { id: 'allocation', label: 'Asset Allocation', icon: <PieChart className="h-5 w-5" /> },
         { id: 'goals', label: 'Investment Goals', icon: <Target className="h-5 w-5" /> },
+        { id: 'watchlist', label: 'Watchlists', icon: <BookOpen className="h-5 w-5" /> }
       ]
     },
-    {
-      title: "Trading",
-      items: [
-        { id: 'trading', label: 'Trade', icon: <DollarSign className="h-5 w-5" /> },
-        { id: 'market', label: 'Market Data', icon: <BarChart3 className="h-5 w-5" /> },
-        { id: 'watchlist', label: 'Watchlists', icon: <BookOpen className="h-5 w-5" /> },
-      ]
-    },
+    // {
+    //   title: "Trading",
+    //   items: [
+    //     { id: 'trading', label: 'Trade', icon: <DollarSign className="h-5 w-5" /> },
+    //     { id: 'market', label: 'Market Data', icon: <BarChart3 className="h-5 w-5" /> },
+    //     { id: 'watchlist', label: 'Watchlists', icon: <BookOpen className="h-5 w-5" /> },
+    //   ]
+    // },
     {
       title: "Research",
       items: [

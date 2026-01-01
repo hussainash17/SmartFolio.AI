@@ -286,10 +286,10 @@ export function PortfolioDashboard({
                                     const donchianData = donchianDataMap.get(stock.symbol);
                                     const primaryPeriod = parseInt(selectedPeriod.split(',')[0]);
                                     const channel = donchianData?.channels?.find(c => c.period === primaryPeriod);
-                                    
+
                                     let supportValue: string | null = null;
                                     let resistanceValue: string | null = null;
-                                    
+
                                     if (donchianLoading) {
                                         supportValue = null;
                                         resistanceValue = null;
@@ -358,6 +358,8 @@ export function PortfolioDashboard({
                                                     >
                                                         <BarChart3 className="h-3 w-3" />
                                                     </Button>
+                                                    {/* todo  remove this button and then replace
+                                                    this with the Add Stock modal  */}
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"

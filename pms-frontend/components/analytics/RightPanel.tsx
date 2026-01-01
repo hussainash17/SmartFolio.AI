@@ -95,7 +95,7 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
         enabled: !!currentSymbol && activeTab === 'events',
     });
 
-    const loading = stockLoading || 
+    const loading = stockLoading ||
         (activeTab === 'fundamentals' && fundamentalsLoading) ||
         (activeTab === 'financials' && earningsLoading) ||
         (activeTab === 'news' && newsLoading) ||
@@ -200,7 +200,7 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
                     <span className="text-xs text-muted-foreground">{formatPrice(symbolInfo?.low)}</span>
                     <div className="flex-1 h-2 bg-muted rounded-full relative">
                         {symbolInfo?.low && symbolInfo?.high && symbolInfo?.last_trade_price && (
-                            <div 
+                            <div
                                 className="absolute top-0 w-2 h-2 bg-primary rounded-full"
                                 style={{
                                     left: `${Math.max(0, Math.min(100, ((symbolInfo.last_trade_price - symbolInfo.low) / (symbolInfo.high - symbolInfo.low)) * 100))}%`,
@@ -217,61 +217,61 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
 
     const renderFinancials = () => {
         return (
-        <div className="space-y-4">
-            {earningsData?.quarterly_eps && earningsData.quarterly_eps.length > 0 ? (
-                <>
-                    <h4 className="text-xs font-semibold">Quarterly EPS</h4>
-                    <table className="w-full text-xs">
-                        <thead>
-                            <tr className="text-muted-foreground border-b border-border">
-                                <th className="text-left py-1 font-medium">Quarter</th>
-                                <th className="text-right py-1 font-medium">EPS</th>
-                                <th className="text-right py-1 font-medium">Growth</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/50">
-                            {earningsData.quarterly_eps.slice(0, 8).map((q, idx) => (
-                                <tr key={idx}>
-                                    <td className="py-2">{q.quarter} {q.year}</td>
-                                    <td className="text-right font-mono">{safeToFixed(q.eps)}</td>
-                                    <td className={`text-right font-mono ${q.growth_percent && Number(q.growth_percent) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                        {q.growth_percent ? `${Number(q.growth_percent) >= 0 ? '+' : ''}${safeToFixed(q.growth_percent, 1)}%` : '--'}
-                                    </td>
+            <div className="space-y-4">
+                {earningsData?.quarterly_eps && earningsData.quarterly_eps.length > 0 ? (
+                    <>
+                        <h4 className="text-xs font-semibold">Quarterly EPS</h4>
+                        <table className="w-full text-xs">
+                            <thead>
+                                <tr className="text-muted-foreground border-b border-border">
+                                    <th className="text-left py-1 font-medium">Quarter</th>
+                                    <th className="text-right py-1 font-medium">EPS</th>
+                                    <th className="text-right py-1 font-medium">Growth</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </>
-            ) : (
-                <div className="text-center py-8 text-muted-foreground text-sm">
-                    No financial data available
-                </div>
-            )}
+                            </thead>
+                            <tbody className="divide-y divide-border/50">
+                                {earningsData.quarterly_eps.slice(0, 8).map((q, idx) => (
+                                    <tr key={idx}>
+                                        <td className="py-2">{q.quarter} {q.year}</td>
+                                        <td className="text-right font-mono">{safeToFixed(q.eps)}</td>
+                                        <td className={`text-right font-mono ${q.growth_percent && Number(q.growth_percent) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                            {q.growth_percent ? `${Number(q.growth_percent) >= 0 ? '+' : ''}${safeToFixed(q.growth_percent, 1)}%` : '--'}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </>
+                ) : (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                        No financial data available
+                    </div>
+                )}
 
-            {earningsData?.annual_profit && earningsData.annual_profit.length > 0 && (
-                <>
-                    <h4 className="text-xs font-semibold mt-4">Annual Profit</h4>
-                    <table className="w-full text-xs">
-                        <thead>
-                            <tr className="text-muted-foreground border-b border-border">
-                                <th className="text-left py-1 font-medium">Year</th>
-                                <th className="text-right py-1 font-medium">Profit</th>
-                                <th className="text-right py-1 font-medium">EPS</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/50">
-                            {earningsData.annual_profit.slice(0, 5).map((a, idx) => (
-                                <tr key={idx}>
-                                    <td className="py-2">{a.year}</td>
-                                    <td className="text-right font-mono">{formatNumber(a.profit)}</td>
-                                    <td className="text-right font-mono">{safeToFixed(a.eps)}</td>
+                {earningsData?.annual_profit && earningsData.annual_profit.length > 0 && (
+                    <>
+                        <h4 className="text-xs font-semibold mt-4">Annual Profit</h4>
+                        <table className="w-full text-xs">
+                            <thead>
+                                <tr className="text-muted-foreground border-b border-border">
+                                    <th className="text-left py-1 font-medium">Year</th>
+                                    <th className="text-right py-1 font-medium">Profit</th>
+                                    <th className="text-right py-1 font-medium">EPS</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </>
-            )}
-        </div>
+                            </thead>
+                            <tbody className="divide-y divide-border/50">
+                                {earningsData.annual_profit.slice(0, 5).map((a, idx) => (
+                                    <tr key={idx}>
+                                        <td className="py-2">{a.year}</td>
+                                        <td className="text-right font-mono">{formatNumber(a.profit)}</td>
+                                        <td className="text-right font-mono">{safeToFixed(a.eps)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </>
+                )}
+            </div>
         );
     };
 
@@ -293,9 +293,9 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
                                 </p>
                             )}
                             {news.url && (
-                                <a 
-                                    href={news.url} 
-                                    target="_blank" 
+                                <a
+                                    href={news.url}
+                                    target="_blank"
                                     rel="noopener noreferrer"
                                     className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-2"
                                 >
@@ -318,9 +318,9 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
             {eventsData && eventsData.length > 0 ? (
                 eventsData.map((event) => (
                     <div key={event.id} className="flex items-start gap-3 p-3 border border-border rounded-md">
-                        <div className={`p-2 rounded ${event.type === 'AGM' ? 'bg-primary/10 text-primary' : 
-                            event.type === 'Record Date' ? 'bg-emerald-500/10 text-emerald-500' : 
-                            'bg-blue-500/10 text-blue-500'}`}>
+                        <div className={`p-2 rounded ${event.type === 'AGM' ? 'bg-primary/10 text-primary' :
+                            event.type === 'Record Date' ? 'bg-emerald-500/10 text-emerald-500' :
+                                'bg-blue-500/10 text-blue-500'}`}>
                             {event.type === 'Record Date' ? <DollarSign className="w-4 h-4" /> : <Calendar className="w-4 h-4" />}
                         </div>
                         <div className="flex-1">
@@ -360,7 +360,7 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
                 </div>
 
                 {/* Quick Order Buttons */}
-                <div className="flex gap-2 mt-3">
+                {/* <div className="flex gap-2 mt-3">
                     <button
                         onClick={handleBuy}
                         disabled={!currentSymbol}
@@ -375,7 +375,7 @@ export function RightPanel({ currentSymbol, onPlaceOrder }: RightPanelProps) {
                     >
                         SELL
                     </button>
-                </div>
+                </div> */}
             </div>
 
             {/* Tabs */}

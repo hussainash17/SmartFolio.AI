@@ -97,7 +97,7 @@ public class MarketSummaryAndIndexScraper {
     }
 
     private MarketSummary persistMarketSummary(MarketTotals marketTotals, List<IndexSnapshot> indexSnapshots,
-                                               StockMovementData movementData, LocalDate marketDate, LocalDateTime now) {
+            StockMovementData movementData, LocalDate marketDate, LocalDateTime now) {
         MarketSummary marketSummary = marketSummaryRepository.findByDate(marketDate)
                 .orElseGet(() -> {
                     MarketSummary s = new MarketSummary();
@@ -112,8 +112,8 @@ public class MarketSummaryAndIndexScraper {
     /**
      * Fetch the DSE homepage HTML.
      */
-    @Retryable(retryFor = {NetworkException.class,
-            Exception.class}, maxAttempts = 3, backoff = @Backoff(delay = 1000L, multiplier = 2.0))
+    @Retryable(retryFor = { NetworkException.class,
+            Exception.class }, maxAttempts = 3, backoff = @Backoff(delay = 1000L, multiplier = 2.0))
     protected String fetchHtml() {
         String url = scraperProperties.getDse().getMarketSummaryUrl();
         try {
@@ -334,9 +334,9 @@ public class MarketSummaryAndIndexScraper {
     }
 
     private void upsertBenchmarkData(IndexSnapshot snapshot,
-                                     Benchmark benchmark,
-                                     LocalDate date,
-                                     OffsetDateTime now) {
+            Benchmark benchmark,
+            LocalDate date,
+            OffsetDateTime now) {
         // Find existing record for this benchmark and date
         Optional<BenchmarkData> existingOpt = benchmarkDataRepository.findByBenchmarkAndDate(benchmark, date);
 
@@ -515,12 +515,12 @@ public class MarketSummaryAndIndexScraper {
         private final String dataSource;
 
         IndexMetadata(String id,
-                      String ticker,
-                      String name,
-                      String description,
-                      String assetClass,
-                      String region,
-                      String dataSource) {
+                String ticker,
+                String name,
+                String description,
+                String assetClass,
+                String region,
+                String dataSource) {
             this.id = id;
             this.ticker = ticker;
             this.name = name;
