@@ -25,7 +25,8 @@ from app.model.fundamental_schemas import (
     ShareholdingChange, EarningsProfitResponse, QuarterlyEarnings,
     AnnualEarnings, FinancialHealth, DividendHistory,
     HistoricalRatios, CompanyComparison, CompanySearchResult,
-    FundamentalDataAvailability
+    FundamentalDataAvailability, ComprehensiveStockDetails,
+    PeerInfo, RiskFactor, ShareholdingItem
 )
 
 logger = logging.getLogger(__name__)
@@ -653,5 +654,260 @@ class FundamentalAnalysisService(BaseService[Company, Any, Any]):
             has_quarterly_data=has_quarterly,
             latest_data_year=latest_financial.year if latest_financial else None,
             latest_quarter_date=latest_quarterly.date if latest_quarterly else None
+        )
+
+    # ========================================================================
+    # API 10: Comprehensive Stock Details
+    # ========================================================================
+    def get_comprehensive_stock_details(self, trading_code: str) -> ComprehensiveStockDetails:
+        """
+        Get comprehensive stock details for the StockDetails frontend component.
+        aggregates data from multiple sources and provides mocked/derived values for missing data.
+        
+        Args:
+            trading_code: Company trading code
+            
+        Returns:
+            ComprehensiveStockDetails object
+        """
+        company = self._get_company_by_trading_code(trading_code)
+        stock_data = self._get_latest_stock_data(company.id)
+        
+        # 1. Basic Financials
+        latest_financial = self.session.exec(
+            select(FinancialPerformance)
+            .where(FinancialPerformance.company_id == company.id)
+            .order_by(desc(FinancialPerformance.year))
+        ).first()
+        
+        # 2. Latest Dividend
+        latest_dividend = self.session.exec(
+            select(DividendInformation)
+            .where(DividendInformation.company_id == company.id)
+            .order_by(desc(DividendInformation.year))
+        ).first()
+        
+        # 3. Quarterly Performance
+        quarterly_data = self.session.exec(
+            select(QuarterlyPerformance)
+            .where(QuarterlyPerformance.company_id == company.id)
+            .order_by(desc(QuarterlyPerformance.date))
+            .limit(8)
+        ).all()
+        
+        # 4. Shareholding
+        shareholding = self.session.exec(
+            select(ShareholdingPattern)
+            .where(ShareholdingPattern.company_id == company.id)
+            .order_by(desc(ShareholdingPattern.date))
+        ).first()
+        
+        # 5. Loan Status
+        loan_status = self.session.exec(
+            select(LoanStatus).where(LoanStatus.company_id == company.id)
+        ).first()
+        
+        # --- Constructing the Response ---
+        
+        # Price Info
+        ltp = stock_data.last_trade_price if stock_data else None
+        change = stock_data.change if stock_data else None
+        change_p = stock_data.change_percent if stock_data else None
+        if change_p is None and ltp and change:
+             try:
+                 change_p = (change / (ltp - change)) * 100
+             except:
+                 pass
+
+        # Metrics
+        pe = None
+        if ltp and latest_financial and latest_financial.eps_basic and latest_financial.eps_basic > 0:
+            pe = Decimal(str(ltp)) / latest_financial.eps_basic
+        
+        pb = None # Need book value per share. Use NAV.
+        if ltp and company.nav and company.nav > 0:
+             pb = Decimal(str(ltp)) / company.nav
+        
+        div_yield = latest_dividend.yield_percentage if latest_dividend else company.dividend_yield
+        
+        # ROE (Return on Equity) = Net Income / Shareholder's Equity
+        roe = None
+        if latest_financial:
+             # Using profit / (Paid Up Capital + Reserve) approximation or profit/NAV*shares
+             # Rough approx: EPS / NAV * 100
+             if latest_financial.eps_basic and latest_financial.nav_per_share and latest_financial.nav_per_share > 0:
+                 roe = (latest_financial.eps_basic / latest_financial.nav_per_share) * 100
+
+        # Debt to Equity
+        debt_to_equity = None
+        if loan_status and company.reserve_and_surplus and company.paid_up_capital:
+             total_debt = (loan_status.short_term_loan or Decimal(0)) + (loan_status.long_term_loan or Decimal(0))
+             equity = (Decimal(str(company.paid_up_capital or 0))) + (Decimal(str(company.reserve_and_surplus or 0)))
+             if equity > 0:
+                 debt_to_equity = total_debt / equity
+
+        # Quarterly EPS List
+        q_eps_list = []
+        for q in reversed(quarterly_data): # Show oldest to newest
+            eps_val = q.eps_basic or 0
+            q_eps_list.append({
+                "quarter": q.quarter,
+                "eps": float(eps_val),
+                "isPositive": eps_val >= 0
+            })
+            
+        # NAV Trend (Last 5 years)
+        nav_trend_list = []
+        financial_history = self.session.exec(
+            select(FinancialPerformance)
+            .where(FinancialPerformance.company_id == company.id)
+            .order_by(desc(FinancialPerformance.year))
+            .limit(5)
+        ).all()
+        for f in reversed(financial_history):
+             nav_trend_list.append({
+                 "year": str(f.year),
+                 "nav": float(f.nav_per_share or 0)
+             })
+
+        # Dividend History
+        div_hist_list = []
+        div_history = self.session.exec(
+            select(DividendInformation)
+            .where(DividendInformation.company_id == company.id)
+            .order_by(desc(DividendInformation.year))
+            .limit(5)
+        ).all()
+        for d in reversed(div_history):
+             # Extract numeric amount if possible, else 0. Usually cash_dividend is %.
+             amt = float(d.cash_dividend or 0)
+             div_hist_list.append({
+                 "year": str(d.year),
+                 "amount": amt
+             })
+             
+        # Shareholding List
+        shareholding_list = []
+        foreign_part = Decimal(0)
+        if shareholding:
+             shareholding_list = [
+                 ShareholdingItem(name="Sponsor", value=shareholding.sponsor_director or 0, color="#22c55e"),
+                 ShareholdingItem(name="Government", value=shareholding.government or 0, color="#6366f1"),
+                 ShareholdingItem(name="Institute", value=shareholding.institute or 0, color="#ef4444"),
+                 ShareholdingItem(name="Foreign", value=shareholding.foreign_holder or 0, color="#f59e0b"),
+                 ShareholdingItem(name="Public", value=shareholding.public_holder or 0, color="#3b82f6"),
+             ]
+             # Filter out 0s
+             shareholding_list = [s for s in shareholding_list if s.value > 0]
+             foreign_part = shareholding.foreign_holder or Decimal(0)
+
+        # Peers (Same Sector)
+        peers_list = []
+        peer_companies = self.session.exec(
+            select(Company)
+            .where(Company.sector == company.sector)
+            .where(Company.id != company.id)
+            .limit(5)
+        ).all()
+        
+        for p in peer_companies:
+             p_stock = self._get_latest_stock_data(p.id)
+             p_price = p_stock.last_trade_price if p_stock else None
+             
+             # Fetch latest financials for peer
+             p_fin = self.session.exec(
+                 select(FinancialPerformance)
+                 .where(FinancialPerformance.company_id == p.id)
+                 .order_by(desc(FinancialPerformance.year))
+                 .limit(1)
+             ).first()
+             
+             p_div = self.session.exec(
+                 select(DividendInformation)
+                 .where(DividendInformation.company_id == p.id)
+                 .order_by(desc(DividendInformation.year))
+                 .limit(1)
+             ).first()
+
+             # Approx metrics for peers
+             p_pe = p.pe_ratio
+             p_pb = None
+             p_roe = None
+             p_div_yield = p.dividend_yield
+             
+             # Calculate derived metrics if missing
+             p_eps = p_fin.eps_basic if p_fin else p.eps
+             p_nav = p_fin.nav_per_share if p_fin else p.nav
+             
+             if p_price and p_price > 0:
+                 if p_eps and p_eps > 0 and (not p_pe or p_pe == 0):
+                     p_pe = Decimal(str(p_price)) / Decimal(str(p_eps))
+                 
+                 if p_nav and p_nav > 0:
+                     p_pb = Decimal(str(p_price)) / Decimal(str(p_nav))
+            
+             if p_eps and p_nav and p_nav > 0:
+                 p_roe = (Decimal(str(p_eps)) / Decimal(str(p_nav))) * 100
+                 
+             if p_div and p_div.yield_percentage:
+                 p_div_yield = p_div.yield_percentage
+                  
+             peers_list.append(PeerInfo(
+                 symbol=p.trading_code,
+                 price=p_price,
+                 pe=p_pe,
+                 pb=p_pb,
+                 div_yield=p_div_yield,
+                 roe=p_roe
+             ))
+
+        # Risk Analysis (Simple Logic)
+        risks = []
+        if debt_to_equity and debt_to_equity < 0.5:
+             risks.append(RiskFactor(label="Low Debt", status="good", description="Healthy debt-to-equity ratio."))
+        elif debt_to_equity and debt_to_equity > 1.5:
+             risks.append(RiskFactor(label="High Debt", status="warning", description="Debt levels are concerning."))
+             
+        if latest_financial and latest_financial.profit and latest_financial.profit > 0:
+             risks.append(RiskFactor(label="Profitable", status="good", description="Company is currently profitable."))
+        else:
+             risks.append(RiskFactor(label="Loss Making", status="warning", description="Company reported a loss in recent year."))
+
+        return ComprehensiveStockDetails(
+            trading_code=company.trading_code,
+            company_name=company.company_name or company.name,
+            sector=company.sector or "Unknown",
+            category=company.market_category or "N/A",
+            
+            current_price=ltp,
+            price_change=change,
+            price_change_percent=change_p,
+            valuation_label="Neutral", # Placeholder
+            
+            pe=pe,
+            industry_pe=Decimal(20.0), # Mocked
+            pb=pb,
+            dividend_yield=div_yield,
+            roe=roe,
+            debt_to_equity=debt_to_equity,
+            interest_coverage=Decimal(12.5), # Mocked
+            
+            cash_position=Decimal(150.0), # Mocked
+            operating_cash_flow=Decimal(50.0), # Mocked
+            health_score=75, # Mocked
+            
+            quarterly_eps=q_eps_list,
+            nav_trend=nav_trend_list,
+            
+            dividend_history=div_hist_list,
+            payout_ratio=Decimal(45.0), # Mocked
+            industry_yield=Decimal(2.5), # Mocked
+            
+            foreign_participation=foreign_part,
+            promoter_pledge=Decimal(0), # Mocked
+            shareholding=shareholding_list,
+            
+            risks=risks,
+            peers=peers_list
         )
 

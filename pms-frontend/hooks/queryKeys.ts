@@ -73,6 +73,7 @@ export const queryKeys = {
   fundamentalSearch: (params: { sector?: string; category?: string; minPe?: number; maxPe?: number; minDividendYield?: number }) =>
     ['fundamentals', 'search', params] as const,
   fundamentalDataAvailability: (tradingCode: string) => ['fundamentals', 'data-availability', tradingCode] as const,
+  fundamentalComprehensive: (tradingCode: string) => ['fundamentals', 'comprehensive', tradingCode] as const,
 
   // Performance Analytics
   performanceSummary: (portfolioId: string, period: string) => ['performance', 'summary', portfolioId, period] as const,

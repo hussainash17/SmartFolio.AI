@@ -3,7 +3,7 @@ Pydantic schemas for Fundamental Analysis API responses
 """
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 from uuid import UUID
 
@@ -211,4 +211,86 @@ class FundamentalDataAvailability(BaseModel):
     has_quarterly_data: bool = False
     latest_data_year: Optional[int] = None
     latest_quarter_date: Optional[date] = None
+
+
+# ============================================================================
+# 10. Comprehensive Stock Details API Response
+# ============================================================================
+class PeerInfo(BaseModel):
+    """Peer company information"""
+    symbol: str
+    price: Optional[Decimal] = None
+    pe: Optional[Decimal] = None
+    pb: Optional[Decimal] = None
+    divYield: Optional[Decimal] = Field(None, alias="div_yield")
+    roe: Optional[Decimal] = None
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+
+class RiskFactor(BaseModel):
+    """Risk factor information"""
+    label: str
+    status: str  # 'good', 'warning', 'bad'
+    description: str
+
+
+class ShareholdingItem(BaseModel):
+    """Shareholding item for a specific category"""
+    name: str # Sponsor, Public, Institution, Foreign
+    value: Decimal
+    color: str
+
+
+class ComprehensiveStockDetails(BaseModel):
+    """Comprehensive stock details for the frontend"""
+    # Basic Info
+    trading_code: str
+    company_name: str
+    sector: str
+    category: str
+    
+    # Valuation & Financials
+    current_price: Optional[Decimal] = None
+    price_change: Optional[Decimal] = None
+    price_change_percent: Optional[Decimal] = None
+    valuation_label: str = "Neutral" # Derived/Mocked for now
+    
+    # Ratios
+    pe: Optional[Decimal] = None # P/E
+    industry_pe: Optional[Decimal] = None
+    pb: Optional[Decimal] = None # P/B
+    dividend_yield: Optional[Decimal] = None
+    roe: Optional[Decimal] = None
+    debt_to_equity: Optional[Decimal] = None
+    interest_coverage: Optional[Decimal] = None
+    
+    # Cash & Health
+    cash_position: Optional[Decimal] = None
+    operating_cash_flow: Optional[Decimal] = None
+    health_score: int = 70 # Mocked/Calculated
+    
+    # Growth & NAV
+    quarterly_eps: List[Dict[str, Any]] = [] # {quarter, eps, isPositive}
+    nav_trend: List[Dict[str, Any]] = [] # {year, nav}
+    
+    # Dividend
+    dividend_history: List[Dict[str, Any]] = [] # {year, amount}
+    payout_ratio: Optional[Decimal] = None
+    industry_yield: Optional[Decimal] = None
+    
+    # Shareholding
+    foreign_participation: Optional[Decimal] = None
+    promoter_pledge: Optional[Decimal] = 0 # Mocked
+    shareholding: List[ShareholdingItem] = []
+    
+    # Risks & Peers
+    risks: List[RiskFactor] = []
+    peers: List[PeerInfo] = []
+
+    class Config:
+        from_attributes = True
+
 

@@ -11,6 +11,9 @@ import { EducationSection } from "./EducationSection";
 import { Button } from "../ui/button";
 import { ArrowLeft } from "lucide-react";
 
+import { useComprehensiveStockDetails } from "../../hooks/useSymbolFundamentals";
+import { Skeleton } from "../ui/skeleton";
+
 interface StockDetailsProps {
     symbol: string;
     data: any; // Using any for now to handle the mix of API and mock data
@@ -18,8 +21,60 @@ interface StockDetailsProps {
 }
 
 export function StockDetails({ symbol, data, onBack }: StockDetailsProps) {
-    // Mock data for demonstration where API data is missing
-    const mockData = {
+    const { data: apiData, isLoading } = useComprehensiveStockDetails({ symbol });
+
+    if (isLoading) {
+        return (
+            <div className="w-full space-y-8 pb-12">
+                <div className="space-y-4">
+                    <Skeleton className="h-12 w-3/4" />
+                    <Skeleton className="h-6 w-1/2" />
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <Skeleton className="h-64" />
+                    <Skeleton className="h-64" />
+                    <Skeleton className="h-64" />
+                </div>
+            </div>
+        );
+    }
+
+    // Use API data or fallback to defaults (to avoid crashes if API fails)
+    const stockData = apiData ? {
+        category: apiData.category || "N/A",
+        valuationLabel: apiData.valuation_label || "Neutral",
+        industryPe: Number(apiData.industry_pe || 0),
+        interestCoverage: Number(apiData.interest_coverage || 0),
+        cashPosition: Number(apiData.cash_position || 0),
+        operatingCashFlow: Number(apiData.operating_cash_flow || 0),
+        healthScore: apiData.health_score || 0,
+        quarterlyEps: apiData.quarterly_eps || [],
+        navTrend: apiData.nav_trend || [],
+        dividendHistory: apiData.dividend_history || [],
+        payoutRatio: Number(apiData.payout_ratio || 0),
+        industryYield: Number(apiData.industry_yield || 0),
+        foreignParticipation: Number(apiData.foreign_participation || 0),
+        promoterPledge: Number(apiData.promoter_pledge || 0),
+        shareholding: (apiData.shareholding || []).map(s => ({ ...s, value: Number(s.value) })),
+        risks: (apiData.risks || []).map(r => ({ ...r, status: r.status === 'bad' ? 'danger' : r.status as 'good' | 'warning' | 'danger' })),
+        peers: (apiData.peers || []).map(p => ({
+            symbol: p.symbol,
+            price: Number(p.price || 0),
+            pe: Number(p.pe || 0),
+            pb: Number(p.pb || 0),
+            divYield: Number(p.div_yield || 0),
+            roe: Number(p.roe || 0)
+        })),
+        currentPrice: Number(apiData.current_price || 0),
+        priceChange: Number(apiData.price_change || 0),
+        priceChangePercent: Number(apiData.price_change_percent || 0),
+        pe: Number(apiData.pe || 0),
+        pb: Number(apiData.pb || 0),
+        dividendYield: Number(apiData.dividend_yield || 0),
+        roe: Number(apiData.roe || 0),
+        debtToEquity: Number(apiData.debt_to_equity || 0),
+    } : {
+        // Keep existing fallback values if apiData is null
         category: "Mainboard (A)",
         valuationLabel: "Slightly Undervalued",
         industryPe: 18.4,
@@ -27,66 +82,29 @@ export function StockDetails({ symbol, data, onBack }: StockDetailsProps) {
         cashPosition: 450.5,
         operatingCashFlow: 125.8,
         healthScore: 85,
-        quarterlyEps: [
-            { quarter: 'Q1 22', eps: 4.5, isPositive: true },
-            { quarter: 'Q2 22', eps: 4.8, isPositive: true },
-            { quarter: 'Q3 22', eps: 4.2, isPositive: true },
-            { quarter: 'Q4 22', eps: 4.6, isPositive: true },
-            { quarter: 'Q1 23', eps: 5.1, isPositive: true },
-            { quarter: 'Q2 23', eps: 5.5, isPositive: true },
-            { quarter: 'Q3 23', eps: 5.8, isPositive: true },
-            { quarter: 'Q4 23', eps: 6.1, isPositive: true },
-        ],
-        navTrend: [
-            { year: '2019', nav: 158.0 },
-            { year: '2020', nav: 175.0 },
-            { year: '2021', nav: 205.0 },
-            { year: '2022', nav: 230.0 },
-            { year: '2023', nav: 265.0 },
-        ],
-        dividendHistory: [
-            { year: '2019', amount: 4.0 },
-            { year: '2020', amount: 4.5 },
-            { year: '2021', amount: 5.0 },
-            { year: '2022', amount: 5.5 },
-            { year: '2023', amount: 6.0 },
-        ],
+        quarterlyEps: [],
+        navTrend: [],
+        dividendHistory: [],
         payoutRatio: 45.2,
         industryYield: 2.8,
         foreignParticipation: 15.4,
         promoterPledge: 0.0,
-        shareholding: [
-            { name: 'Sponsor', value: 45, color: '#22c55e' },
-            { name: 'Public', value: 35, color: '#3b82f6' },
-            { name: 'Institution', value: 20, color: '#ef4444' },
-        ],
-        risks: [
-            { label: "Low Debt", status: 'good' as const, description: "The company maintains a very healthy debt-to-equity ratio, reducing financial risk." },
-            { label: "Consistent Growth", status: 'good' as const, description: "Revenue and EPS have shown steady growth over the last 5 years." },
-            { label: "Dividend Cut Risk", status: 'warning' as const, description: "Payout ratio is slightly higher than historical average, though still sustainable." },
-            { label: "Market Volatility", status: 'warning' as const, description: "Stock price shows higher sensitivity to overall market movements." },
-        ],
-        peers: [
-            { symbol: 'SQUAREPHARMA', price: 238.5, pe: 14.5, pb: 2.8, divYield: 3.5, roe: 18.4 },
-            { symbol: 'BEXIMCO', price: 195.0, pe: 18.2, pb: 3.1, divYield: 1.8, roe: 12.5 },
-            { symbol: 'RENATA', price: 110.0, pe: 22.5, pb: 3.5, divYield: 1.2, roe: 15.8 },
-            { symbol: 'ACI', price: 85.0, pe: 15.8, pb: 2.2, divYield: 2.0, roe: 10.5 },
-        ]
+        shareholding: [],
+        risks: [],
+        peers: [],
+        currentPrice: 238.5,
+        priceChange: 2.5,
+        priceChangePercent: 1.25,
+        pe: 14.5,
+        pb: 2.8,
+        dividendYield: 3.5,
+        roe: 18.4,
+        debtToEquity: 0.25,
     };
 
-    // Merge API data with mock data
     const mergedData = {
-        ...mockData,
-        ...data,
-        // Ensure specific fields from API are used if available
-        currentPrice: data?.currentPrice || 238.5,
-        priceChange: data?.priceChange || 2.5,
-        priceChangePercent: data?.priceChangePercent || 1.25,
-        pe: data?.pe || 14.5,
-        pb: data?.pb || 2.8,
-        dividendYield: data?.dividendYield || 3.5,
-        roe: data?.roe || 18.4,
-        debtToEquity: data?.debtToEquity || 0.25,
+        ...stockData,
+        // Allow props data to override if absolutely necessary, but generally prefer API
     };
 
     return (

@@ -40,10 +40,12 @@ export function ShareholdingSection({
                             </Pie>
                             <Tooltip
                                 contentStyle={{
-                                    backgroundColor: '#030213',
+                                    backgroundColor: '#0f172a', // slate-900
                                     border: '1px solid rgba(255,255,255,0.1)',
-                                    borderRadius: '8px'
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                                 }}
+                                itemStyle={{ color: '#e2e8f0' }} // slate-200
                             />
                             <Legend verticalAlign="bottom" height={36} />
                         </PieChart>
