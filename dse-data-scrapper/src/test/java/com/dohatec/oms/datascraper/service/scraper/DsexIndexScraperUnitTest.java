@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 /**
- * Unit test for DsexIndexScraper
+ * Unit test for DsexIndexSharesScraper
  * Verifies parsing logic by subclassing to override fetchHtml
  */
 public class DsexIndexScraperUnitTest {
@@ -30,7 +30,7 @@ public class DsexIndexScraperUnitTest {
         @Test
         public void testParseTradingCodes_IgnoresHeaderLinks() {
                 // Create a subclass to valid HTML injection without network
-                DsexIndexScraper scraper = new DsexIndexScraper(
+                DsexIndexSharesScraper scraper = new DsexIndexSharesScraper(
                                 mock(RestTemplate.class),
                                 mock(CompanyRepository.class),
                                 mock(ScraperLogService.class),
@@ -39,7 +39,7 @@ public class DsexIndexScraperUnitTest {
                         // private
                         // Since fetchHtml is private, we can't override it directly unless we change
                         // visibility or use Reflection.
-                        // However, DsexIndexScraper.parseTradingCodes is private.
+                        // However, DsexIndexSharesScraper.parseTradingCodes is private.
                         // Let's use Reflection to invoke parseTradingCodes directly with our HTML.
                 };
 
