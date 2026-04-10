@@ -944,34 +944,140 @@ def get_sector_analysis(
 ):
     """Get market sector performance analysis"""
 
-    # Get all sectors
-    sectors_query = session.exec(
-        select(Company.sector, func.count(Company.id).label("stock_count"))
+    # Get latest date from DailyOHLC
+    latest_date_query = select(func.max(DailyOHLC.date))
+    latest_date = session.exec(latest_date_query).one()
+    
+    if not latest_date:
+        # Fallback if no data exists
+        return {
+            "total_sectors": 0,
+            "sectors": [],
+            "market_summary": {
+                "best_performing_sector": None,
+                "worst_performing_sector": None,
+                "avg_sector_performance": 0
+            }
+        }
+
+    # Calculate dates for 1W and 1M comparison
+    # We find the max date that is <= target date to handle weekends/holidays
+    date_1w_target = latest_date - timedelta(days=7)
+    date_1m_target = latest_date - timedelta(days=30)
+    
+    # Helper to get closest available trading date
+    def get_closest_date(target_date):
+        query = select(func.max(DailyOHLC.date)).where(DailyOHLC.date <= target_date)
+        return session.exec(query).one()
+        
+    date_1w = get_closest_date(date_1w_target)
+    date_1m = get_closest_date(date_1m_target)
+
+    # Fetch data for calculations
+    # We need: Sector, Market Cap, Latest Price, 1W Price, 1M Price for ALL companies
+    # This is more efficient than querying per sector
+    
+    # 1. Get latest data (Price + Change%)
+    latest_data = session.exec(
+        select(
+            Company.id, 
+            Company.sector, 
+            Company.market_cap,
+            DailyOHLC.close_price,
+            DailyOHLC.change_percent
+        )
+        .join(DailyOHLC, Company.id == DailyOHLC.company_id)
+        .where(DailyOHLC.date == latest_date)
         .where(Company.sector.is_not(None))
-        .group_by(Company.sector)
     ).all()
+    
+    # 2. Get 1W data (Price only)
+    data_1w = {}
+    if date_1w:
+        results_1w = session.exec(
+            select(DailyOHLC.company_id, DailyOHLC.close_price)
+            .where(DailyOHLC.date == date_1w)
+        ).all()
+        data_1w = {r[0]: float(r[1]) for r in results_1w}
+        
+    # 3. Get 1M data (Price only)
+    data_1m = {}
+    if date_1m:
+        results_1m = session.exec(
+            select(DailyOHLC.company_id, DailyOHLC.close_price)
+            .where(DailyOHLC.date == date_1m)
+        ).all()
+        data_1m = {r[0]: float(r[1]) for r in results_1m}
 
+    # Aggregate by sector
+    sectors_data = {}
+    total_market_cap = 0
+    
+    for company_id, sector, mcap, close, change_pct in latest_data:
+        if not sector: continue
+        
+        mcap_val = float(mcap or 0)
+        close_val = float(close or 0)
+        change_pct_val = float(change_pct or 0)
+        
+        if sector not in sectors_data:
+            sectors_data[sector] = {
+                "count": 0,
+                "total_mcap": 0,
+                "weighted_change_1d": 0,
+                "weighted_change_1w": 0,
+                "weighted_change_1m": 0,
+                "mcap_for_1w": 0, # Only sum mcap if we have 1w data for this stock
+                "mcap_for_1m": 0  # Only sum mcap if we have 1m data for this stock
+            }
+            
+        sec = sectors_data[sector]
+        sec["count"] += 1
+        sec["total_mcap"] += mcap_val
+        total_market_cap += mcap_val
+        
+        # 1D Change (Weighted)
+        sec["weighted_change_1d"] += change_pct_val * mcap_val
+        
+        # 1W Change
+        if company_id in data_1w and data_1w[company_id] > 0:
+            price_1w = data_1w[company_id]
+            change_1w = ((close_val - price_1w) / price_1w) * 100
+            sec["weighted_change_1w"] += change_1w * mcap_val
+            sec["mcap_for_1w"] += mcap_val
+            
+        # 1M Change
+        if company_id in data_1m and data_1m[company_id] > 0:
+            price_1m = data_1m[company_id]
+            change_1m = ((close_val - price_1m) / price_1m) * 100
+            sec["weighted_change_1m"] += change_1m * mcap_val
+            sec["mcap_for_1m"] += mcap_val
+
+    # Finalize results
     sector_analysis = []
-    for sector, stock_count in sectors_query:
-        # Mock sector performance (in real implementation, calculate from actual data)
-        performance_1d = -2.0 + (hash(sector) % 80) / 10  # -2% to +6%
-        performance_1w = -5.0 + (hash(sector + "1w") % 150) / 10  # -5% to +10%
-        performance_1m = -10.0 + (hash(sector + "1m") % 300) / 10  # -10% to +20%
-
+    
+    for sector, data in sectors_data.items():
+        # Avoid division by zero
+        perf_1d = (data["weighted_change_1d"] / data["total_mcap"]) if data["total_mcap"] > 0 else 0
+        perf_1w = (data["weighted_change_1w"] / data["mcap_for_1w"]) if data["mcap_for_1w"] > 0 else 0
+        perf_1m = (data["weighted_change_1m"] / data["mcap_for_1m"]) if data["mcap_for_1m"] > 0 else 0
+        
+        weight = (data["total_mcap"] / total_market_cap * 100) if total_market_cap > 0 else 0
+        
         sector_analysis.append({
             "sector": sector,
-            "stock_count": stock_count,
+            "stock_count": data["count"],
             "performance": {
-                "1_day": round(performance_1d, 2),
-                "1_week": round(performance_1w, 2),
-                "1_month": round(performance_1m, 2)
+                "1_day": round(perf_1d, 2),
+                "1_week": round(perf_1w, 2),
+                "1_month": round(perf_1m, 2)
             },
-            "market_cap_weight": round(5.0 + (hash(sector + "mcap") % 150) / 10, 2),  # Mock weight
-            "momentum": "bullish" if performance_1w > 2 else "bearish" if performance_1w < -2 else "neutral"
+            "market_cap_weight": round(weight, 2),
+            "momentum": "bullish" if perf_1w > 2 else "bearish" if perf_1w < -2 else "neutral"
         })
 
-    # Sort by 1-week performance
-    sector_analysis.sort(key=lambda x: x["performance"]["1_week"], reverse=True)
+    # Sort by 1-day performance (more relevant for daily dashboard)
+    sector_analysis.sort(key=lambda x: x["performance"]["1_day"], reverse=True)
 
     return {
         "total_sectors": len(sector_analysis),
@@ -980,7 +1086,7 @@ def get_sector_analysis(
             "best_performing_sector": sector_analysis[0]["sector"] if sector_analysis else None,
             "worst_performing_sector": sector_analysis[-1]["sector"] if sector_analysis else None,
             "avg_sector_performance": round(
-                sum(s["performance"]["1_week"] for s in sector_analysis) / len(sector_analysis),
+                sum(s["performance"]["1_day"] for s in sector_analysis) / len(sector_analysis),
                 2) if sector_analysis else 0
         }
     }

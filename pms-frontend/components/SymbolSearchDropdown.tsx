@@ -104,7 +104,7 @@ export function SymbolSearchDropdown({
   return (
     <Card
       ref={dropdownRef}
-      className="absolute top-full left-0 right-0 mt-1 z-50 max-h-[400px] overflow-y-auto shadow-lg"
+      className="absolute top-full left-0 right-0 mt-1 z-[9999] max-h-[400px] overflow-y-auto shadow-lg"
     >
       {loading && (
         <div className="flex items-center justify-center py-8">
@@ -123,42 +123,39 @@ export function SymbolSearchDropdown({
           {results.map((result, index) => (
             <div
               key={result.symbol}
-              className={`flex items-center justify-between px-4 py-3 hover:bg-accent cursor-pointer ${
-                index === selectedIndex ? "bg-accent" : ""
-              }`}
+              className={`flex items-center gap-3 px-4 py-3 hover:bg-accent cursor-pointer ${index === selectedIndex ? "bg-accent" : ""
+                }`}
               onMouseEnter={() => setSelectedIndex(index)}
             >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">{result.symbol}</span>
-                  {result.sector && (
-                    <Badge variant="outline" className="text-xs">
-                      {result.sector}
-                    </Badge>
-                  )}
-                </div>
-                <div className="text-sm text-muted-foreground truncate">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <span className="font-semibold text-sm whitespace-nowrap">{result.symbol}</span>
+                {result.sector && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 whitespace-nowrap">
+                    {result.sector}
+                  </Badge>
+                )}
+                <span className="text-xs text-muted-foreground truncate">
                   {result.company_name}
-                </div>
+                </span>
               </div>
 
-              <div className="flex items-center gap-2 ml-4">
+              <div className="flex items-center gap-1.5 flex-shrink-0">
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-xs h-8"
+                  className="text-[11px] h-7 px-2"
                   onClick={(e) => {
                     e.stopPropagation();
                     onPickChart(result.symbol);
                   }}
                 >
                   <LineChart className="h-3 w-3 mr-1" />
-                  Launch Chart
+                  Chart
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-xs h-8"
+                  className="text-[11px] h-7 px-2"
                   onClick={(e) => {
                     e.stopPropagation();
                     onPickFundamentals(result.symbol);

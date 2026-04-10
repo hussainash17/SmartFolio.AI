@@ -256,6 +256,8 @@ def list_stocks(
         limit: int = Query(50, ge=1, le=500),
         offset: int = Query(0, ge=0),
 ) -> List[Dict[str, Any]]:
+    from app.model.fundamental import FinancialPerformance, DividendInformation
+    
     stmt = select(Company)
     if q:
         like = f"%{q.upper()}%"
@@ -275,14 +277,85 @@ def list_stocks(
             .order_by(StockData.timestamp.desc())
             .limit(1)
         ).first()
-        # Calculate market cap: last_trade_price × total_outstanding_securities (in crores)
+        
+        # Get latest financial performance for P/E, ROE calculations
+        latest_financial = session.exec(
+            select(FinancialPerformance)
+            .where(FinancialPerformance.company_id == company.id)
+            .order_by(FinancialPerformance.year.desc())
+            .limit(1)
+        ).first()
+        
+        # Get latest dividend information for dividend yield
+        latest_dividend = session.exec(
+            select(DividendInformation)
+            .where(DividendInformation.company_id == company.id)
+            .order_by(DividendInformation.year.desc())
+            .limit(1)
+        ).first()
+        
+        # Get loan status for debt to equity calculation
+        from app.model.fundamental import LoanStatus
+        loan_status = session.exec(
+            select(LoanStatus)
+            .where(LoanStatus.company_id == company.id)
+            .limit(1)
+        ).first()
+        
+        # Calculate market cap: last_trade_price × shares (in crores)
+        # Try total_outstanding_securities first, then total_shares as fallback
         market_cap = None
-        if latest_data and company.total_outstanding_securities:
+        if latest_data:
+            shares = company.total_outstanding_securities or company.total_shares
+            if shares:
+                try:
+                    # Market cap in crores (1 crore = 10,000,000)
+                    market_cap = (float(latest_data.last_trade_price) * shares) / 10_000_000
+                except (ValueError, TypeError):
+                    market_cap = None
+            # If still None, try using company.market_cap if available
+            if market_cap is None and company.market_cap:
+                try:
+                    market_cap = float(company.market_cap)
+                except (ValueError, TypeError):
+                    market_cap = None
+        
+        # Calculate P/E ratio if not in company table
+        pe_ratio = company.pe_ratio
+        if pe_ratio is None and latest_data and latest_financial and latest_financial.eps_basic and latest_financial.eps_basic > 0:
             try:
-                # Market cap in crores (1 crore = 10,000,000)
-                market_cap = (float(latest_data.last_trade_price) * company.total_outstanding_securities) / 10_000_000
-            except (ValueError, TypeError):
-                market_cap = None
+                pe_ratio = float(latest_data.last_trade_price) / float(latest_financial.eps_basic)
+            except (ValueError, ZeroDivisionError, TypeError):
+                pe_ratio = None
+        
+        # Calculate dividend yield if not in company table
+        dividend_yield = company.dividend_yield
+        if dividend_yield is None and latest_dividend and latest_dividend.yield_percentage is not None:
+            dividend_yield = float(latest_dividend.yield_percentage)
+        
+        # Calculate ROE: profit / equity (reserve_and_surplus)
+        roe = None
+        if latest_financial and latest_financial.profit is not None and company.reserve_and_surplus and company.reserve_and_surplus > 0:
+            try:
+                roe = (float(latest_financial.profit) / float(company.reserve_and_surplus)) * 100.0
+            except (ValueError, ZeroDivisionError, TypeError):
+                roe = None
+        
+        # Get EPS and NAV
+        eps = float(latest_financial.eps_basic) if latest_financial and latest_financial.eps_basic is not None else (float(company.eps) if company.eps else None)
+        nav = float(latest_financial.nav_per_share) if latest_financial and latest_financial.nav_per_share is not None else (float(company.nav) if company.nav else None)
+        
+        # Calculate debt to equity ratio: total_debt / reserve_and_surplus
+        debt_to_equity = None
+        if loan_status and company.reserve_and_surplus and company.reserve_and_surplus > 0:
+            try:
+                short_term = float(loan_status.short_term_loan or 0)
+                long_term = float(loan_status.long_term_loan or 0)
+                total_debt = short_term + long_term
+                if total_debt > 0:
+                    debt_to_equity = total_debt / float(company.reserve_and_surplus)
+            except (ValueError, ZeroDivisionError, TypeError):
+                debt_to_equity = None
 
         result.append(
             {
@@ -291,14 +364,22 @@ def list_stocks(
                 "company_name": company.company_name,
                 "sector": company.sector,
                 "industry": company.industry,
-                "last": str(latest_data.last_trade_price) if latest_data else None,
+                "ltp": str(latest_data.last_trade_price) if latest_data else None,
                 "change": str(latest_data.change) if latest_data else None,
+                "ycp": str(latest_data.previous_close) if latest_data else None,
                 "change_percent": str(latest_data.change_percent) if latest_data else None,
                 "volume": latest_data.volume if latest_data else None,
                 "turnover": str(latest_data.turnover) if latest_data else None,
                 "timestamp": latest_data.timestamp if latest_data else None,
                 "total_outstanding_securities": company.total_outstanding_securities,
-                "market_cap": str(market_cap) if market_cap is not None else None,
+                "market_cap": market_cap,  # Return as number, not string
+                "pe": pe_ratio,
+                "dividend_yield": dividend_yield,
+                "roe": roe,
+                "debt_to_equity": debt_to_equity,
+                "debt_equity": debt_to_equity,  # Also include without underscore for frontend compatibility
+                "eps": eps,
+                "nav": nav,
             }
         )
     return result

@@ -3,6 +3,7 @@ import { User, Order, Trade, MarketData, Watchlist, Transaction, NewsItem, Accou
 import { MarketService, NewsService, OrdersService, OpenAPI, WatchlistService, AlertsService } from '../src/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from './queryKeys';
+import { useAllMarketData } from './useAllMarketData';
 
 export function useTrading() {
   const [user] = useState<User>({
@@ -22,67 +23,8 @@ export function useTrading() {
 
   const queryClient = useQueryClient();
 
-  const { data: marketData = [] } = useQuery({
-    queryKey: queryKeys.marketList(500, 0),
-    enabled: !!(OpenAPI as any).TOKEN,
-    queryFn: async () => {
-      const pageSize = 200;
-      let offset = 0;
-      const seen = new Set<string>();
-      const allRows: any[] = [];
-
-      while (true) {
-        const page = (await MarketService.listStocks({ limit: pageSize, offset })) as any[];
-        const rows = page || [];
-        if (!rows.length) {
-          break;
-        }
-        for (const row of rows) {
-          const symbol: string = String(row?.symbol || '').toUpperCase();
-          if (!symbol || seen.has(symbol)) continue;
-          seen.add(symbol);
-          allRows.push(row);
-        }
-        if (rows.length < pageSize) {
-          break;
-        }
-        offset += pageSize;
-        if (offset >= 2000) {
-          // Safety guard to avoid unexpectedly large loops
-          break;
-        }
-      }
-
-      const mapped: MarketData[] = allRows.map((it: any) => ({
-        symbol: String(it.symbol || '').toUpperCase(),
-        companyName: it.company_name || it.name || String(it.symbol || '').toUpperCase(),
-        currentPrice: Number(it.last || 0),
-        change: Number(it.change || 0),
-        changePercent: Number(it.change_percent || 0),
-        volume: Number(it.volume || 0),
-        high52Week: 0,
-        low52Week: 0,
-        marketCap: (() => {
-            const lastPrice = Number(it.last || 0);
-            const totalSecurities = Number(it.total_outstanding_securities || 0);
-            // Calculate market cap: last_trade_price × total_outstanding_securities (in crores)
-            // 1 crore = 10,000,000
-            return lastPrice > 0 && totalSecurities > 0 
-                ? (lastPrice * totalSecurities) / 10_000_000 
-                : Number(it.market_cap || 0);
-        })(),
-        peRatio: undefined,
-        dividend: undefined,
-        dividendYield: undefined,
-        sector: it.sector || 'Unknown',
-        industry: it.industry || 'Unknown',
-        lastUpdated: it.timestamp || new Date().toISOString(),
-      }));
-
-      return mapped.sort((a, b) => a.symbol.localeCompare(b.symbol));
-    },
-    staleTime: 30 * 1000,
-  });
+  // Use shared hook for market data (fetches all stocks with pagination)
+  const { data: marketData = [] } = useAllMarketData();
 
   const { data: news = [] } = useQuery({
     queryKey: queryKeys.newsList(20, 0),
@@ -453,16 +395,18 @@ export function useTrading() {
   };
 
   const createAlert = async (payload: { stock_id?: string; alert_type: string; condition: string; target_value: number; notification_method?: string; is_recurring?: boolean; frequency?: string | null; notes?: string | null; }) => {
-    const created = await AlertsService.createAlert({ requestBody: {
-      stock_id: payload.stock_id,
-      alert_type: payload.alert_type,
-      condition: payload.condition,
-      target_value: payload.target_value as unknown as any,
-      notification_method: payload.notification_method || 'in_app',
-      is_recurring: payload.is_recurring || false,
-      frequency: payload.frequency || null,
-      notes: payload.notes || null,
-    }});
+    const created = await AlertsService.createAlert({
+      requestBody: {
+        stock_id: payload.stock_id,
+        alert_type: payload.alert_type,
+        condition: payload.condition,
+        target_value: payload.target_value as unknown as any,
+        notification_method: payload.notification_method || 'in_app',
+        is_recurring: payload.is_recurring || false,
+        frequency: payload.frequency || null,
+        notes: payload.notes || null,
+      }
+    });
     return created;
   };
 

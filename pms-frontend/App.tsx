@@ -7,6 +7,7 @@ import { usePortfolios } from "./hooks/usePortfolios";
 import { useTrading } from "./hooks/useTrading";
 import { useAuth } from "./hooks/useAuth";
 import { Portfolio, PortfolioSummary, Stock } from "./types/portfolio";
+import { SmartFolioLogo } from "./components/SmartFolioLogo";
 import { Activity, FileText, HelpCircle, Receipt, Settings, ShieldCheck, TrendingUp, User, } from "lucide-react";
 import { MarketService, PortfolioService } from "./src/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -244,8 +245,8 @@ export default function App() {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
                 <div className="text-center space-y-4">
-                    <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mx-auto">
-                        <TrendingUp className="h-7 w-7 text-primary-foreground animate-pulse" />
+                    <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-emerald-500 rounded-xl flex items-center justify-center mx-auto">
+                        <SmartFolioLogo className="h-7 w-7 text-white" />
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-foreground">SmartFolio.AI</h1>
