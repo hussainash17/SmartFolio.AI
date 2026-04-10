@@ -112,42 +112,42 @@ docker-compose logs -f
 
 ### Environment Variables
 
-#### Backend (.env)
+Copy `.env.example` to `.env` and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+#### Key variables
+
 ```env
-# Database
-DATABASE_URL=postgresql://user:password@localhost/smartstock
-REDIS_URL=redis://localhost:6379
+# Domain & hosting
+DOMAIN=localhost
+FRONTEND_HOST=http://localhost:5173
+ENVIRONMENT=local  # local | staging | production
 
 # Security
-SECRET_KEY=your-secret-key
-ACCESS_TOKEN_EXPIRE_MINUTES=30
+SECRET_KEY=your-secret-key-here
+FIRST_SUPERUSER=admin@example.com
+FIRST_SUPERUSER_PASSWORD=your-superuser-password
 
-# Email
+# Email (optional)
+SMTP_HOST=
+SMTP_USER=
+SMTP_PASSWORD=
+EMAILS_FROM_EMAIL=info@example.com
 SMTP_TLS=True
 SMTP_PORT=587
-SMTP_HOST=smtp.gmail.com
-SMTP_USER=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
 
-# DSE Scraping
-DSE_BASE_URL=https://www.dsebd.org
-SCRAPING_INTERVAL=30
-MARKET_HOURS_START=10:00
-MARKET_HOURS_END=14:30
-
-# Payment (bKash)
-BKASH_APP_KEY=your-bkash-app-key
-BKASH_APP_SECRET=your-bkash-app-secret
-BKASH_USERNAME=your-bkash-username
-BKASH_PASSWORD=your-bkash-password
+# PostgreSQL
+POSTGRES_SERVER=your-db-host
+POSTGRES_PORT=5432
+POSTGRES_DB=app
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your-db-password
 ```
 
-#### Frontend (.env)
-```env
-VITE_API_URL=http://localhost:8000
-VITE_WS_URL=ws://localhost:8000/ws
-VITE_TRADINGVIEW_WIDGET_URL=https://s3.tradingview.com/tv.js
-```
+See `.env.example` for the full list of available variables.
 
 ## 📈 API Endpoints
 
