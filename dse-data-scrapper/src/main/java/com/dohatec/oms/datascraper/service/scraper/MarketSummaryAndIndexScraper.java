@@ -5,10 +5,12 @@ import com.dohatec.oms.datascraper.dto.MarketTotals;
 import com.dohatec.oms.datascraper.exception.NetworkException;
 import com.dohatec.oms.datascraper.model.Benchmark;
 import com.dohatec.oms.datascraper.model.BenchmarkData;
+import com.dohatec.oms.datascraper.model.BenchmarkTick;
 import com.dohatec.oms.datascraper.model.MarketSummary;
 import com.dohatec.oms.datascraper.model.ScraperLog;
 import com.dohatec.oms.datascraper.repository.BenchmarkDataRepository;
 import com.dohatec.oms.datascraper.repository.BenchmarkRepository;
+import com.dohatec.oms.datascraper.repository.BenchmarkTickRepository;
 import com.dohatec.oms.datascraper.repository.MarketSummaryRepository;
 import com.dohatec.oms.datascraper.service.ScraperLogService;
 import com.dohatec.oms.datascraper.util.HtmlParserUtil;
@@ -53,6 +55,7 @@ public class MarketSummaryAndIndexScraper {
     private final MarketSummaryRepository marketSummaryRepository;
     private final BenchmarkRepository benchmarkRepository;
     private final BenchmarkDataRepository benchmarkDataRepository;
+    private final BenchmarkTickRepository benchmarkTickRepository;
     private final ScraperLogService scraperLogService;
 
     /**
@@ -85,6 +88,23 @@ public class MarketSummaryAndIndexScraper {
             // Store individual index data in benchmark_data table
             int indexSuccessCount = persistIndexSnapshots(indexSnapshots, marketDate, nowOffset);
             log.info("Successfully saved {} index snapshots", indexSuccessCount);
+
+            // Store tick data for indices
+            for (IndexSnapshot snapshot : indexSnapshots) {
+                try {
+                    BenchmarkTick tick = BenchmarkTick.builder()
+                            .benchmarkId(snapshot.metadata().getId())
+                            .tickTime(nowOffset)
+                            .value(snapshot.value())
+                            .volumeDelta(0L) // TODO: Calculate delta if needed, for now 0 or raw volume
+                            .turnoverDelta(BigDecimal.ZERO)
+                            .createdAt(nowOffset)
+                            .build();
+                    benchmarkTickRepository.save(tick);
+                } catch (Exception e) {
+                    log.error("Failed to save tick for index {}", snapshot.metadata().getId(), e);
+                }
+            }
 
             scraperLogService.completeLog(scraperLog, "SUCCESS", 1 + indexSuccessCount, 0);
             log.info("Market summary and index scraping completed successfully");

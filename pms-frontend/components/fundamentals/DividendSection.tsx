@@ -42,10 +42,13 @@ export function DividendSection({
                             <Tooltip
                                 cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                                 contentStyle={{
-                                    backgroundColor: '#030213',
+                                    backgroundColor: '#0f172a',
                                     border: '1px solid rgba(255,255,255,0.1)',
-                                    borderRadius: '8px'
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                                 }}
+                                itemStyle={{ color: '#e2e8f0' }}
+                                labelStyle={{ color: '#94a3b8' }}
                             />
                             <Bar dataKey="amount" fill="#eab308" radius={[4, 4, 0, 0]} />
                         </BarChart>

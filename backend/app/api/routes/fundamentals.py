@@ -21,7 +21,8 @@ from app.model.fundamental_schemas import (
     HistoricalRatios,
     CompanyComparison,
     CompanySearchResult,
-    FundamentalDataAvailability
+    FundamentalDataAvailability,
+    ComprehensiveStockDetails
 )
 from app.services.base import ServiceException
 from app.services.fundamental_service import FundamentalAnalysisService
@@ -372,5 +373,37 @@ def check_data_availability(
     """
     try:
         return service.check_data_availability(trading_code)
+    except ServiceException as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e))
+
+
+# ============================================================================
+# API 10: Comprehensive Stock Details
+# ============================================================================
+@router.get(
+    "/comprehensive/{trading_code}",
+    response_model=ComprehensiveStockDetails,
+    summary="Get Comprehensive Stock Details",
+    description="Get all detailed information needed for the Stock Details page"
+)
+def get_comprehensive_stock_details(
+        trading_code: str,
+        current_user: CurrentUser,
+        service: FundamentalAnalysisService = Depends(get_fundamental_service)
+) -> ComprehensiveStockDetails:
+    """
+    Get comprehensive stock details including:
+    - Basic Info
+    - Valuations & Financials
+    - Ratios
+    - Cash & Health (aggregated)
+    - Growth & NAV trends
+    - Dividend History
+    - Shareholding Pattern
+    - Peers
+    - Risks
+    """
+    try:
+        return service.get_comprehensive_stock_details(trading_code)
     except ServiceException as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
