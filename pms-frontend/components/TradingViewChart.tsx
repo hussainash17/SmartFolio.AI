@@ -231,6 +231,22 @@ export const TradingViewChart = memo(forwardRef<TradingViewChartRef, TradingView
         // Create base UDF datafeed
         const baseDatafeed = new window.Datafeeds.UDFCompatibleDatafeed(datafeedUrl);
 
+        // Patch the UDF datafeed's internal configuration promise to immediately resolve
+        // with the correct config. This prevents a race condition where the UDF bundle's
+        // default config (supports_group_request: true) causes it to create SymbolsStorage,
+        // which fires off bulk symbol_info requests for NYSE/FOREX/AMEX exchanges that
+        // don't exist on this backend.
+        const correctConfig = {
+          supported_resolutions: ['1D', '1W', '1M'],
+          supports_group_request: false,
+          supports_search: true,
+          supports_marks: false,
+          supports_timescale_marks: false,
+        };
+        (baseDatafeed as any)._configurationReadyPromise = Promise.resolve().then(() => {
+          (baseDatafeed as any)._configuration = correctConfig;
+        });
+
         // Create caching wrapper that properly proxies all methods
         const cache = new Map<string, any>();
         const pendingRequests = new Map<string, Promise<any>>();
@@ -332,11 +348,7 @@ export const TradingViewChart = memo(forwardRef<TradingViewChartRef, TradingView
           datafeed: baseDatafeed,
           library_path: '/charting_library/',
           locale: 'en',
-          enabled_features: ['study_templates', 'move_logo_to_main_pane'],
-          charts_storage_url: 'https://saveload.tradingview.com',
-          charts_storage_api_version: '1.1',
-          client_id: 'tradingview.com',
-          user_id: 'public_user_id',
+          enabled_features: ['move_logo_to_main_pane'],
           time_frames: [
             { text: '1d', resolution: '1D', description: '1 Day', title: '1D' },
             { text: '5d', resolution: '1D', description: '5 Days', title: '5D' },

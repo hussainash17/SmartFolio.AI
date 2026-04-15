@@ -101,6 +101,8 @@ export default function App() {
     // App state
     const [currentView, setCurrentView] = useState<View>("dashboard");
     const [isPortfolioFormOpen, setIsPortfolioFormOpen] = useState(false);
+    const [stockFormMode, setStockFormMode] = useState<"add" | "edit" | "buy" | "sell">("add");
+    const [targetPortfolioId, setTargetPortfolioId] = useState<string | undefined>(undefined);
     const [isStockFormOpen, setIsStockFormOpen] = useState(false);
     const [isUploadPortfolioOpen, setIsUploadPortfolioOpen] = useState(false);
     const [isQuickTradeOpen, setIsQuickTradeOpen] = useState(false);
@@ -324,22 +326,32 @@ export default function App() {
 
     const handleAddStock = () => {
         setEditingStock(null);
+        setStockFormMode('add');
         setIsStockFormOpen(true);
     };
 
     const handleEditStock = (stock: Stock) => {
         setEditingStock(stock);
+        setStockFormMode('edit');
         setIsStockFormOpen(true);
     };
 
-    const handleStockSubmit = (stockData: Omit<Stock, "id">) => {
+    const handleTradeStock = (stock: Stock, mode: 'buy' | 'sell', portfolioId?: string) => {
+        setEditingStock(stock);
+        setStockFormMode(mode);
+        // If portfolioId is provided, use it. Otherwise undefined (StockForm will ask if needed).
+        setTargetPortfolioId(portfolioId);
+        setIsStockFormOpen(true);
+    };
+
+    const handleStockSubmit = async (stockData: Omit<Stock, "id">) => {
         if (!selectedPortfolio) return;
 
         if (editingStock) {
-            updateStock(selectedPortfolio.id, editingStock.id, stockData);
+            await updateStock(selectedPortfolio.id, editingStock.id, stockData);
             toast.success("Stock position updated successfully!");
         } else {
-            addStock(selectedPortfolio.id, stockData);
+            await addStock(selectedPortfolio.id, stockData);
             toast.success("Stock position added successfully!");
         }
     };
@@ -423,7 +435,17 @@ export default function App() {
                             onCreatePortfolio={handleCreatePortfolio}
                             onUploadPortfolio={() => setIsUploadPortfolioOpen(true)}
                             onSelectPortfolio={handleSelectPortfolio}
-                            onQuickTrade={handleQuickTrade}
+                            onQuickTrade={(symbol, side) => {
+                                handleTradeStock({
+                                    symbol: symbol || '',
+                                    companyName: '',
+                                    quantity: 0,
+                                    purchasePrice: 0,
+                                    currentPrice: 0,
+                                    purchaseDate: ''
+                                } as Stock, side || 'buy', selectedPortfolioDisplay?.id);
+                            }}
+                            onTradeStock={handleTradeStock}
                             onChartStock={handleChartStock}
                             portfolios={portfoliosWithLivePricing}
                             portfolioSummary={portfolioSummaryDisplay}
@@ -444,6 +466,7 @@ export default function App() {
                             onQuickTrade={handleQuickTrade}
                             onChartStock={handleChartStock}
                             marketData={marketData}
+                            onTradeStock={handleTradeStock}
                         />
                     </Suspense>
                 ) : null;
@@ -521,7 +544,16 @@ export default function App() {
                 return (
                     <Suspense fallback={<div>Loading Stock Screener...</div>}>
                         <StockScreener
-                            onQuickTrade={handleQuickTrade}
+                            onQuickTrade={(symbol, side) => {
+                                handleTradeStock({
+                                    symbol: symbol || '',
+                                    companyName: '',
+                                    quantity: 0,
+                                    purchasePrice: 0,
+                                    currentPrice: 0,
+                                    purchaseDate: ''
+                                } as Stock, side || 'buy'); // No portfolio ID passed, StockForm will ask
+                            }}
                             onChartStock={handleChartStock}
                             onAddToWatchlist={addToWatchlist}
                         />
@@ -784,6 +816,8 @@ export default function App() {
                     onSubmit={handleStockSubmit}
                     initialData={editingStock || undefined}
                     availableStocks={marketData}
+                    mode={stockFormMode}
+                    portfolioId={selectedPortfolio?.id}
                 />
             </Suspense>
 

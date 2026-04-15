@@ -27,6 +27,7 @@ interface PortfolioDetailProps {
   onQuickTrade: (symbol?: string, side?: 'buy' | 'sell') => void;
   onChartStock: (symbol: string) => void;
   marketData?: MarketData[];
+  onTradeStock: (stock: Stock, mode: 'buy' | 'sell') => void;
 }
 
 export function PortfolioDetail({
@@ -37,6 +38,7 @@ export function PortfolioDetail({
   onDeleteStock,
   onQuickTrade,
   onChartStock,
+  onTradeStock,
   marketData = []
 }: PortfolioDetailProps) {
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
@@ -223,10 +225,6 @@ export function PortfolioDetail({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => setIsUploadDialogOpen(true)} className="gap-2">
-            <Upload className="h-4 w-4" />
-            Upload Portfolio
-          </Button>
           <Button onClick={onAddStock} className="gap-2">
             <Plus className="h-4 w-4" />
             Add Stock
@@ -328,16 +326,7 @@ export function PortfolioDetail({
                       className="pl-9 w-[200px]"
                     />
                   </div>
-                  <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue placeholder="Period" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="5">5-day</SelectItem>
-                      <SelectItem value="10">10-day</SelectItem>
-                      <SelectItem value="20">20-day</SelectItem>
-                    </SelectContent>
-                  </Select>
+
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="show-negative"
@@ -364,7 +353,21 @@ export function PortfolioDetail({
                       <th className="pb-3 text-right pr-4 font-medium">Avg Cost</th>
                       <th className="pb-3 text-right pr-4 font-medium">Purchase Price</th>
                       <th className="pb-3 text-right pr-4 font-medium">Current Price</th>
-                      <th className="pb-3 text-right pr-2 font-medium">S/R</th>
+                      <th className="pb-3 text-right pr-2 font-medium whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
+                          <span>S/R</span>
+                          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                            <SelectTrigger className="h-6 w-[80px] text-xs px-1 py-0 border-none bg-transparent hover:bg-muted focus:ring-0">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="5">5-day</SelectItem>
+                              <SelectItem value="10">10-day</SelectItem>
+                              <SelectItem value="20">20-day</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </th>
                       <th className="pb-3 text-right pr-4 font-medium">Market Value</th>
                       <th className="pb-3 text-right pr-4 font-medium">Unrealized</th>
                       <th className="pb-3 text-center font-medium">Actions</th>
@@ -451,25 +454,20 @@ export function PortfolioDetail({
                                   <Target className="h-4 w-4" />
                                 </Button>
                                 <div className="w-px h-4 bg-border mx-1" />
-                                {/* todo  remove this button and then replace
-                                this with the Add Stock modal , but during loading the add stock modal
-                                use the selected stock symbol */}
                                 <Button
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
-                                  onClick={() => onQuickTrade(stock.symbol, 'buy')}
+                                  onClick={() => onTradeStock(stock, 'buy')}
                                   title="Buy / Add"
                                 >
                                   <Plus className="h-4 w-4" />
                                 </Button>
-                                {/* todo  remove this button and then replace
-                                this with the Add Stock modal with the selected stock symbol */}
                                 <Button
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                  onClick={() => onQuickTrade(stock.symbol, 'sell')}
+                                  onClick={() => onTradeStock(stock, 'sell')}
                                   title="Sell / Reduce"
                                 >
                                   <Minus className="h-4 w-4" />

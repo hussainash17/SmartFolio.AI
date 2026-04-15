@@ -63,13 +63,13 @@ export function useTrading() {
         high52Week: 0,
         low52Week: 0,
         marketCap: (() => {
-            const lastPrice = Number(it.ltp || it.last || 0);
-            const totalSecurities = Number(it.total_outstanding_securities || 0);
-            // Calculate market cap: last_trade_price × total_outstanding_securities (in crores)
-            // 1 crore = 10,000,000
-            return lastPrice > 0 && totalSecurities > 0 
-                ? (lastPrice * totalSecurities) / 10_000_000 
-                : Number(it.market_cap || 0);
+          const lastPrice = Number(it.ltp || it.last || 0);
+          const totalSecurities = Number(it.total_outstanding_securities || 0);
+          // Calculate market cap: last_trade_price × total_outstanding_securities (in crores)
+          // 1 crore = 10,000,000
+          return lastPrice > 0 && totalSecurities > 0
+            ? (lastPrice * totalSecurities) / 10_000_000
+            : Number(it.market_cap || 0);
         })(),
         peRatio: undefined,
         dividend: undefined,
@@ -293,7 +293,8 @@ export function useTrading() {
           validity: (orderData.timeInForce || 'day').toUpperCase() as any,
           notes: undefined,
           is_simulated: true,
-        },
+          filled_at: orderData.fillDate || undefined,
+        } as any,
       });
       return created;
     },
@@ -301,6 +302,7 @@ export function useTrading() {
       queryClient.invalidateQueries({ queryKey: queryKeys.ordersList });
       // Invalidate all recent trades queries (regardless of limit)
       queryClient.invalidateQueries({ queryKey: ['trades', 'recent'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary });
       queryClient.invalidateQueries({ queryKey: queryKeys.fundsSummary });
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions });
@@ -456,16 +458,18 @@ export function useTrading() {
   };
 
   const createAlert = async (payload: { stock_id?: string; alert_type: string; condition: string; target_value: number; notification_method?: string; is_recurring?: boolean; frequency?: string | null; notes?: string | null; }) => {
-    const created = await AlertsService.createAlert({ requestBody: {
-      stock_id: payload.stock_id,
-      alert_type: payload.alert_type,
-      condition: payload.condition,
-      target_value: payload.target_value as unknown as any,
-      notification_method: payload.notification_method || 'in_app',
-      is_recurring: payload.is_recurring || false,
-      frequency: payload.frequency || null,
-      notes: payload.notes || null,
-    }});
+    const created = await AlertsService.createAlert({
+      requestBody: {
+        stock_id: payload.stock_id,
+        alert_type: payload.alert_type,
+        condition: payload.condition,
+        target_value: payload.target_value as unknown as any,
+        notification_method: payload.notification_method || 'in_app',
+        is_recurring: payload.is_recurring || false,
+        frequency: payload.frequency || null,
+        notes: payload.notes || null,
+      }
+    });
     return created;
   };
 

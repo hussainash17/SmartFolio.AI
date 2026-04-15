@@ -3,8 +3,8 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { BarChart3, DollarSign, Plus, ShoppingCart, TrendingDown, TrendingUp, Upload } from "lucide-react";
-import { Portfolio, PortfolioSummary } from "../types/portfolio";
+import { BarChart3, DollarSign, Plus, ShoppingCart, TrendingDown, TrendingUp, Upload, Minus } from "lucide-react";
+import { Portfolio, PortfolioSummary, Stock } from "../types/portfolio";
 import { useEffect, useState, useMemo } from "react";
 import { OpenAPI } from "../src/client";
 import { formatCurrency, formatPercent } from "../lib/utils";
@@ -16,6 +16,7 @@ interface PortfolioDashboardProps {
     onSelectPortfolio: (portfolio: Portfolio) => void;
     onQuickTrade: (symbol?: string, side?: 'buy' | 'sell') => void;
     onChartStock: (symbol: string) => void;
+    onTradeStock: (stock: Stock, mode: 'buy' | 'sell', portfolioId?: string) => void;
     portfolios: Portfolio[];
     portfolioSummary: PortfolioSummary;
     selectedPortfolio?: Portfolio | null;
@@ -27,6 +28,7 @@ export function PortfolioDashboard({
     onSelectPortfolio,
     onQuickTrade,
     onChartStock,
+    onTradeStock,
     portfolios,
     portfolioSummary,
     selectedPortfolio
@@ -192,7 +194,12 @@ export function PortfolioDashboard({
                     const gainLoss = portfolio.totalValue - portfolio.totalCost - portfolio.cash;
                     const gainLossPercent = portfolio.totalCost > 0 ? (gainLoss / portfolio.totalCost) * 100 : 0;
                     return (
-                        <Card key={portfolio.id} className="cursor-pointer hover:shadow-md transition-shadow"
+                        <Card
+                            key={portfolio.id}
+                            className={`cursor-pointer hover:shadow-md transition-shadow ${selectedPortfolio?.id === portfolio.id
+                                ? 'border-primary ring-1 ring-primary shadow-md'
+                                : ''
+                                }`}
                             onClick={() => onSelectPortfolio(portfolio)}>
                             <CardHeader>
                                 <div className="flex justify-between items-start">
@@ -240,20 +247,11 @@ export function PortfolioDashboard({
                             <div>
                                 <CardTitle>Selected Portfolio Holdings</CardTitle>
                                 <p className="text-sm text-muted-foreground mt-1">
-                                    Showing stocks from: {portfolioForSummary.name}
+                                    Showing stocks from: <span className="font-bold text-primary">{portfolioForSummary.name}</span>
                                 </p>
                             </div>
                             <div className="flex items-center gap-3">
-                                <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                                    <SelectTrigger className="w-[140px]">
-                                        <SelectValue placeholder="Period" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="5">5-day</SelectItem>
-                                        <SelectItem value="10">10-day</SelectItem>
-                                        <SelectItem value="20">20-day</SelectItem>
-                                    </SelectContent>
-                                </Select>
+
                                 <Button variant="outline" onClick={() => onSelectPortfolio(portfolioForSummary)}>
                                     View Full Details
                                 </Button>
@@ -269,7 +267,21 @@ export function PortfolioDashboard({
                                     <TableHead className="text-right">Quantity</TableHead>
                                     <TableHead className="text-right">Avg Cost</TableHead>
                                     <TableHead className="text-right">Current Price</TableHead>
-                                    <TableHead className="text-right">S/R</TableHead>
+                                    <TableHead className="text-right whitespace-nowrap">
+                                        <div className="flex items-center justify-end gap-1">
+                                            <span>S/R</span>
+                                            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                                                <SelectTrigger className="h-6 w-[80px] text-xs px-1 py-0 border-none bg-transparent hover:bg-muted focus:ring-0">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="5">5-day</SelectItem>
+                                                    <SelectItem value="10">10-day</SelectItem>
+                                                    <SelectItem value="20">20-day</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </TableHead>
                                     <TableHead className="text-right">Market Value</TableHead>
                                     <TableHead className="text-right">Gain/Loss</TableHead>
                                     <TableHead className="text-right">%</TableHead>
@@ -365,11 +377,24 @@ export function PortfolioDashboard({
                                                         size="sm"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            onQuickTrade(stock.symbol);
+                                                            onTradeStock(stock, 'buy', selectedPortfolio?.id);
                                                         }}
-                                                        className="h-8 w-8 p-0"
+                                                        className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                                        title="Buy More"
                                                     >
-                                                        <ShoppingCart className="h-3 w-3" />
+                                                        <Plus className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onTradeStock(stock, 'sell', selectedPortfolio?.id);
+                                                        }}
+                                                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                        title="Sell/Reduce"
+                                                    >
+                                                        <Minus className="h-4 w-4" />
                                                     </Button>
                                                 </div>
                                             </TableCell>
