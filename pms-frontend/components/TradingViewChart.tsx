@@ -1,6 +1,7 @@
 import { useEffect, useRef, memo, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { useTradingViewQuote } from '../hooks/useTradingViewQuote';
 import { useTradingViewPositions, TradingViewPosition } from '../hooks/useTradingViewPositions';
+import { OpenAPI } from '../src/client';
 
 interface TradingViewChartProps {
   symbol?: string;
@@ -153,9 +154,10 @@ export const TradingViewChart = memo(forwardRef<TradingViewChartRef, TradingView
 
       setIsLoadingDefault(true);
       try {
-        const apiUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
+        const apiUrl = OpenAPI.BASE;
         // Try to get first stock from market/stocks endpoint
         const response = await fetch(`${apiUrl}/api/v1/market/stocks?limit=1`);
+        console.log(response)
         if (response.ok) {
           const data = await response.json();
           if (data && data.length > 0 && data[0].symbol) {
@@ -163,6 +165,7 @@ export const TradingViewChart = memo(forwardRef<TradingViewChartRef, TradingView
           } else {
             // Try tradingview symbols endpoint as fallback
             const tvResponse = await fetch(`${apiUrl}/api/v1/tradingview/symbols?limit=1`);
+            console.log(tvResponse)
             if (tvResponse.ok) {
               const tvData = await tvResponse.json();
               if (tvData && tvData.length > 0 && tvData[0].symbol) {
@@ -222,10 +225,9 @@ export const TradingViewChart = memo(forwardRef<TradingViewChartRef, TradingView
         widgetRef.current = null;
       }
 
-      // Initialize the TradingView widget
       try {
-        // Get API URL from environment or use default
-        const apiUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
+        // Get API URL from OpenAPI configuration
+        const apiUrl = OpenAPI.BASE;
         const datafeedUrl = `${apiUrl}/api/v1/tradingview`;
 
         // Create base UDF datafeed
